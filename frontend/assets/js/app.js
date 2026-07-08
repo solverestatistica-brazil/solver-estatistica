@@ -7,6 +7,7 @@
   let currentHeaders = ['bloco', 'tratamento', 'valor'];
   let regressionChart = null;
   let uploadedRows = [];
+  let experimentType = 'DBC';
 
   const unlockedSteps = new Set(['modelo', 'dados']);
   let currentStep = 'modelo';
@@ -17,7 +18,8 @@
     bindViewSwitch();
     bindStepper();
     bindActions();
-    updateFieldVisibility();
+    bindTypeGrid();
+    selectExperimentType('DBC');
     testApi(false);
     if (window.location.hash === '#analisar') showApp();
   }
@@ -102,7 +104,6 @@
       selectDataMode('manual');
       generateManualTable();
     });
-    $('generateTable').addEventListener('click', generateManualTable);
     $('addRow').addEventListener('click', addEmptyRow);
     $('clearRows').addEventListener('click', () => renderEditableTable(currentHeaders, []));
     $('loadExample').addEventListener('click', loadExampleData);
@@ -116,18 +117,74 @@
 
     $('switchToRegression').addEventListener('click', () => {
       const col = $('doseAdvisory').dataset.column || '';
-      $('analysisType').value = 'regression';
+      selectExperimentType('regression');
       if (col) $('numericFactorColumn').value = col;
-      updateFieldVisibility();
       goToStep('modelo');
       notify('Tipo de analise alterado para Regressao direta. Confira os campos e rode novamente.', 'success');
     });
 
-    ['design', 'analysisType'].forEach((id) => $(id).addEventListener('change', () => {
-      updateFieldVisibility();
-      hideColumnMapping();
-      if (!$('dataManualPanel').classList.contains('hidden')) generateManualTable();
-    }));
+    $('baseDesign').addEventListener('change', () => {
+      selectExperimentType(experimentType);
+    });
+  }
+
+  function bindTypeGrid() {
+    document.querySelectorAll('.type-card').forEach((btn) => {
+      btn.addEventListener('click', () => selectExperimentType(btn.dataset.type));
+    });
+  }
+
+  function selectExperimentType(type) {
+    experimentType = type;
+    document.querySelectorAll('.type-card').forEach((btn) => {
+      btn.classList.toggle('selected', btn.dataset.type === type);
+    });
+
+    const needsBase = type === 'factorial' || type === 'split_plot';
+    $('baseDesignWrap').style.display = needsBase ? 'block' : 'none';
+    const base = $('baseDesign').value || 'DBC';
+
+    let design, analysisType;
+    switch (type) {
+      case 'DIC': design = 'DIC'; analysisType = 'single'; break;
+      case 'DBC': design = 'DBC'; analysisType = 'single'; break;
+      case 'DQL': design = 'DQL'; analysisType = 'single'; break;
+      case 'factorial': design = base; analysisType = 'factorial'; break;
+      case 'split_plot': design = base; analysisType = 'split_plot'; break;
+      case 'regression': design = 'DIC'; analysisType = 'regression'; break;
+      default: design = 'DBC'; analysisType = 'single';
+    }
+    $('design').value = design;
+    $('analysisType').value = analysisType;
+
+    applyDefaultColumnNames();
+    updateFieldVisibility();
+    updateManualFieldsUI();
+    hideColumnMapping();
+    if (!$('dataManualPanel').classList.contains('hidden')) generateManualTable();
+  }
+
+  function applyDefaultColumnNames() {
+    $('responseColumn').value = $('responseColumn').value.trim() || 'valor';
+    if (experimentType === 'regression') {
+      $('numericFactorColumn').value = $('numericFactorColumn').value.trim() || 'dose';
+      $('treatmentColumn').value = 'tratamento';
+    } else if (experimentType === 'factorial') {
+      $('treatmentColumn').value = 'tratamento';
+      $('blockColumn').value = $('blockColumn').value.trim() || 'bloco';
+      const current = splitColumns($('factorColumns').value);
+      $('factorColumns').value = current.length === 2 ? current.join(',') : 'fator_a,fator_b';
+    } else if (experimentType === 'split_plot') {
+      $('treatmentColumn').value = 'tratamento';
+      $('blockColumn').value = $('blockColumn').value.trim() || 'bloco';
+      const current = splitColumns($('factorColumns').value);
+      $('factorColumns').value = current.length === 2 ? current.join(',') : 'fator_parcela,fator_subparcela';
+    } else {
+      $('treatmentColumn').value = $('treatmentColumn').value.trim() || 'tratamento';
+      $('blockColumn').value = $('blockColumn').value.trim() || 'bloco';
+      $('rowColumn').value = $('rowColumn').value.trim() || 'linha';
+      $('columnColumn').value = $('columnColumn').value.trim() || 'coluna';
+    }
   }
 
   function selectDataMode(mode) {
@@ -143,6 +200,103 @@
       uploadedRows = [];
       $('rowCount').textContent = 'Nenhum arquivo carregado.';
     }
+  }
+
+  // --- Campos numericos contextuais (modo manual) ---
+
+  function numberField(id, label, value) {
+    const wrap = document.createElement('label');
+    const span = document.createElement('span');
+    span.textContent = label;
+    wrap.appendChild(span);
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.min = '1';
+    input.id = id;
+    input.value = value;
+    input.addEventListener('input', updateMatrixSizeNote);
+    wrap.appendChild(input);
+    return wrap;
+  }
+
+  function updateManualFieldsUI() {
+    const box = $('manualFieldsDynamic');
+    if (!box) return;
+    box.innerHTML = '';
+    const type = experimentType;
+    const base = $('baseDesign').value || 'DBC';
+    const grid = document.createElement('div');
+    grid.className = 'manual-builder';
+
+    if (type === 'DIC') {
+      grid.appendChild(numberField('nTreatments', 'Nº de tratamentos', 4));
+      grid.appendChild(numberField('nReps', 'Nº de repetições', 4));
+    } else if (type === 'DBC') {
+      grid.appendChild(numberField('nTreatments', 'Nº de tratamentos', 4));
+      grid.appendChild(numberField('nBlocks', 'Nº de blocos', 4));
+    } else if (type === 'DQL') {
+      grid.appendChild(numberField('nTreatments', 'Nº de tratamentos (= linhas = colunas)', 4));
+    } else if (type === 'factorial') {
+      grid.appendChild(numberField('nFactorA', 'Níveis do Fator A', 2));
+      grid.appendChild(numberField('nFactorB', 'Níveis do Fator B', 2));
+      grid.appendChild(numberField('nBlocks', base === 'DBC' ? 'Nº de blocos' : 'Nº de repetições', 4));
+    } else if (type === 'split_plot') {
+      grid.appendChild(numberField('nFactorA', 'Níveis do fator parcela', 2));
+      grid.appendChild(numberField('nFactorB', 'Níveis do fator subparcela', 2));
+      grid.appendChild(numberField('nBlocks', 'Nº de blocos', 4));
+    } else if (type === 'regression') {
+      grid.appendChild(numberField('nTreatments', 'Nº de doses/níveis', 5));
+      grid.appendChild(numberField('nBlocks', 'Repetições por dose', 4));
+    }
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn solid';
+    btn.id = 'generateTable';
+    btn.textContent = 'Gerar tabela manual';
+    btn.addEventListener('click', generateManualTable);
+    grid.appendChild(btn);
+
+    box.appendChild(grid);
+    const note = document.createElement('p');
+    note.className = 'small-note';
+    note.id = 'matrixSizeNote';
+    box.appendChild(note);
+    updateMatrixSizeNote();
+  }
+
+  function numVal(id, fallback) {
+    const el = $(id);
+    if (!el) return fallback;
+    return Number(el.value || fallback);
+  }
+
+  function updateMatrixSizeNote() {
+    const note = $('matrixSizeNote');
+    if (!note) return;
+    const type = experimentType;
+    const base = $('baseDesign').value || 'DBC';
+    let text = '';
+    if (type === 'DIC') {
+      const t = numVal('nTreatments', 4), r = numVal('nReps', 4);
+      text = `${t} tratamentos × ${r} repetições = ${t * r} linhas na matriz.`;
+    } else if (type === 'DBC') {
+      const t = numVal('nTreatments', 4), b = numVal('nBlocks', 4);
+      text = `${t} tratamentos × ${b} blocos = ${t * b} linhas na matriz.`;
+    } else if (type === 'DQL') {
+      const t = numVal('nTreatments', 4);
+      text = `${t} × ${t} = ${t * t} linhas (linhas × colunas × 1 tratamento por célula).`;
+    } else if (type === 'factorial') {
+      const a = numVal('nFactorA', 2), b = numVal('nFactorB', 2), r = numVal('nBlocks', 4);
+      text = `${a} × ${b} × ${r} (fator A × fator B × ${base === 'DBC' ? 'blocos' : 'repetições'}) = ${a * b * r} linhas.`;
+    } else if (type === 'split_plot') {
+      const p = numVal('nFactorA', 2), s = numVal('nFactorB', 2), r = numVal('nBlocks', 4);
+      text = `${p} × ${s} × ${r} (parcela × subparcela × blocos) = ${p * s * r} linhas.`;
+    } else if (type === 'regression') {
+      const d = numVal('nTreatments', 5), r = numVal('nBlocks', 4);
+      text = `${d} doses × ${r} repetições = ${d * r} linhas.`;
+    }
+    note.textContent = text;
   }
 
   function expectedColumnNames() {
@@ -299,7 +453,6 @@
     const isRegression = type === 'regression';
 
     const rules = {
-      design: !isRegression,
       treatmentColumn: !isRegression,
       blockColumn: !isRegression && design === 'DBC',
       rowColumn: !isRegression && design === 'DQL',
@@ -364,10 +517,10 @@
   function generateManualTable() {
     uploadedRows = [];
     hideColumnMapping();
-    const design = $('design').value;
-    const analysisType = $('analysisType').value;
-    const nTreatments = Number($('nTreatments').value || 4);
-    const nBlocks = Number($('nBlocks').value || 4);
+    applyDefaultColumnNames();
+
+    const type = experimentType;
+    const base = $('baseDesign').value || 'DBC';
     const response = $('responseColumn').value || 'valor';
     const treatment = $('treatmentColumn').value || 'tratamento';
     const block = $('blockColumn').value || 'bloco';
@@ -376,58 +529,92 @@
     const numeric = $('numericFactorColumn').value.trim();
     const factors = splitColumns($('factorColumns').value);
 
-    const headers = [];
-    if (design === 'DBC') headers.push(block);
-    if (design === 'DQL') headers.push(row, col);
-    if (analysisType === 'factorial' || analysisType === 'split_plot') headers.push(...factors.filter(Boolean));
-    if (analysisType === 'regression' && numeric) headers.push(numeric);
-    if (analysisType !== 'regression') headers.push(treatment);
-    if (!headers.includes(response)) headers.push(response);
-
+    let headers = [];
     const rows = [];
-    if (design === 'DQL') {
-      for (let r = 1; r <= nTreatments; r++) {
-        for (let c = 1; c <= nTreatments; c++) {
-          const treatmentIndex = ((r + c - 2) % nTreatments) + 1;
-          rows.push(Object.fromEntries(headers.map((h) => [h, ''])));
-          rows[rows.length - 1][row] = `L${r}`;
-          rows[rows.length - 1][col] = `C${c}`;
-          if (headers.includes(treatment)) rows[rows.length - 1][treatment] = `T${treatmentIndex}`;
+
+    if (type === 'DQL') {
+      const n = numVal('nTreatments', 4);
+      headers = unique([row, col, treatment, response]);
+      for (let r = 1; r <= n; r++) {
+        for (let c = 1; c <= n; c++) {
+          const idx = ((r + c - 2) % n) + 1;
+          rows.push({ [row]: `L${r}`, [col]: `C${c}`, [treatment]: `T${idx}`, [response]: '' });
         }
       }
-    } else if (analysisType === 'regression') {
-      for (let i = 0; i < nTreatments; i++) {
-        for (let rep = 1; rep <= nBlocks; rep++) {
-          const obj = Object.fromEntries(headers.map((h) => [h, '']));
-          if (numeric) obj[numeric] = i * 50;
+    } else if (type === 'regression') {
+      const nDoses = numVal('nTreatments', 5);
+      const nReps = numVal('nBlocks', 4);
+      const doseCol = numeric || 'dose';
+      headers = unique([doseCol, response]);
+      for (let i = 0; i < nDoses; i++) {
+        for (let rep = 1; rep <= nReps; rep++) {
+          rows.push({ [doseCol]: i * 50, [response]: '' });
+        }
+      }
+    } else if (type === 'factorial') {
+      const a = numVal('nFactorA', 2);
+      const b = numVal('nFactorB', 2);
+      const reps = numVal('nBlocks', 4);
+      const fa = factors[0] || 'fator_a';
+      const fb = factors[1] || 'fator_b';
+      headers = base === 'DBC' ? unique([block, fa, fb, treatment, response]) : unique([fa, fb, treatment, response]);
+      for (let r = 1; r <= reps; r++) {
+        for (let i = 1; i <= a; i++) {
+          for (let j = 1; j <= b; j++) {
+            const obj = {};
+            if (base === 'DBC') obj[block] = `B${r}`;
+            obj[fa] = `A${i}`;
+            obj[fb] = `B${j}`;
+            obj[treatment] = `A${i}B${j}`;
+            obj[response] = '';
+            rows.push(obj);
+          }
+        }
+      }
+    } else if (type === 'split_plot') {
+      const p = numVal('nFactorA', 2);
+      const s = numVal('nFactorB', 2);
+      const nBlk = numVal('nBlocks', 4);
+      const fp = factors[0] || 'fator_parcela';
+      const fs = factors[1] || 'fator_subparcela';
+      headers = unique([block, fp, fs, treatment, response]);
+      for (let r = 1; r <= nBlk; r++) {
+        for (let i = 1; i <= p; i++) {
+          for (let j = 1; j <= s; j++) {
+            rows.push({ [block]: `B${r}`, [fp]: `P${i}`, [fs]: `S${j}`, [treatment]: `P${i}S${j}`, [response]: '' });
+          }
+        }
+      }
+    } else {
+      // DIC ou DBC (fator unico)
+      const nT = numVal('nTreatments', 4);
+      const nRepOrBlock = numVal(type === 'DBC' ? 'nBlocks' : 'nReps', 4);
+      headers = type === 'DBC' ? unique([block, treatment, response]) : unique([treatment, response]);
+      for (let r = 1; r <= nRepOrBlock; r++) {
+        for (let t = 1; t <= nT; t++) {
+          const obj = {};
+          if (type === 'DBC') obj[block] = `B${r}`;
+          obj[treatment] = `T${t}`;
           obj[response] = '';
           rows.push(obj);
         }
       }
-    } else {
-      for (let b = 1; b <= nBlocks; b++) {
-        for (let t = 1; t <= nTreatments; t++) {
-          const obj = Object.fromEntries(headers.map((h) => [h, '']));
-          if (headers.includes(block)) obj[block] = `B${b}`;
-          if (headers.includes(treatment)) obj[treatment] = `T${t}`;
-          factors.forEach((f, idx) => {
-            if (headers.includes(f)) obj[f] = idx === 0 ? `F${t}` : `${t * 50}`;
-          });
-          rows.push(obj);
-        }
-      }
     }
-    renderEditableTable(unique(headers), rows);
+
+    renderEditableTable(headers, rows);
+    updateMatrixSizeNote();
   }
 
   function renderEditableTable(headers, rows) {
     currentHeaders = unique(headers);
+    const responseCol = $('responseColumn').value || 'valor';
     dataTable.innerHTML = '';
     const thead = document.createElement('thead');
     const trh = document.createElement('tr');
     currentHeaders.forEach((h) => {
       const th = document.createElement('th');
       th.textContent = h;
+      if (h === responseCol) th.classList.add('col-resp');
       trh.appendChild(th);
     });
     const actionTh = document.createElement('th');
@@ -446,9 +633,11 @@
   }
 
   function rowElement(row = {}) {
+    const responseCol = $('responseColumn').value || 'valor';
     const tr = document.createElement('tr');
     currentHeaders.forEach((h) => {
       const td = document.createElement('td');
+      if (h === responseCol) td.classList.add('col-resp');
       const input = document.createElement('input');
       input.value = row[h] ?? '';
       input.dataset.column = h;
@@ -619,9 +808,10 @@
     table.appendChild(tbody);
   }
 
-  function renderSimpleTable(id, columns, rows) {
-    const table = $(id);
+  function renderMeansTable(rows) {
+    const table = $('meansTable');
     table.innerHTML = '';
+    const columns = ['treatment', 'mean', 'n', 'sd', 'group'];
     const thead = document.createElement('thead');
     const trh = document.createElement('tr');
     columns.forEach((c) => {
@@ -629,10 +819,15 @@
       th.textContent = labelFor(c);
       trh.appendChild(th);
     });
+    const barTh = document.createElement('th');
+    barTh.textContent = 'Média (melhor → pior)';
+    trh.appendChild(barTh);
     thead.appendChild(trh);
     table.appendChild(thead);
+
     const tbody = document.createElement('tbody');
-    rows.forEach((row) => {
+    const n = rows.length;
+    rows.forEach((row, idx) => {
       const tr = document.createElement('tr');
       columns.forEach((c) => {
         const td = document.createElement('td');
@@ -645,6 +840,12 @@
         }
         tr.appendChild(td);
       });
+      const barTd = document.createElement('td');
+      const t = n > 1 ? 1 - idx / (n - 1) : 1;
+      const pct = Math.round(15 + t * 85);
+      const hue = Math.round(t * 120);
+      barTd.innerHTML = `<div class="mean-bar-wrap"><div class="mean-bar" style="width:${pct}%;background:hsl(${hue},65%,45%)"></div></div>`;
+      tr.appendChild(barTd);
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
@@ -773,7 +974,7 @@
       if (!res.ok) throw new Error(json.detail || 'Erro na comparacao');
       $('meansResultBox').classList.remove('hidden');
       $('meansFactorLabel').textContent = label ? `Medias e grupos - ${label}` : 'Medias e grupos';
-      renderSimpleTable('meansTable', ['treatment', 'mean', 'n', 'sd', 'group'], json?.means?.treatment_means || []);
+      renderMeansTable(json?.means?.treatment_means || []);
       setApiStatus('API online', 'ok');
     } catch (err) {
       setApiStatus('Erro na comparacao', 'err');
@@ -908,12 +1109,7 @@
   function loadExampleData() {
     uploadedRows = [];
     hideColumnMapping();
-    $('design').value = 'DBC';
-    $('analysisType').value = 'single';
-    $('responseColumn').value = 'valor';
-    $('treatmentColumn').value = 'tratamento';
-    $('blockColumn').value = 'bloco';
-    updateFieldVisibility();
+    selectExperimentType('DBC');
     const rows = [
       {bloco:'B1', tratamento:'T1', valor:58.2}, {bloco:'B1', tratamento:'T2', valor:61.4}, {bloco:'B1', tratamento:'T3', valor:66.8}, {bloco:'B1', tratamento:'T4', valor:64.7},
       {bloco:'B2', tratamento:'T1', valor:57.6}, {bloco:'B2', tratamento:'T2', valor:60.1}, {bloco:'B2', tratamento:'T3', valor:66.4}, {bloco:'B2', tratamento:'T4', valor:63.1},
