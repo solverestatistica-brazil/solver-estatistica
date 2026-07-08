@@ -456,6 +456,16 @@ def _assign_letters(order: List[str], nonsig_pairs: set[Tuple[str, str]]) -> Dic
 
 
 def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
+    """Ajusta a regressão polinomial (linear/quadrática/cúbica) sobre um fator numérico.
+
+    Importante: só faz sentido estimar "dose ótima" quando existe de fato uma
+    variável numérica contínua (dose, concentração, etc.). Antes, quando nenhuma
+    coluna numérica era informada, o código tentava extrair um número do rótulo
+    do próprio tratamento (ex.: "T1" -> 1, "T2" -> 2). Isso gerava regressões e
+    "doses ótimas" sem sentido estatístico em experimentos de fator único ou DBC
+    com tratamentos puramente categóricos (T1, T2, T3...). Agora esse fallback
+    só é usado quando o tipo de análise selecionado é explicitamente "regressão".
+    """
     p = ctx.payload
     response = ctx.response
     numeric_col = p.get("numeric_factor_column") or p.get("dose_column")
@@ -464,7 +474,9 @@ def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
     if numeric_col and numeric_col in df.columns:
         x = pd.to_numeric(df[numeric_col], errors="coerce")
         x_label = numeric_col
-    elif ctx.treatment in df.columns:
+    elif ctx.analysis_type == "regression" and ctx.treatment in df.columns:
+        # Fallback só vale no fluxo de regressão direta, onde o próprio
+        # "tratamento" pode ter sido preenchido com valores de dose em texto.
         x = _parse_numeric_from_text(df[ctx.treatment])
         x_label = ctx.treatment
     else:
@@ -591,11 +603,26 @@ def _regression_plot_base64(reg_df: pd.DataFrame, x_grid: np.ndarray, y_grid: np
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
+def _should_run_regression(ctx: AnalysisContext) -> bool:
+    """Decide se vale a pena tentar ajustar uma regressão.
+
+    Só roda automaticamente quando: o tipo de análise é "Regressão direta", ou
+    quando existe uma coluna numérica de fator/dose explicitamente informada
+    (por exemplo, num fatorial com um fator numérico de dose). Isso evita gerar
+    regressão e "dose ótima" para tratamentos puramente categóricos (T1, T2...)
+    em análises de fator único, fatorial sem dose ou parcelas subdivididas.
+    """
+    if ctx.analysis_type == "regression":
+        return True
+    numeric_col = ctx.payload.get("numeric_factor_column") or ctx.payload.get("dose_column")
+    return bool(numeric_col) and ctx.analysis_type in {"factorial", "split_plot"}
+
+
 def analyze(payload: Dict[str, Any]) -> Dict[str, Any]:
     ctx = _prepare_context(payload)
     anova = _anova(ctx)
     means = _means(ctx, anova)
-    regression = _regression(ctx) if ctx.analysis_type in {"regression", "single", "factorial"} else None
+    regression = _regression(ctx) if _should_run_regression(ctx) else None
     recommendations = _recommendations(ctx, anova, means, regression)
 
     result = {
