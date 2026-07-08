@@ -13,8 +13,50 @@
     apiInput.value = savedApi;
     bindTabs();
     bindActions();
+    bindViewSwitch();
     generateManualTable();
+    updateFieldVisibility();
     testApi(false);
+    // Link direto para a tela de análise (ex.: recarregar a página com #analisar).
+    if (window.location.hash === '#analisar') {
+      showApp();
+    }
+  }
+
+  /* --------------------------------------------------------------
+   * Navegação em duas etapas: tela inicial (site/marca) e tela de
+   * análise (ferramenta). Mantém tudo em uma página só para não
+   * complicar o deploy no GitHub Pages, mas evita mostrar a
+   * ferramenta completa antes do usuário pedir para começar.
+   * ------------------------------------------------------------ */
+  function bindViewSwitch() {
+    $('heroOpenApp').addEventListener('click', showApp);
+    $('navOpenApp').addEventListener('click', showApp);
+    $('navBackToSite').addEventListener('click', showLanding);
+    $('logoHome').addEventListener('click', (event) => {
+      if (!$('view-app').classList.contains('hidden')) {
+        event.preventDefault();
+        showLanding();
+      }
+    });
+  }
+
+  function showApp() {
+    $('view-landing').classList.add('hidden');
+    $('view-app').classList.remove('hidden');
+    $('navActionsLanding').classList.add('hidden');
+    $('navActionsApp').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    history.replaceState(null, '', '#analisar');
+  }
+
+  function showLanding() {
+    $('view-app').classList.add('hidden');
+    $('view-landing').classList.remove('hidden');
+    $('navActionsApp').classList.add('hidden');
+    $('navActionsLanding').classList.remove('hidden');
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    history.replaceState(null, '', '#top');
   }
 
   function bindTabs() {
@@ -43,7 +85,39 @@
     $('downloadExcel').addEventListener('click', () => downloadExport('/api/export/excel', 'solver-resultados.xlsx'));
     $('downloadPng').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png'));
     $('downloadPlotPdf').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf'));
-    ['design','analysisType'].forEach((id) => $(id).addEventListener('change', generateManualTable));
+    ['design', 'analysisType'].forEach((id) => $(id).addEventListener('change', () => {
+      generateManualTable();
+      updateFieldVisibility();
+    }));
+  }
+
+  /* --------------------------------------------------------------
+   * Esconde campos que não fazem sentido para a combinação atual de
+   * delineamento + tipo de análise, em vez de mostrar o formulário
+   * inteiro sempre (ex.: "coluna bloco" só importa em DBC, "grau de
+   * regressão" só importa quando o tipo de análise é "Regressão").
+   * ------------------------------------------------------------ */
+  function updateFieldVisibility() {
+    const design = $('design').value;
+    const type = $('analysisType').value;
+    const isRegression = type === 'regression';
+
+    const rules = {
+      design: !isRegression,
+      comparisonTest: !isRegression,
+      treatmentColumn: !isRegression,
+      blockColumn: !isRegression && design === 'DBC',
+      rowColumn: !isRegression && design === 'DQL',
+      columnColumn: !isRegression && design === 'DQL',
+      factorColumns: type === 'factorial' || type === 'split_plot',
+      numericFactorColumn: isRegression || type === 'factorial',
+      regressionDegree: isRegression,
+    };
+
+    Object.entries(rules).forEach(([field, visible]) => {
+      const el = document.querySelector(`[data-field="${field}"]`);
+      if (el) el.classList.toggle('field-hidden', !visible);
+    });
   }
 
   function cleanApiBase(value) {
@@ -442,6 +516,7 @@
     $('responseColumn').value = 'valor';
     $('treatmentColumn').value = 'tratamento';
     $('blockColumn').value = 'bloco';
+    updateFieldVisibility();
     const rows = [
       {bloco:'B1', tratamento:'T1', valor:58.2}, {bloco:'B1', tratamento:'T2', valor:61.4}, {bloco:'B1', tratamento:'T3', valor:66.8}, {bloco:'B1', tratamento:'T4', valor:64.7},
       {bloco:'B2', tratamento:'T1', valor:57.6}, {bloco:'B2', tratamento:'T2', valor:60.1}, {bloco:'B2', tratamento:'T3', valor:66.4}, {bloco:'B2', tratamento:'T4', valor:63.1},
