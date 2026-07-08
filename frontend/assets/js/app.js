@@ -125,6 +125,7 @@
 
     ['design', 'analysisType'].forEach((id) => $(id).addEventListener('change', () => {
       updateFieldVisibility();
+      hideColumnMapping();
       if (!$('dataManualPanel').classList.contains('hidden')) generateManualTable();
     }));
   }
@@ -135,6 +136,7 @@
     $('dataUploadPanel').classList.toggle('hidden', mode !== 'upload');
     $('dataManualPanel').classList.toggle('hidden', mode !== 'manual');
     $('dataErrorMsg').classList.add('hidden');
+    hideColumnMapping();
     if (mode === 'upload') {
       $('dataTableTools').style.display = 'none';
       $('dataTableWrap').style.display = 'none';
@@ -174,6 +176,121 @@
 
   function getActiveRows() {
     return uploadedRows.length ? uploadedRows : tableToRows();
+  }
+
+  // --- Mapeamento de colunas (upload com nomes de coluna diferentes do configurado) ---
+
+  function requiredColumnFields() {
+    const design = $('design').value;
+    const type = $('analysisType').value;
+    const isRegression = type === 'regression';
+    const fields = [];
+    fields.push({ id: 'responseColumn', label: 'Coluna resposta' });
+    if (!isRegression) fields.push({ id: 'treatmentColumn', label: 'Coluna tratamento' });
+    if (!isRegression && design === 'DBC') fields.push({ id: 'blockColumn', label: 'Coluna bloco' });
+    if (!isRegression && design === 'DQL') {
+      fields.push({ id: 'rowColumn', label: 'Coluna linha' });
+      fields.push({ id: 'columnColumn', label: 'Coluna coluna' });
+    }
+    if (isRegression) fields.push({ id: 'numericFactorColumn', label: 'Coluna dose / fator numerico' });
+    return fields;
+  }
+
+  function missingColumnFields(headers) {
+    const set = new Set(headers);
+    return requiredColumnFields().filter((f) => {
+      const configured = $(f.id).value.trim();
+      return !configured || !set.has(configured);
+    });
+  }
+
+  function hideColumnMapping() {
+    const box = $('columnMapping');
+    if (!box) return;
+    box.classList.add('hidden');
+    box.innerHTML = '';
+  }
+
+  function showColumnMapping(missing, headers) {
+    const box = $('columnMapping');
+    if (!box) return;
+    box.innerHTML = '';
+    box.classList.remove('hidden');
+
+    const title = document.createElement('p');
+    title.className = 'small-note';
+    title.innerHTML = '<b>Os nomes das colunas do seu arquivo nao batem com a configuracao.</b> Indique qual coluna corresponde a cada campo:';
+    box.appendChild(title);
+
+    const usedHeaders = new Set();
+    missing.forEach((f) => {
+      const wrap = document.createElement('label');
+      wrap.style.display = 'block';
+      wrap.style.marginTop = '10px';
+      wrap.appendChild(document.createTextNode(f.label));
+
+      const select = document.createElement('select');
+      select.dataset.target = f.id;
+      select.style.marginTop = '6px';
+
+      const emptyOpt = document.createElement('option');
+      emptyOpt.value = '';
+      emptyOpt.textContent = 'Selecione a coluna do arquivo...';
+      select.appendChild(emptyOpt);
+
+      headers.forEach((h) => {
+        const opt = document.createElement('option');
+        opt.value = h;
+        opt.textContent = h;
+        select.appendChild(opt);
+      });
+
+      const guess = headers.find((h) => !usedHeaders.has(h) && fuzzyMatches(h, f.id));
+      if (guess) {
+        select.value = guess;
+        usedHeaders.add(guess);
+      }
+
+      wrap.appendChild(select);
+      box.appendChild(wrap);
+    });
+
+    const applyBtn = document.createElement('button');
+    applyBtn.type = 'button';
+    applyBtn.className = 'btn solid';
+    applyBtn.style.marginTop = '14px';
+    applyBtn.textContent = 'Aplicar mapeamento e iniciar analise';
+    applyBtn.addEventListener('click', applyColumnMapping);
+    box.appendChild(applyBtn);
+  }
+
+  function fuzzyMatches(header, fieldId) {
+    const h = header.trim().toLowerCase();
+    const hints = {
+      responseColumn: ['valor', 'resposta', 'response', 'y'],
+      treatmentColumn: ['tratamento', 'treat', 'trat'],
+      blockColumn: ['bloco', 'block', 'rep'],
+      rowColumn: ['linha', 'row'],
+      columnColumn: ['coluna', 'col'],
+      numericFactorColumn: ['dose', 'fator', 'x']
+    };
+    return (hints[fieldId] || []).some((hint) => h.includes(hint));
+  }
+
+  function applyColumnMapping() {
+    const box = $('columnMapping');
+    if (!box) return;
+    const selects = Array.from(box.querySelectorAll('select'));
+    const incomplete = selects.some((s) => !s.value);
+    if (incomplete) {
+      notify('Selecione todas as colunas antes de continuar.', 'error');
+      return;
+    }
+    selects.forEach((s) => { $(s.dataset.target).value = s.value; });
+    hideColumnMapping();
+    $('dataErrorMsg').classList.add('hidden');
+    notify('Colunas mapeadas.', 'success');
+    runAnalysis();
   }
 
   function updateFieldVisibility() {
@@ -246,6 +363,7 @@
 
   function generateManualTable() {
     uploadedRows = [];
+    hideColumnMapping();
     const design = $('design').value;
     const analysisType = $('analysisType').value;
     const nTreatments = Number($('nTreatments').value || 4);
@@ -398,8 +516,20 @@
   async function runAnalysis() {
     const base = cleanApiBase(apiInput.value);
     if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
+
+    const rows = getActiveRows();
+    if (!rows.length) return notify('Insira ou carregue dados antes de analisar.', 'error');
+
+    if (uploadedRows.length) {
+      const missing = missingColumnFields(currentHeaders);
+      if (missing.length) {
+        showColumnMapping(missing, currentHeaders);
+        notify('Confira o mapeamento de colunas antes de rodar a analise.', 'error');
+        return;
+      }
+    }
+
     const payload = payloadFromUi();
-    if (!payload.data.length) return notify('Insira ou carregue dados antes de analisar.', 'error');
     try {
       setApiStatus('Processando...', '');
       const res = await fetch(`${base}/api/analyze`, {
@@ -741,17 +871,27 @@
       currentHeaders = unique(Object.keys(rows[0] || {}));
       $('dataTableTools').style.display = 'none';
       $('dataTableWrap').style.display = 'none';
-      $('rowCount').textContent = `${rows.length} linha(s) carregada(s) de "${file.name}". Clique em Iniciar analise.`;
       $('dataErrorMsg').classList.add('hidden');
-      notify('Arquivo carregado. Clique em Iniciar analise.', 'success');
+
+      const missing = missingColumnFields(currentHeaders);
+      if (missing.length) {
+        $('rowCount').textContent = `${rows.length} linha(s) carregada(s) de "${file.name}". Confira o mapeamento de colunas abaixo.`;
+        showColumnMapping(missing, currentHeaders);
+        notify('Arquivo carregado. Os nomes das colunas nao batem com a configuracao - confira o mapeamento abaixo.', 'info');
+      } else {
+        $('rowCount').textContent = `${rows.length} linha(s) carregada(s) de "${file.name}". Clique em Iniciar analise.`;
+        hideColumnMapping();
+        notify('Arquivo carregado. Clique em Iniciar analise.', 'success');
+      }
     } catch (err) {
       notify(err.message || 'Erro ao ler arquivo.', 'error');
     }
   }
 
   function parseCsv(text) {
-    const sep = text.includes(';') ? ';' : ',';
-    const lines = text.trim().split(/\r?\n/).filter(Boolean);
+    const cleaned = text.replace(/^﻿/, '');
+    const sep = cleaned.includes(';') ? ';' : ',';
+    const lines = cleaned.trim().split(/\r?\n/).filter(Boolean);
     const headers = lines.shift().split(sep).map((h) => h.trim());
     return lines.map((line) => {
       const values = line.split(sep).map((v) => v.trim());
@@ -767,6 +907,7 @@
 
   function loadExampleData() {
     uploadedRows = [];
+    hideColumnMapping();
     $('design').value = 'DBC';
     $('analysisType').value = 'single';
     $('responseColumn').value = 'valor';
