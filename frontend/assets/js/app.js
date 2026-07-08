@@ -6,6 +6,7 @@
   const dataTable = $('dataTable');
   let currentHeaders = ['bloco', 'tratamento', 'valor'];
   let regressionChart = null;
+  let uploadedRows = [];
 
   const unlockedSteps = new Set(['modelo', 'dados']);
   let currentStep = 'modelo';
@@ -133,6 +134,46 @@
     $('chooseManual').classList.toggle('selected', mode === 'manual');
     $('dataUploadPanel').classList.toggle('hidden', mode !== 'upload');
     $('dataManualPanel').classList.toggle('hidden', mode !== 'manual');
+    $('dataErrorMsg').classList.add('hidden');
+    if (mode === 'upload') {
+      $('dataTableTools').style.display = 'none';
+      $('dataTableWrap').style.display = 'none';
+      uploadedRows = [];
+      $('rowCount').textContent = 'Nenhum arquivo carregado.';
+    }
+  }
+
+  function expectedColumnNames() {
+    return [
+      $('responseColumn').value || 'valor',
+      $('treatmentColumn').value || 'tratamento',
+      $('blockColumn').value || 'bloco',
+      $('rowColumn').value || 'linha',
+      $('columnColumn').value || 'coluna',
+      $('numericFactorColumn').value.trim(),
+      ...splitColumns($('factorColumns').value)
+    ].filter(Boolean);
+  }
+
+  function normalizeHeaders(rows) {
+    if (!rows.length) return rows;
+    const actualKeys = Object.keys(rows[0]);
+    const renameMap = {};
+    expectedColumnNames().forEach((expected) => {
+      if (actualKeys.includes(expected)) return;
+      const match = actualKeys.find((k) => k.trim().toLowerCase() === expected.trim().toLowerCase());
+      if (match) renameMap[match] = expected;
+    });
+    if (!Object.keys(renameMap).length) return rows;
+    return rows.map((row) => {
+      const newRow = {};
+      Object.entries(row).forEach(([k, v]) => { newRow[renameMap[k] || k] = v; });
+      return newRow;
+    });
+  }
+
+  function getActiveRows() {
+    return uploadedRows.length ? uploadedRows : tableToRows();
   }
 
   function updateFieldVisibility() {
@@ -204,6 +245,7 @@
   }
 
   function generateManualTable() {
+    uploadedRows = [];
     const design = $('design').value;
     const analysisType = $('analysisType').value;
     const nTreatments = Number($('nTreatments').value || 4);
@@ -349,7 +391,7 @@
       regression_degree: degree ? Number(degree) : null,
       goal: $('goal').value,
       alpha: 0.05,
-      data: tableToRows()
+      data: getActiveRows()
     };
   }
 
@@ -367,6 +409,7 @@
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.detail || 'Erro na analise');
+      $('dataErrorMsg').classList.add('hidden');
       $('meansResultBox').classList.add('hidden');
       renderResults(json);
       setupComparisonPanel(json);
@@ -376,7 +419,10 @@
       setApiStatus('API online', 'ok');
     } catch (err) {
       setApiStatus('Erro na analise', 'err');
-      notify(err.message || 'Erro ao rodar analise.', 'error');
+      const msg = err.message || 'Erro ao rodar analise.';
+      notify(msg, 'error');
+      $('dataErrorMsg').textContent = msg;
+      $('dataErrorMsg').classList.remove('hidden');
     }
   }
 
@@ -619,7 +665,7 @@
       advisory.classList.add('hidden');
       return;
     }
-    const rows = tableToRows();
+    const rows = getActiveRows();
     let candidateCol = null;
     if (type === 'single') {
       const col = $('treatmentColumn').value || 'tratamento';
@@ -677,20 +723,27 @@
     if (!file) return;
     const ext = file.name.split('.').pop().toLowerCase();
     try {
+      let rows;
       if (ext === 'csv') {
         const text = await file.text();
-        const rows = parseCsv(text);
-        renderEditableTable(Object.keys(rows[0] || {}), rows);
+        rows = parseCsv(text);
       } else if (['xlsx','xls'].includes(ext)) {
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, {type:'array'});
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
-        renderEditableTable(Object.keys(rows[0] || {}), rows);
+        rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
       } else {
         throw new Error('Formato nao suportado. Use CSV, XLS ou XLSX.');
       }
-      notify('Arquivo carregado. Confira as colunas antes de analisar.', 'success');
+      rows = normalizeHeaders(rows);
+      if (!rows.length) throw new Error('O arquivo nao tem linhas de dados.');
+      uploadedRows = rows;
+      currentHeaders = unique(Object.keys(rows[0] || {}));
+      $('dataTableTools').style.display = 'none';
+      $('dataTableWrap').style.display = 'none';
+      $('rowCount').textContent = `${rows.length} linha(s) carregada(s) de "${file.name}". Clique em Iniciar analise.`;
+      $('dataErrorMsg').classList.add('hidden');
+      notify('Arquivo carregado. Clique em Iniciar analise.', 'success');
     } catch (err) {
       notify(err.message || 'Erro ao ler arquivo.', 'error');
     }
@@ -713,6 +766,7 @@
   }
 
   function loadExampleData() {
+    uploadedRows = [];
     $('design').value = 'DBC';
     $('analysisType').value = 'single';
     $('responseColumn').value = 'valor';
