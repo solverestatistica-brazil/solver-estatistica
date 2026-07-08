@@ -176,21 +176,30 @@ input[type="file"]::file-selector-button{font-family:var(--font-heading);font-we
 input[type="file"]::file-selector-button:hover{background:var(--surface-subtle)}
 
 /* --- Passo 1: selecao de tipo de experimento --- */
+/* Este painel vive dentro do .workspace-flat (fundo claro), entao usa a
+   paleta clara (text-l1/text-l2/surface-line) e nao a paleta escura usada
+   na capa (text-d1/text-d2/border-dark), que ficava ilegivel aqui. */
+.workspace-flat .section-head{text-align:left;margin:0 0 18px}
+.workspace-flat .section-head span{color:var(--brand-deep);font-family:var(--font-heading);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;display:block}
+.workspace-flat .section-head h2{color:var(--text-l1);margin:8px 0 4px}
+.workspace-flat .section-head p{color:var(--text-l2);margin:0}
+
 .type-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
-.type-card{text-align:left;background:rgba(255,255,255,.03);border:1.5px solid var(--border-dark);border-radius:16px;padding:16px;cursor:pointer;color:var(--text-d1);transition:.18s ease}
-.type-card:hover{border-color:rgba(143,195,120,.4);transform:translateY(-1px)}
-.type-card b{display:block;font-family:var(--font-heading);font-size:14px;margin-bottom:4px}
-.type-card span{display:block;font-size:11.5px;color:var(--text-d2);line-height:1.5}
-.type-card.selected{border-color:var(--brand);background:rgba(62,126,84,.18)}
+.type-card{text-align:left;background:#fff;border:1.5px solid var(--surface-line);border-radius:16px;padding:16px;cursor:pointer;color:var(--text-l1);transition:.18s ease;box-shadow:0 1px 2px rgba(20,33,26,.04)}
+.type-card:hover{border-color:#bcd6c2;box-shadow:0 6px 16px rgba(20,33,26,.08);transform:translateY(-1px)}
+.type-card b{display:block;font-family:var(--font-heading);font-size:14.5px;margin-bottom:4px;color:var(--text-l1)}
+.type-card span{display:block;font-size:11.5px;color:var(--text-l2);line-height:1.5}
+.type-card.selected{border-color:var(--brand);background:var(--success-tint);box-shadow:0 2px 8px rgba(62,126,84,.16)}
+.type-card.selected b{color:var(--brand-deep)}
 .type-card .icon-circle.small{margin-bottom:8px}
 
-.sub-options-row{background:rgba(255,255,255,.03);border:1px solid var(--border-dark);border-radius:14px;padding:14px 16px;margin-bottom:14px}
-.sub-options-row label{display:block;font-family:var(--font-heading);font-size:11px;font-weight:700;color:var(--text-d2);max-width:280px}
+.sub-options-row{background:#fff;border:1px solid var(--surface-line);border-radius:14px;padding:14px 16px;margin-bottom:14px}
+.sub-options-row label{display:block;font-family:var(--font-heading);font-size:11px;font-weight:700;color:var(--text-l2);max-width:280px}
 .sub-options-row select{margin-top:6px;width:100%;border:1px solid var(--surface-line);background:#fff;color:var(--text-l1);border-radius:10px;padding:10px 11px}
 
-.advanced-toggle{margin-top:16px;border:1px solid var(--border-dark);border-radius:14px;padding:12px 16px;background:rgba(255,255,255,.02)}
-.advanced-toggle summary{cursor:pointer;font-family:var(--font-heading);font-size:12px;font-weight:700;color:var(--text-d2);list-style:revert}
-.advanced-toggle[open] summary{margin-bottom:6px;color:var(--brand-bright)}
+.advanced-toggle{margin-top:16px;border:1px solid var(--surface-line);border-radius:14px;padding:12px 16px;background:#fff}
+.advanced-toggle summary{cursor:pointer;font-family:var(--font-heading);font-size:12px;font-weight:700;color:var(--text-l2);list-style:revert}
+.advanced-toggle[open] summary{margin-bottom:6px;color:var(--brand-deep)}
 
 /* --- Passo 2: campos numericos dinamicos --- */
 .manual-builder-dynamic .manual-builder{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end}
