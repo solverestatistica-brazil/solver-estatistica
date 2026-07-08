@@ -13,7 +13,7 @@
 <body>
   <div class="page-shell">
     <nav class="nav">
-      <a class="logo-group" href="#top" aria-label="Solver Estatística">
+      <a class="logo-group" href="#top" id="logoHome" aria-label="Solver Estatística">
         <svg width="42" height="42" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
           <rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="rgba(255,255,255,0.03)" stroke="#3E7E54" stroke-width="1.6"/>
           <polyline points="10,25 16,18 20,21 28,12" stroke="#8FC378" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
@@ -24,236 +24,246 @@
           <small>INTELLIGENCE FOR FIELD TRIALS</small>
         </span>
       </a>
-      <div class="nav-actions">
+      <div class="nav-actions" id="navActionsLanding">
         <a class="btn ghost" href="#tutorial">Tutorial</a>
-        <a class="btn solid" href="#analisar">Iniciar análise</a>
+        <button class="btn solid" id="navOpenApp" type="button">Iniciar análise</button>
+      </div>
+      <div class="nav-actions hidden" id="navActionsApp">
+        <button class="btn ghost" id="navBackToSite" type="button">← Voltar ao site</button>
       </div>
     </nav>
 
-    <header class="hero" id="top">
-      <section class="hero-copy">
-        <span class="badge"><i></i>Estatística experimental de precisão</span>
-        <h1>Transforme ensaios de campo em <em>decisões estatísticas seguras</em>.</h1>
-        <p>Faça ANOVA para DIC, DBC e DQL, compare médias, avalie regressões e gere relatórios técnicos em PDF ou Excel com visual profissional.</p>
-        <div class="cta-row">
-          <a class="btn big solid" href="#analisar">Criar análise</a>
-          <a class="btn big ghost" href="#formatos">Ver formato dos dados</a>
-        </div>
-        <div class="feature-grid">
-          <article><b>ANOVA</b><span>Teste F interpretado</span></article>
-          <article><b>Tukey + testes</b><span>Duncan, Dunnett, SNK, Scheffé</span></article>
-          <article><b>Regressão</b><span>Linear, quadrática e cúbica</span></article>
-          <article><b>Exportação</b><span>PDF, Excel, PNG e PDF vetorial</span></article>
-        </div>
-      </section>
+    <div id="view-landing">
+      <header class="hero" id="top">
+        <section class="hero-copy">
+          <span class="badge"><i></i>Estatística experimental de precisão</span>
+          <h1>Transforme ensaios de campo em <em>decisões estatísticas seguras</em>.</h1>
+          <p>Faça ANOVA para DIC, DBC e DQL, compare médias, avalie regressões e gere relatórios técnicos em PDF ou Excel com visual profissional.</p>
+          <div class="cta-row">
+            <button class="btn big solid" id="heroOpenApp" type="button">Criar análise</button>
+            <a class="btn big ghost" href="#formatos">Ver formato dos dados</a>
+          </div>
+          <div class="feature-grid">
+            <article><b>ANOVA</b><span>Teste F interpretado</span></article>
+            <article><b>Tukey + testes</b><span>Duncan, Dunnett, SNK, Scheffé</span></article>
+            <article><b>Regressão</b><span>Linear, quadrática e cúbica</span></article>
+            <article><b>Exportação</b><span>PDF, Excel, PNG e PDF vetorial</span></article>
+          </div>
+        </section>
 
-      <section class="preview-card" aria-label="Prévia do relatório">
-        <div class="window-head"><span><i></i><i></i><i></i></span><b>PREVIEW DO RELATÓRIO</b></div>
-        <div class="stats-row">
-          <div><label>CV experimental</label><strong id="previewCv">8,40%</strong><em>Precisão alta</em></div>
-          <div><label>F calculado</label><strong id="previewF">18,73</strong><em>Sig. 1%</em></div>
-          <div><label>R² regressão</label><strong id="previewR2">0,94</strong><em>Ótimo ajuste</em></div>
-        </div>
-        <div class="chart-placeholder">
-          <div class="chart-title"><span>Curva ajustada e dose ótima</span><b id="previewDose">124,8 kg/ha</b></div>
-          <svg width="100%" height="105" viewBox="0 0 340 105" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-            <defs><linearGradient id="areaFillSolver" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3E7E54" stop-opacity="0.26"/><stop offset="100%" stop-color="#3E7E54" stop-opacity="0"/></linearGradient></defs>
-            <path d="M8,84 C42,70 66,34 112,28 C150,24 182,39 208,47 C246,55 278,62 330,54 L330,98 L8,98 Z" fill="url(#areaFillSolver)"/>
-            <path d="M8,84 C42,70 66,34 112,28 C150,24 182,39 208,47 C246,55 278,62 330,54" fill="none" stroke="#24492E" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-            <line x1="112" y1="28" x2="112" y2="96" stroke="#D7DEDA" stroke-width="1.5" stroke-dasharray="3,3"/>
-            <circle cx="112" cy="28" r="5.5" fill="#C2703D" stroke="#F6F9F6" stroke-width="2.5"/>
-          </svg>
-        </div>
-        <div class="mini-list">
-          <div><span>Tratamentos</span><b>Significativo <mark>1%</mark></b></div>
-          <div><span>Blocos</span><b>Não significativo <mark class="muted">ns</mark></b></div>
-        </div>
-      </section>
-    </header>
+        <section class="preview-card" aria-label="Prévia do relatório">
+          <div class="window-head"><span><i></i><i></i><i></i></span><b>PREVIEW DO RELATÓRIO</b></div>
+          <div class="stats-row">
+            <div><label>CV experimental</label><strong id="previewCv">8,40%</strong><em>Precisão alta</em></div>
+            <div><label>F calculado</label><strong id="previewF">18,73</strong><em>Sig. 1%</em></div>
+            <div><label>R² regressão</label><strong id="previewR2">0,94</strong><em>Ótimo ajuste</em></div>
+          </div>
+          <div class="chart-placeholder">
+            <div class="chart-title"><span>Curva ajustada e dose ótima</span><b id="previewDose">124,8 kg/ha</b></div>
+            <svg width="100%" height="105" viewBox="0 0 340 105" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+              <defs><linearGradient id="areaFillSolver" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3E7E54" stop-opacity="0.26"/><stop offset="100%" stop-color="#3E7E54" stop-opacity="0"/></linearGradient></defs>
+              <path d="M8,84 C42,70 66,34 112,28 C150,24 182,39 208,47 C246,55 278,62 330,54 L330,98 L8,98 Z" fill="url(#areaFillSolver)"/>
+              <path d="M8,84 C42,70 66,34 112,28 C150,24 182,39 208,47 C246,55 278,62 330,54" fill="none" stroke="#24492E" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <line x1="112" y1="28" x2="112" y2="96" stroke="#D7DEDA" stroke-width="1.5" stroke-dasharray="3,3"/>
+              <circle cx="112" cy="28" r="5.5" fill="#C2703D" stroke="#F6F9F6" stroke-width="2.5"/>
+            </svg>
+          </div>
+          <div class="mini-list">
+            <div><span>Tratamentos</span><b>Significativo <mark>1%</mark></b></div>
+            <div><span>Blocos</span><b>Não significativo <mark class="muted">ns</mark></b></div>
+          </div>
+        </section>
+      </header>
 
-    <main>
-      <section class="panel app-panel" id="analisar">
-        <div class="section-head">
-          <span>Dashboard estatístico</span>
-          <h2>Monte a análise sem sair do navegador</h2>
-          <p>Preencha manualmente ou envie CSV/XLSX. O frontend fica no GitHub Pages e conversa com o backend FastAPI hospedado no Render.</p>
+      <main>
+        <section class="panel" id="formatos">
+          <div class="section-head left">
+            <span>Formato de dados</span>
+            <h2>Colunas mínimas por delineamento</h2>
+          </div>
+          <div class="format-grid">
+            <article><b>DIC</b><code>tratamento, valor</code><p>Use quando não houver blocos, linhas ou colunas.</p></article>
+            <article><b>DBC</b><code>bloco, tratamento, valor</code><p>Um registro por combinação bloco × tratamento.</p></article>
+            <article><b>DQL</b><code>linha, coluna, tratamento, valor</code><p>Tratamentos, linhas e colunas devem ter o mesmo número de níveis.</p></article>
+            <article><b>Regressão</b><code>dose, valor</code><p>Informe o fator numérico para cálculo de dose ótima.</p></article>
+          </div>
+        </section>
+
+        <section class="panel tutorial-panel" id="tutorial">
+          <div class="section-head left">
+            <span>Publicação</span>
+            <h2>Fluxo GitHub Pages + Render</h2>
+            <p>O tutorial completo está no arquivo <code>TUTORIAL_GITHUB_RENDER.md</code> do projeto. A versão resumida: suba este repositório no GitHub, ative o workflow do GitHub Pages, crie o Web Service no Render apontando para a pasta <code>backend</code> e cole a URL do Render no campo indicado ao clicar em "Criar análise".</p>
         </div>
+        </section>
+      </main>
+    </div>
 
-        <div class="status-bar">
-          <label for="apiBase">URL do backend Render</label>
-          <input id="apiBase" type="url" placeholder="https://seu-backend.onrender.com" />
-          <button class="btn ghost" id="saveApi">Salvar URL</button>
-          <span id="apiStatus" class="status-pill">API não testada</span>
-        </div>
+    <div id="view-app" class="hidden">
+      <main>
+        <section class="panel app-panel" id="analisar">
+          <div class="section-head">
+            <span>Dashboard estatístico</span>
+            <h2>Monte a análise sem sair do navegador</h2>
+            <p>Preencha manualmente ou envie CSV/XLSX. O frontend fica no GitHub Pages e conversa com o backend FastAPI hospedado no Render.</p>
+          </div>
 
-        <div class="workspace">
-          <aside class="sidebar" aria-label="Configurações da análise">
-            <button class="side-item active" data-tab="config"><i></i>Configuração</button>
-            <button class="side-item" data-tab="dados"><i></i>Dados</button>
-            <button class="side-item" data-tab="resultados"><i></i>Resultados</button>
-            <button class="side-item" data-tab="exports"><i></i>Exportações</button>
-          </aside>
+          <div class="status-bar">
+            <label for="apiBase">URL do backend Render</label>
+            <input id="apiBase" type="url" placeholder="https://seu-backend.onrender.com" />
+            <button class="btn ghost" id="saveApi">Salvar URL</button>
+            <span id="apiStatus" class="status-pill">API não testada</span>
+          </div>
 
-          <section class="workarea">
-            <div class="tab active" id="tab-config">
-              <div class="form-grid">
-                <label>Delineamento
-                  <select id="design">
-                    <option value="DIC">DIC · Inteiramente casualizado</option>
-                    <option value="DBC">DBC · Blocos casualizados</option>
-                    <option value="DQL">DQL · Quadrado latino</option>
-                  </select>
-                </label>
-                <label>Tipo de análise
-                  <select id="analysisType">
-                    <option value="single">Fator único / tratamento</option>
-                    <option value="factorial">Fatorial</option>
-                    <option value="split_plot">Parcelas subdivididas</option>
-                    <option value="regression">Regressão direta</option>
-                  </select>
-                </label>
-                <label>Teste de médias
-                  <select id="comparisonTest">
-                    <option value="tukey">Tukey</option>
-                    <option value="duncan">Duncan</option>
-                    <option value="dunnett">Dunnett</option>
-                    <option value="snk">SNK</option>
-                    <option value="scheffe">Scheffé</option>
-                  </select>
-                </label>
-                <label>Objetivo
-                  <select id="goal">
-                    <option value="max">Maior resposta é melhor</option>
-                    <option value="min">Menor resposta é melhor</option>
-                  </select>
-                </label>
-                <label>Coluna resposta
-                  <input id="responseColumn" value="valor" />
-                </label>
-                <label>Coluna tratamento
-                  <input id="treatmentColumn" value="tratamento" />
-                </label>
-                <label>Coluna bloco
-                  <input id="blockColumn" value="bloco" />
-                </label>
-                <label>Coluna linha · DQL
-                  <input id="rowColumn" value="linha" />
-                </label>
-                <label>Coluna coluna · DQL
-                  <input id="columnColumn" value="coluna" />
-                </label>
-                <label>Fatores fatorial/subparcelas
-                  <input id="factorColumns" placeholder="Ex.: hibrido,dose" />
-                </label>
-                <label>Fator numérico / dose
-                  <input id="numericFactorColumn" placeholder="Ex.: dose" />
-                </label>
-                <label>Grau de regressão solicitado
-                  <select id="regressionDegree">
-                    <option value="">Automático</option>
-                    <option value="1">Linear</option>
-                    <option value="2">Quadrático</option>
-                    <option value="3">Cúbico</option>
-                  </select>
-                </label>
-              </div>
-              <div class="hint-card">
-                <b>Regra do Solver</b>
-                <p>Se uma regressão solicitada não for a melhor para os dados, o backend recomenda automaticamente o modelo com maior R² ajustado.</p>
-              </div>
-            </div>
+          <div class="workspace">
+            <aside class="sidebar" aria-label="Configurações da análise">
+              <button class="side-item active" data-tab="config"><i></i>Configuração</button>
+              <button class="side-item" data-tab="dados"><i></i>Dados</button>
+              <button class="side-item" data-tab="resultados"><i></i>Resultados</button>
+              <button class="side-item" data-tab="exports"><i></i>Exportações</button>
+            </aside>
 
-            <div class="tab" id="tab-dados">
-              <div class="data-actions">
-                <div class="manual-builder">
-                  <label>Tratamentos <input id="nTreatments" type="number" min="2" value="4"></label>
-                  <label>Blocos/Repetições <input id="nBlocks" type="number" min="1" value="4"></label>
-                  <button class="btn solid" id="generateTable">Gerar tabela manual</button>
+            <section class="workarea">
+              <div class="tab active" id="tab-config">
+                <div class="form-grid" id="configFormGrid">
+                  <label data-field="design">Delineamento
+                    <select id="design">
+                      <option value="DIC">DIC · Inteiramente casualizado</option>
+                      <option value="DBC">DBC · Blocos casualizados</option>
+                      <option value="DQL">DQL · Quadrado latino</option>
+                    </select>
+                  </label>
+                  <label data-field="analysisType">Tipo de análise
+                    <select id="analysisType">
+                      <option value="single">Fator único / tratamento</option>
+                      <option value="factorial">Fatorial</option>
+                      <option value="split_plot">Parcelas subdivididas</option>
+                      <option value="regression">Regressão direta</option>
+                    </select>
+                  </label>
+                  <label data-field="comparisonTest">Teste de médias
+                    <select id="comparisonTest">
+                      <option value="tukey">Tukey</option>
+                      <option value="duncan">Duncan</option>
+                      <option value="dunnett">Dunnett</option>
+                      <option value="snk">SNK</option>
+                      <option value="scheffe">Scheffé</option>
+                    </select>
+                  </label>
+                  <label data-field="goal">Objetivo
+                    <select id="goal">
+                      <option value="max">Maior resposta é melhor</option>
+                      <option value="min">Menor resposta é melhor</option>
+                    </select>
+                  </label>
+                  <label data-field="responseColumn">Coluna resposta
+                    <input id="responseColumn" value="valor" />
+                  </label>
+                  <label data-field="treatmentColumn">Coluna tratamento
+                    <input id="treatmentColumn" value="tratamento" />
+                  </label>
+                  <label data-field="blockColumn">Coluna bloco
+                    <input id="blockColumn" value="bloco" />
+                  </label>
+                  <label data-field="rowColumn">Coluna linha · DQL
+                    <input id="rowColumn" value="linha" />
+                  </label>
+                  <label data-field="columnColumn">Coluna coluna · DQL
+                    <input id="columnColumn" value="coluna" />
+                  </label>
+                  <label data-field="factorColumns">Fatores fatorial/subparcelas
+                    <input id="factorColumns" placeholder="Ex.: hibrido,dose" />
+                  </label>
+                  <label data-field="numericFactorColumn">Fator numérico / dose
+                    <input id="numericFactorColumn" placeholder="Ex.: dose" />
+                  </label>
+                  <label data-field="regressionDegree">Grau de regressão solicitado
+                    <select id="regressionDegree">
+                      <option value="">Automático</option>
+                      <option value="1">Linear</option>
+                      <option value="2">Quadrático</option>
+                      <option value="3">Cúbico</option>
+                    </select>
+                  </label>
                 </div>
-                <div class="upload-box">
-                  <label for="fileInput">Upload CSV/XLSX</label>
-                  <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" />
-                  <button class="btn ghost" id="loadExample">Carregar exemplo</button>
+                <p class="small-note" id="fieldFilterNote">Os campos acima mudam automaticamente conforme o delineamento e o tipo de análise escolhidos.</p>
+                <div class="hint-card">
+                  <b>Regra do Solver</b>
+                  <p>Se uma regressão solicitada não for a melhor para os dados, o backend recomenda automaticamente o modelo com maior R² ajustado.</p>
                 </div>
               </div>
-              <div class="table-tools">
-                <button class="btn ghost" id="addRow">Adicionar linha</button>
-                <button class="btn ghost danger" id="clearRows">Limpar</button>
-                <button class="btn solid" id="runAnalysis">Rodar análise</button>
-              </div>
-              <div class="table-wrap">
-                <table id="dataTable" class="data-table" aria-label="Tabela de dados editável"></table>
-              </div>
-              <p class="small-note" id="rowCount">Nenhuma linha carregada.</p>
-            </div>
 
-            <div class="tab" id="tab-resultados">
-              <div id="emptyResults" class="empty-state">
-                <b>Sem resultado ainda</b>
-                <p>Gere ou carregue dados e clique em “Rodar análise”.</p>
-              </div>
-              <div id="results" class="results hidden">
-                <div class="result-cards">
-                  <article><span>CV experimental</span><strong id="resCv">—</strong><em id="resCvLabel">—</em></article>
-                  <article><span>Linhas analisadas</span><strong id="resRows">—</strong><em>Observações</em></article>
-                  <article><span>Melhor tratamento</span><strong id="resBest">—</strong><em id="resBestMean">—</em></article>
+              <div class="tab" id="tab-dados">
+                <div class="data-actions">
+                  <div class="manual-builder">
+                    <label>Tratamentos <input id="nTreatments" type="number" min="2" value="4"></label>
+                    <label>Blocos/Repetições <input id="nBlocks" type="number" min="1" value="4"></label>
+                    <button class="btn solid" id="generateTable">Gerar tabela manual</button>
+                  </div>
+                  <div class="upload-box">
+                    <label for="fileInput">Upload CSV/XLSX</label>
+                    <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" />
+                    <button class="btn ghost" id="loadExample">Carregar exemplo</button>
+                  </div>
                 </div>
-                <div class="grid-two">
-                  <section class="result-box">
-                    <h3>Quadro de ANOVA</h3>
-                    <div class="table-wrap compact"><table id="anovaTable" class="result-table"></table></div>
+                <div class="table-tools">
+                  <button class="btn ghost" id="addRow">Adicionar linha</button>
+                  <button class="btn ghost danger" id="clearRows">Limpar</button>
+                  <button class="btn solid" id="runAnalysis">Rodar análise</button>
+                </div>
+                <div class="table-wrap">
+                  <table id="dataTable" class="data-table" aria-label="Tabela de dados editável"></table>
+                </div>
+                <p class="small-note" id="rowCount">Nenhuma linha carregada.</p>
+              </div>
+
+              <div class="tab" id="tab-resultados">
+                <div id="emptyResults" class="empty-state">
+                  <b>Sem resultado ainda</b>
+                  <p>Gere ou carregue dados e clique em “Rodar análise”.</p>
+                </div>
+                <div id="results" class="results hidden">
+                  <div class="result-cards">
+                    <article><span>CV experimental</span><strong id="resCv">—</strong><em id="resCvLabel">—</em></article>
+                    <article><span>Linhas analisadas</span><strong id="resRows">—</strong><em>Observações</em></article>
+                    <article><span>Melhor tratamento</span><strong id="resBest">—</strong><em id="resBestMean">—</em></article>
+                  </div>
+                  <div class="grid-two">
+                    <section class="result-box">
+                      <h3>Quadro de ANOVA</h3>
+                      <div class="table-wrap compact"><table id="anovaTable" class="result-table"></table></div>
+                    </section>
+                    <section class="result-box">
+                      <h3>Médias e grupos</h3>
+                      <div class="table-wrap compact"><table id="meansTable" class="result-table"></table></div>
+                    </section>
+                  </div>
+                  <section class="result-box hidden" id="regressionBox">
+                    <h3>Regressão</h3>
+                    <div id="regressionSummary" class="regression-summary"></div>
+                    <canvas id="regressionChart" height="120"></canvas>
                   </section>
                   <section class="result-box">
-                    <h3>Médias e grupos</h3>
-                    <div class="table-wrap compact"><table id="meansTable" class="result-table"></table></div>
+                    <h3>Recomendações</h3>
+                    <ul id="recommendations" class="recommendations"></ul>
                   </section>
                 </div>
-                <section class="result-box" id="regressionBox">
-                  <h3>Regressão</h3>
-                  <div id="regressionSummary" class="regression-summary"></div>
-                  <canvas id="regressionChart" height="120"></canvas>
-                </section>
-                <section class="result-box">
-                  <h3>Recomendações</h3>
-                  <ul id="recommendations" class="recommendations"></ul>
-                </section>
               </div>
-            </div>
 
-            <div class="tab" id="tab-exports">
-              <div class="export-grid">
-                <button class="export-card" id="downloadPdf"><b>PDF técnico</b><span>Relatório para diretoria/laudo</span></button>
-                <button class="export-card" id="downloadExcel"><b>Excel</b><span>ANOVA, médias e resumo</span></button>
-                <button class="export-card" id="downloadPng"><b>PNG regressão</b><span>Imagem em alta qualidade</span></button>
-                <button class="export-card" id="downloadPlotPdf"><b>PDF vetorial</b><span>Gráfico de regressão editável</span></button>
+              <div class="tab" id="tab-exports">
+                <div class="export-grid">
+                  <button class="export-card" id="downloadPdf"><b>PDF técnico</b><span>Relatório para diretoria/laudo</span></button>
+                  <button class="export-card" id="downloadExcel"><b>Excel</b><span>ANOVA, médias e resumo</span></button>
+                  <button class="export-card" id="downloadPng"><b>PNG regressão</b><span>Imagem em alta qualidade</span></button>
+                  <button class="export-card" id="downloadPlotPdf"><b>PDF vetorial</b><span>Gráfico de regressão editável</span></button>
+                </div>
+                <p class="small-note">As exportações são geradas pelo backend. Configure a URL do Render antes de baixar.</p>
               </div>
-              <p class="small-note">As exportações são geradas pelo backend. Configure a URL do Render antes de baixar.</p>
-            </div>
-          </section>
-        </div>
-      </section>
-
-      <section class="panel" id="formatos">
-        <div class="section-head left">
-          <span>Formato de dados</span>
-          <h2>Colunas mínimas por delineamento</h2>
-        </div>
-        <div class="format-grid">
-          <article><b>DIC</b><code>tratamento, valor</code><p>Use quando não houver blocos, linhas ou colunas.</p></article>
-          <article><b>DBC</b><code>bloco, tratamento, valor</code><p>Um registro por combinação bloco × tratamento.</p></article>
-          <article><b>DQL</b><code>linha, coluna, tratamento, valor</code><p>Tratamentos, linhas e colunas devem ter o mesmo número de níveis.</p></article>
-          <article><b>Regressão</b><code>dose, valor</code><p>Informe o fator numérico para cálculo de dose ótima.</p></article>
-        </div>
-      </section>
-
-      <section class="panel tutorial-panel" id="tutorial">
-        <div class="section-head left">
-          <span>Publicação</span>
-          <h2>Fluxo GitHub Pages + Render</h2>
-          <p>O tutorial completo está no arquivo <code>TUTORIAL_GITHUB_RENDER.md</code> do projeto. A versão resumida: suba este repositório no GitHub, ative o workflow do GitHub Pages, crie o Web Service no Render apontando para a pasta <code>backend</code> e cole a URL do Render no campo acima.</p>
-        </div>
-      </section>
-    </main>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
