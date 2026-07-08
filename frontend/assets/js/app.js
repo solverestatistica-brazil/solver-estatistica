@@ -1,34 +1,26 @@
-/* Solver Frontend: aplicação estática para GitHub Pages. */
+/* Solver Frontend: aplicacao estatica para GitHub Pages. */
 (() => {
   const $ = (id) => document.getElementById(id);
   const apiInput = $('apiBase');
   const apiStatus = $('apiStatus');
   const dataTable = $('dataTable');
   let currentHeaders = ['bloco', 'tratamento', 'valor'];
-  let currentResult = null;
   let regressionChart = null;
+
+  const unlockedSteps = new Set(['modelo', 'dados']);
+  let currentStep = 'modelo';
 
   function init() {
     const savedApi = localStorage.getItem('solver_api_base_url') || window.SOLVER_API_BASE_URL || '';
     apiInput.value = savedApi;
-    bindTabs();
-    bindActions();
     bindViewSwitch();
-    generateManualTable();
+    bindStepper();
+    bindActions();
     updateFieldVisibility();
     testApi(false);
-    // Link direto para a tela de análise (ex.: recarregar a página com #analisar).
-    if (window.location.hash === '#analisar') {
-      showApp();
-    }
+    if (window.location.hash === '#analisar') showApp();
   }
 
-  /* --------------------------------------------------------------
-   * Navegação em duas etapas: tela inicial (site/marca) e tela de
-   * análise (ferramenta). Mantém tudo em uma página só para não
-   * complicar o deploy no GitHub Pages, mas evita mostrar a
-   * ferramenta completa antes do usuário pedir para começar.
-   * ------------------------------------------------------------ */
   function bindViewSwitch() {
     $('heroOpenApp').addEventListener('click', showApp);
     $('navOpenApp').addEventListener('click', showApp);
@@ -59,15 +51,43 @@
     history.replaceState(null, '', '#top');
   }
 
-  function bindTabs() {
-    document.querySelectorAll('.side-item').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.side-item').forEach((b) => b.classList.remove('active'));
-        document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
-        btn.classList.add('active');
-        $(`tab-${btn.dataset.tab}`).classList.add('active');
-      });
+  function bindStepper() {
+    document.querySelectorAll('.step-pill').forEach((btn) => {
+      btn.addEventListener('click', () => goToStep(btn.dataset.step));
     });
+    document.querySelectorAll('[data-back]').forEach((btn) => {
+      btn.addEventListener('click', () => goToStep(btn.dataset.back));
+    });
+    $('toDadosNext').addEventListener('click', () => goToStep('dados'));
+    $('toExportsNext').addEventListener('click', () => goToStep('exports'));
+    updateStepper();
+  }
+
+  function goToStep(name) {
+    if (!unlockedSteps.has(name)) {
+      notify('Rode a analise antes de acessar esta etapa.', 'error');
+      return;
+    }
+    currentStep = name;
+    document.querySelectorAll('.step').forEach((s) => s.classList.toggle('active', s.id === `step-${name}`));
+    updateStepper();
+    const flat = document.querySelector('.workspace-flat');
+    if (flat) flat.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function updateStepper() {
+    document.querySelectorAll('.step-pill').forEach((btn) => {
+      const step = btn.dataset.step;
+      btn.classList.toggle('active', step === currentStep);
+      btn.classList.toggle('done', unlockedSteps.has(step) && step !== currentStep);
+      btn.disabled = !unlockedSteps.has(step);
+    });
+  }
+
+  function unlockResultsAndExports() {
+    unlockedSteps.add('resultados');
+    unlockedSteps.add('exports');
+    updateStepper();
   }
 
   function bindActions() {
@@ -75,28 +95,46 @@
       localStorage.setItem('solver_api_base_url', cleanApiBase(apiInput.value));
       testApi(true);
     });
+
+    $('chooseUpload').addEventListener('click', () => selectDataMode('upload'));
+    $('chooseManual').addEventListener('click', () => {
+      selectDataMode('manual');
+      generateManualTable();
+    });
     $('generateTable').addEventListener('click', generateManualTable);
     $('addRow').addEventListener('click', addEmptyRow);
     $('clearRows').addEventListener('click', () => renderEditableTable(currentHeaders, []));
     $('loadExample').addEventListener('click', loadExampleData);
     $('runAnalysis').addEventListener('click', runAnalysis);
     $('fileInput').addEventListener('change', handleFileUpload);
+
     $('downloadPdf').addEventListener('click', () => downloadExport('/api/export/pdf', 'solver-relatorio.pdf'));
     $('downloadExcel').addEventListener('click', () => downloadExport('/api/export/excel', 'solver-resultados.xlsx'));
     $('downloadPng').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png'));
     $('downloadPlotPdf').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf'));
-    ['design', 'analysisType'].forEach((id) => $(id).addEventListener('change', () => {
-      generateManualTable();
+
+    $('switchToRegression').addEventListener('click', () => {
+      const col = $('doseAdvisory').dataset.column || '';
+      $('analysisType').value = 'regression';
+      if (col) $('numericFactorColumn').value = col;
       updateFieldVisibility();
+      goToStep('modelo');
+      notify('Tipo de analise alterado para Regressao direta. Confira os campos e rode novamente.', 'success');
+    });
+
+    ['design', 'analysisType'].forEach((id) => $(id).addEventListener('change', () => {
+      updateFieldVisibility();
+      if (!$('dataManualPanel').classList.contains('hidden')) generateManualTable();
     }));
   }
 
-  /* --------------------------------------------------------------
-   * Esconde campos que não fazem sentido para a combinação atual de
-   * delineamento + tipo de análise, em vez de mostrar o formulário
-   * inteiro sempre (ex.: "coluna bloco" só importa em DBC, "grau de
-   * regressão" só importa quando o tipo de análise é "Regressão").
-   * ------------------------------------------------------------ */
+  function selectDataMode(mode) {
+    $('chooseUpload').classList.toggle('selected', mode === 'upload');
+    $('chooseManual').classList.toggle('selected', mode === 'manual');
+    $('dataUploadPanel').classList.toggle('hidden', mode !== 'upload');
+    $('dataManualPanel').classList.toggle('hidden', mode !== 'manual');
+  }
+
   function updateFieldVisibility() {
     const design = $('design').value;
     const type = $('analysisType').value;
@@ -104,7 +142,6 @@
 
     const rules = {
       design: !isRegression,
-      comparisonTest: !isRegression,
       treatmentColumn: !isRegression,
       blockColumn: !isRegression && design === 'DBC',
       rowColumn: !isRegression && design === 'DQL',
@@ -127,7 +164,7 @@
   async function testApi(showSuccess) {
     const base = cleanApiBase(apiInput.value);
     if (!base) {
-      setApiStatus('API não configurada', 'err');
+      setApiStatus('API nao configurada', 'err');
       return;
     }
     try {
@@ -137,7 +174,7 @@
       if (showSuccess) notify('Backend salvo e respondendo.', 'success');
     } catch (err) {
       setApiStatus('API sem resposta', 'err');
-      if (showSuccess) notify('Não consegui conectar. Verifique a URL do Render e o CORS.', 'error');
+      if (showSuccess) notify('Nao consegui conectar. Verifique a URL do Render e o CORS.', 'error');
     }
   }
 
@@ -234,7 +271,7 @@
       trh.appendChild(th);
     });
     const actionTh = document.createElement('th');
-    actionTh.textContent = 'Ações';
+    actionTh.textContent = 'Acoes';
     trh.appendChild(actionTh);
     thead.appendChild(trh);
     dataTable.appendChild(thead);
@@ -242,6 +279,9 @@
     const tbody = document.createElement('tbody');
     rows.forEach((row) => tbody.appendChild(rowElement(row)));
     dataTable.appendChild(tbody);
+
+    $('dataTableTools').style.display = 'flex';
+    $('dataTableWrap').style.display = 'block';
     updateRowCount();
   }
 
@@ -305,7 +345,7 @@
       column_column: $('columnColumn').value || 'coluna',
       factor_columns: splitColumns($('factorColumns').value),
       numeric_factor_column: $('numericFactorColumn').value.trim() || null,
-      comparison_test: $('comparisonTest').value,
+      comparison_test: 'tukey',
       regression_degree: degree ? Number(degree) : null,
       goal: $('goal').value,
       alpha: 0.05,
@@ -326,14 +366,17 @@
         body: JSON.stringify(payload)
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.detail || 'Erro na análise');
-      currentResult = json;
+      if (!res.ok) throw new Error(json.detail || 'Erro na analise');
+      $('meansResultBox').classList.add('hidden');
       renderResults(json);
-      openTab('resultados');
+      setupComparisonPanel(json);
+      checkDoseAdvisory();
+      unlockResultsAndExports();
+      goToStep('resultados');
       setApiStatus('API online', 'ok');
     } catch (err) {
-      setApiStatus('Erro na análise', 'err');
-      notify(err.message || 'Erro ao rodar análise.', 'error');
+      setApiStatus('Erro na analise', 'err');
+      notify(err.message || 'Erro ao rodar analise.', 'error');
     }
   }
 
@@ -341,25 +384,63 @@
     $('emptyResults').classList.add('hidden');
     $('results').classList.remove('hidden');
     const cv = result?.anova?.cv;
-    $('resCv').textContent = cv == null ? '—' : `${format(cv)}%`;
-    $('resCvLabel').textContent = result?.anova?.cv_label || '—';
-    $('resRows').textContent = result?.meta?.n_rows ?? '—';
+    $('resCv').textContent = cv == null ? '-' : `${format(cv)}%`;
+    $('resCvLabel').textContent = result?.anova?.cv_label || '-';
+    $('resRows').textContent = result?.meta?.n_rows ?? '-';
     const best = result?.means?.best;
-    $('resBest').textContent = best?.treatment ?? '—';
-    $('resBestMean').textContent = best?.mean == null ? '—' : `Média ${format(best.mean)}`;
+    $('resBest').textContent = best?.treatment ?? '-';
+    $('resBestMean').textContent = best?.mean == null ? '-' : `Media ${format(best.mean)}`;
 
-    renderSimpleTable('anovaTable', ['source','df','sum_sq','mean_sq','f_calc','f_5','f_1','p_value','significance'], result?.anova?.table || []);
-    renderSimpleTable('meansTable', ['treatment','mean','n','sd','group'], result?.means?.treatment_means || []);
+    renderAnovaTable(result?.anova?.table || []);
     renderRecommendations(result?.recommendations || []);
     renderRegression(result?.regression);
 
     const firstF = (result?.anova?.table || []).find((r) => r.f_calc != null);
-    $('previewCv').textContent = cv == null ? '—' : `${format(cv)}%`;
-    $('previewF').textContent = firstF ? format(firstF.f_calc) : '—';
+    $('previewCv').textContent = cv == null ? '-' : `${format(cv)}%`;
+    $('previewF').textContent = firstF ? format(firstF.f_calc) : '-';
     const reg = result?.regression?.selected_model;
-    $('previewR2').textContent = reg?.r2 == null ? '—' : format(reg.r2);
+    $('previewR2').textContent = reg?.r2 == null ? '-' : format(reg.r2);
     const opt = reg?.optimum;
-    $('previewDose').textContent = opt?.x == null ? '—' : `${format(opt.x)} ${result?.regression?.x_label || ''}`;
+    $('previewDose').textContent = opt?.x == null ? '-' : `${format(opt.x)} ${result?.regression?.x_label || ''}`;
+  }
+
+  function sigPill(value) {
+    if (value == null || value === '-' || value === '—') return '<span class="sig-dash">-</span>';
+    const cls = value === '1%' ? 'sig-1' : value === '5%' ? 'sig-5' : 'sig-ns';
+    return `<span class="sig-pill ${cls}">${value}</span>`;
+  }
+
+  function renderAnovaTable(rows) {
+    const table = $('anovaTable');
+    const columns = ['source', 'df', 'sum_sq', 'mean_sq', 'f_calc', 'f_5', 'f_1', 'significance'];
+    table.innerHTML = '';
+    const thead = document.createElement('thead');
+    const trh = document.createElement('tr');
+    columns.forEach((c) => {
+      const th = document.createElement('th');
+      th.textContent = labelFor(c);
+      trh.appendChild(th);
+    });
+    thead.appendChild(trh);
+    table.appendChild(thead);
+    const tbody = document.createElement('tbody');
+    rows.forEach((row) => {
+      const tr = document.createElement('tr');
+      columns.forEach((c) => {
+        const td = document.createElement('td');
+        if (c === 'significance') {
+          td.innerHTML = sigPill(row[c]);
+        } else if (c === 'source') {
+          td.textContent = row[c] ?? '-';
+        } else {
+          td.classList.add('num');
+          td.textContent = row[c] == null ? '-' : format(row[c]);
+        }
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody);
   }
 
   function renderSimpleTable(id, columns, rows) {
@@ -379,7 +460,13 @@
       const tr = document.createElement('tr');
       columns.forEach((c) => {
         const td = document.createElement('td');
-        td.textContent = row[c] == null ? '—' : (typeof row[c] === 'number' ? format(row[c]) : row[c]);
+        const val = row[c];
+        if (typeof val === 'number') {
+          td.classList.add('num');
+          td.textContent = format(val);
+        } else {
+          td.textContent = val == null || val === '' ? '-' : val;
+        }
         tr.appendChild(td);
       });
       tbody.appendChild(tr);
@@ -410,10 +497,10 @@
     const selected = reg.selected_model || {};
     [
       `Modelo: grau ${reg.selected_degree}`,
-      `R²: ${format(selected.r2)}`,
-      `R² ajustado: ${format(selected.adj_r2)}`,
+      `R2: ${format(selected.r2)}`,
+      `R2 ajustado: ${format(selected.adj_r2)}`,
       selected.equation || '',
-      selected.optimum ? `Ótimo: ${format(selected.optimum.x)} → ${format(selected.optimum.y)}` : ''
+      selected.optimum ? `Otimo: ${format(selected.optimum.x)} -> ${format(selected.optimum.y)}` : ''
     ].filter(Boolean).forEach((text) => {
       const span = document.createElement('span');
       span.textContent = text;
@@ -439,6 +526,121 @@
         }
       }
     });
+  }
+
+  function extractSingleColumn(rawSource) {
+    if (!rawSource || rawSource.includes(':')) return null;
+    const m = rawSource.match(/Q\("([^"]+)"\)/);
+    return m ? m[1] : null;
+  }
+
+  function setupComparisonPanel(result) {
+    const panel = $('comparisonPanel');
+    const container = $('comparisonButtons');
+    container.innerHTML = '';
+    const type = result?.meta?.analysis_type;
+
+    if (type === 'regression') {
+      panel.classList.add('hidden');
+      return;
+    }
+    panel.classList.remove('hidden');
+
+    if (type === 'single') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn solid';
+      btn.textContent = 'Comparar medias';
+      btn.addEventListener('click', () => runComparison(null, null));
+      container.appendChild(btn);
+      return;
+    }
+
+    let any = false;
+    (result?.anova?.table || []).forEach((row) => {
+      if (row.source === 'Total') return;
+      const col = extractSingleColumn(row.raw_source);
+      if (!col) return;
+      any = true;
+      const sig = row.significance === '1%' || row.significance === '5%';
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn';
+      btn.textContent = `Comparar: ${row.source}`;
+      btn.disabled = !sig;
+      btn.title = sig ? '' : 'So e possivel comparar fatores significativos no teste F.';
+      btn.addEventListener('click', () => runComparison(col, row.source));
+      container.appendChild(btn);
+    });
+    if (!any) {
+      const p = document.createElement('p');
+      p.className = 'small-note';
+      p.textContent = 'Nenhum fator elegivel foi significativo no teste F - sem comparacao de medias recomendada.';
+      container.appendChild(p);
+    }
+  }
+
+  async function runComparison(colOverride, label) {
+    const base = cleanApiBase(apiInput.value);
+    if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
+    const payload = payloadFromUi();
+    payload.comparison_test = $('comparisonTestPost').value;
+    if (colOverride) payload.treatment_column = colOverride;
+    try {
+      setApiStatus('Processando...', '');
+      const res = await fetch(`${base}/api/analyze`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || 'Erro na comparacao');
+      $('meansResultBox').classList.remove('hidden');
+      $('meansFactorLabel').textContent = label ? `Medias e grupos - ${label}` : 'Medias e grupos';
+      renderSimpleTable('meansTable', ['treatment', 'mean', 'n', 'sd', 'group'], json?.means?.treatment_means || []);
+      setApiStatus('API online', 'ok');
+    } catch (err) {
+      setApiStatus('Erro na comparacao', 'err');
+      notify(err.message || 'Erro ao comparar medias.', 'error');
+    }
+  }
+
+  function isMostlyNumeric(values) {
+    const cleaned = values.map((v) => String(v ?? '').trim()).filter((v) => v !== '');
+    if (cleaned.length < 3) return false;
+    const numericCount = cleaned.filter((v) => !Number.isNaN(Number(v.replace(',', '.')))).length;
+    return numericCount / cleaned.length >= 0.8 && new Set(cleaned).size >= 3;
+  }
+
+  function checkDoseAdvisory() {
+    const type = $('analysisType').value;
+    const advisory = $('doseAdvisory');
+    if (type === 'regression') {
+      advisory.classList.add('hidden');
+      return;
+    }
+    const rows = tableToRows();
+    let candidateCol = null;
+    if (type === 'single') {
+      const col = $('treatmentColumn').value || 'tratamento';
+      if (isMostlyNumeric(rows.map((r) => r[col]))) candidateCol = col;
+    } else if (type === 'factorial' || type === 'split_plot') {
+      splitColumns($('factorColumns').value).some((col) => {
+        if (isMostlyNumeric(rows.map((r) => r[col]))) {
+          candidateCol = col;
+          return true;
+        }
+        return false;
+      });
+    }
+    if (candidateCol) {
+      advisory.classList.remove('hidden');
+      advisory.dataset.column = candidateCol;
+      $('doseAdvisoryText').textContent = `A coluna "${candidateCol}" parece conter valores numericos (uma dose). Considere rodar como Regressao direta para estimar a dose otima em vez de so comparar medias.`;
+    } else {
+      advisory.classList.add('hidden');
+      advisory.dataset.column = '';
+    }
   }
 
   async function downloadExport(endpoint, filename) {
@@ -486,7 +688,7 @@
         const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
         renderEditableTable(Object.keys(rows[0] || {}), rows);
       } else {
-        throw new Error('Formato não suportado. Use CSV, XLS ou XLSX.');
+        throw new Error('Formato nao suportado. Use CSV, XLS ou XLSX.');
       }
       notify('Arquivo carregado. Confira as colunas antes de analisar.', 'success');
     } catch (err) {
@@ -527,11 +729,6 @@
     notify('Exemplo DBC carregado.', 'success');
   }
 
-  function openTab(name) {
-    const btn = document.querySelector(`.side-item[data-tab="${name}"]`);
-    if (btn) btn.click();
-  }
-
   function splitColumns(value) {
     return String(value || '').split(',').map((s) => s.trim()).filter(Boolean);
   }
@@ -541,14 +738,14 @@
   }
 
   function format(v) {
-    if (v == null || Number.isNaN(Number(v))) return '—';
+    if (v == null || Number.isNaN(Number(v))) return '-';
     return Number(v).toLocaleString('pt-BR', {maximumFractionDigits: 4});
   }
 
   function labelFor(key) {
     const map = {
       source:'FV', df:'GL', sum_sq:'SQ', mean_sq:'QM', f_calc:'F calc', f_5:'F 5%', f_1:'F 1%', p_value:'p', significance:'Sig.',
-      treatment:'Tratamento', mean:'Média', n:'n', sd:'DP', group:'Grupo'
+      treatment:'Tratamento', mean:'Media', n:'n', sd:'DP', group:'Grupo'
     };
     return map[key] || key;
   }
