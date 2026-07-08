@@ -1,0 +1,9 @@
+__pycache__/
+*.py[cod]
+.env
+.venv/
+venv/
+.DS_Store
+node_modules/
+*.log
+.ipynb_checkpoints/
