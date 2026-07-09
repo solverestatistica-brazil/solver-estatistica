@@ -168,10 +168,18 @@
 </div>
 
 <div class="status-bar">
+<div class="api-indicator">
+<span class="api-dot" id="apiDot"></span>
+<span id="apiStatus" class="status-pill">Verificando API…</span>
+</div>
+<details class="advanced-toggle api-settings">
+<summary>Configurações do backend</summary>
+<div class="api-settings-body">
 <label for="apiBase">URL do backend Render</label>
 <input id="apiBase" type="url" placeholder="https://seu-backend.onrender.com" />
 <button class="btn ghost" id="saveApi">Salvar URL</button>
-<span id="apiStatus" class="status-pill">API não testada</span>
+</div>
+</details>
 </div>
 
 <nav class="stepper" aria-label="Etapas da análise">
