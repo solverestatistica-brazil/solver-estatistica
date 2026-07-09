@@ -917,20 +917,53 @@
 
     const ctx = $('regressionChart');
     if (regressionChart) regressionChart.destroy();
+
+    // Cores da marca Solver, para o grafico nao ficar com o azul/vermelho
+    // padrao do Chart.js (destoando do resto do site).
+    const datasets = [
+      {
+        label: 'Observado',
+        data: (reg.points || []).map((p) => ({x: p.x, y: p.y})),
+        backgroundColor: 'rgba(62,126,84,.55)',
+        borderColor: '#3E7E54',
+        borderWidth: 1.5,
+        pointRadius: 4,
+        pointHoverRadius: 5
+      },
+      {
+        label: 'Ajustado',
+        type: 'line',
+        data: (reg.fitted_curve || []).map((p) => ({x: p.x, y: p.y})),
+        pointRadius: 0,
+        borderWidth: 2.5,
+        borderColor: '#24492E',
+        backgroundColor: 'rgba(36,73,46,.08)',
+        tension: 0.15
+      }
+    ];
+    const optimum = selected.optimum;
+    if (optimum && optimum.x != null) {
+      datasets.push({
+        label: 'Ponto ótimo',
+        data: [{x: optimum.x, y: optimum.y}],
+        backgroundColor: '#C2703D',
+        borderColor: '#ffffff',
+        borderWidth: 2,
+        pointRadius: 6,
+        pointHoverRadius: 7,
+        showLine: false
+      });
+    }
+
     regressionChart = new Chart(ctx, {
       type: 'scatter',
-      data: {
-        datasets: [
-          {label: 'Observado', data: (reg.points || []).map((p) => ({x:p.x, y:p.y}))},
-          {label: 'Ajustado', type: 'line', data: (reg.fitted_curve || []).map((p) => ({x:p.x, y:p.y})), pointRadius: 0, borderWidth: 2}
-        ]
-      },
+      data: { datasets },
       options: {
         responsive: true,
-        plugins: {legend: {position: 'bottom'}},
+        plugins: {legend: {position: 'bottom', labels: {color: '#5C6D64', font: {family: 'Montserrat'}}}},
         scales: {
-          x: {title: {display: true, text: reg.x_label || 'x'}},
-          y: {title: {display: true, text: reg.y_label || 'Resposta'}}
+          x: {title: {display: true, text: reg.x_label || 'x', color: '#5C6D64'}, grid: {color: '#E7ECE9'}, ticks: {color: '#5C6D64'}},
+          y: {title: {display: true, text: reg.y_label || 'Resposta', color: '#5C6D64'}, grid: {color: '#E7ECE9'}, ticks: {color: '#5C6D64'}}
         }
       }
     });
