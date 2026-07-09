@@ -1064,7 +1064,7 @@
     if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
     const payload = payloadFromUi();
     payload.analysis_type = 'regression';
-    payload.numeric_factor_column = colOverride || $('treatmentColumn').value || 'tratamento';
+    payload.numeric_factor_column = colOverride || null;
     const degree = $('regressionDegreePost').value;
     payload.regression_degree = degree ? Number(degree) : null;
     const stopLoading = startLoadingSequence(btn, [
