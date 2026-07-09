@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import io
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -17,7 +18,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
-from reportlab.platypus import BaseDocTemplate, Frame, KeepTogether, PageTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import BaseDocTemplate, Frame, Image, KeepTogether, PageTemplate, Paragraph, Spacer, Table, TableStyle
 
 from statistics_engine import analyze
 
@@ -360,6 +361,23 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         story.append(KeepTogether(means_block))
         story.append(Spacer(1, 0.3 * cm))
 
+    comparison = result.get("means", {}).get("comparison")
+    if comparison and comparison.get("comparisons"):
+        comp_rows = [["Grupo A", "Grupo B", "Diferença", "Dif. crítica", "p", "Significativo"]]
+        for c in comparison["comparisons"]:
+            comp_rows.append([
+                c.get("group_a"), c.get("group_b"), _fmt(c.get("diff")), _fmt(c.get("critical_diff")),
+                _fmt(c.get("p_value")), "Sim" if c.get("significant") else "Não",
+            ])
+        comparison_block = [
+            Paragraph(f"Teste de comparação de médias · {comparison.get('test')} (α = {comparison.get('alpha')})", h2),
+            _styled_table(comp_rows),
+        ]
+        if comparison.get("note"):
+            comparison_block.append(Paragraph(comparison.get("note"), caption))
+        story.append(KeepTogether(comparison_block))
+        story.append(Spacer(1, 0.3 * cm))
+
     reg = result.get("regression")
     if reg:
         selected = reg.get("selected_model", {})
@@ -367,10 +385,16 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         reg_text = f"{selected.get('equation')} &nbsp;·&nbsp; R² ajustado: <b>{_fmt(selected.get('adj_r2'))}</b>"
         if opt.get("x") is not None:
             reg_text += f" &nbsp;·&nbsp; Ponto ótimo estimado: <b>x = {_fmt(opt.get('x'))}</b>, y = {_fmt(opt.get('y'))}"
-        story.append(KeepTogether([
+        reg_flowables = [
             Paragraph("Regressão", h2),
             Paragraph(reg_text, body),
-        ]))
+        ]
+        plot_b64 = reg.get("plot_png_base64")
+        if plot_b64:
+            img_buffer = io.BytesIO(base64.b64decode(plot_b64))
+            reg_flowables.append(Spacer(1, 0.25 * cm))
+            reg_flowables.append(Image(img_buffer, width=14 * cm, height=8.1 * cm))
+        story.append(KeepTogether(reg_flowables))
 
     doc.build(story)
     return buffer.getvalue()
