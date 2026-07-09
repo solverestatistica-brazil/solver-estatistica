@@ -330,6 +330,17 @@ def _means(ctx: AnalysisContext, anova: Dict[str, Any]) -> Dict[str, Any]:
     table["sd"] = table["sd"].fillna(0)
     table = table.sort_values("mean", ascending=(ctx.goal == "min"))
 
+    mean_min = float(table["mean"].min())
+    mean_max = float(table["mean"].max())
+    span = mean_max - mean_min
+    if span > 0:
+        if ctx.goal == "min":
+            table["rank_pct"] = table["mean"].apply(lambda v: round((mean_max - float(v)) / span * 100, 1))
+        else:
+            table["rank_pct"] = table["mean"].apply(lambda v: round((float(v) - mean_min) / span * 100, 1))
+    else:
+        table["rank_pct"] = 100.0
+
     best_row = table.iloc[0].to_dict() if len(table) else None
     comparison = _comparison_tests(table, anova, ctx)
     if comparison and comparison.get("letters"):
@@ -488,6 +499,15 @@ def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
     if reg_df["x"].nunique() < 2:
         return None
 
+    means_df = (
+        reg_df.groupby("x")["y"]
+        .agg(["mean", "count", "std"])
+        .reset_index()
+        .rename(columns={"mean": "y", "count": "n", "std": "sd"})
+        .sort_values("x")
+    )
+    means_df["sd"] = means_df["sd"].fillna(0)
+
     requested_degree = p.get("regression_degree")
     requested_degree = int(requested_degree) if requested_degree else None
     max_degree = min(3, int(reg_df["x"].nunique()) - 1)
@@ -510,7 +530,7 @@ def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
 
     x_grid = np.linspace(reg_df["x"].min(), reg_df["x"].max(), 120)
     y_grid = _predict_poly(selected["coefficients"], x_grid)
-    plot_png = _regression_plot_base64(reg_df, x_grid, y_grid, selected)
+    plot_png = _regression_plot_base64(means_df, x_grid, y_grid, selected)
 
     return {
         "x_label": x_label,
@@ -520,7 +540,7 @@ def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
         "selected_degree": selected["degree"],
         "recommendation": recommendation,
         "selected_model": selected,
-        "points": reg_df.to_dict(orient="records"),
+        "points": means_df.to_dict(orient="records"),
         "fitted_curve": [{"x": float(a), "y": float(b)} for a, b in zip(x_grid, y_grid)],
         "plot_png_base64": plot_png,
     }
@@ -585,14 +605,18 @@ def _poly_optimum(coeffs: List[float], x_min: float, x_max: float, goal: str) ->
     return {"x": chosen[0], "y": chosen[1], "goal": goal}
 
 
-def _regression_plot_base64(reg_df: pd.DataFrame, x_grid: np.ndarray, y_grid: np.ndarray, model: Dict[str, Any]) -> str:
+def _regression_plot_base64(means_df: pd.DataFrame, x_grid: np.ndarray, y_grid: np.ndarray, model: Dict[str, Any]) -> str:
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
-    ax.scatter(reg_df["x"], reg_df["y"], label="Observado")
-    ax.plot(x_grid, y_grid, label=f"Grau {model['degree']} · R²aj {model['adj_r2']:.3f}")
+    ax.errorbar(
+        means_df["x"], means_df["y"], yerr=means_df["sd"],
+        fmt="o", color="#24492E", ecolor="#3E7E54", elinewidth=1.4,
+        capsize=4, markersize=7, label="Observado (média por dose)",
+    )
+    ax.plot(x_grid, y_grid, color="#5FAF77", linewidth=2.2, label=f"Grau {model['degree']} · R²aj {model['adj_r2']:.3f}")
     optimum = model.get("optimum") or {}
     if optimum.get("x") is not None:
-        ax.axvline(optimum["x"], linestyle="--", linewidth=1)
-        ax.scatter([optimum["x"]], [optimum["y"]], marker="o", s=55, label="Dose ótima")
+        ax.axvline(optimum["x"], linestyle="--", linewidth=1, color="#8a6d2f")
+        ax.scatter([optimum["x"]], [optimum["y"]], marker="D", s=60, color="#c99a2e", zorder=5, label="Dose ótima")
     ax.set_xlabel("Dose / fator numérico")
     ax.set_ylabel("Resposta")
     ax.set_title("Regressão ajustada")
@@ -609,7 +633,7 @@ def analyze(payload: Dict[str, Any]) -> Dict[str, Any]:
     ctx = _prepare_context(payload)
     anova = _anova(ctx)
     means = _means(ctx, anova)
-    regression = _regression(ctx) if ctx.analysis_type in {"regression", "single", "factorial"} else None
+    regression = _regression(ctx) if ctx.analysis_type == "regression" else None
     recommendations = _recommendations(ctx, anova, means, regression)
 
     result = {
@@ -649,12 +673,6 @@ def _recommendations(ctx: AnalysisContext, anova: Dict[str, Any], means: Dict[st
     if best:
         direction = "maior" if ctx.goal == "max" else "menor"
         messages.append(f"Tratamento com {direction} média: {best['treatment']} ({float(best['mean']):.3f}).")
-
-    if ctx.analysis_type == "factorial":
-        factors = ctx.payload.get("factor_columns") or []
-        numeric_factor = ctx.payload.get("numeric_factor_column") or ctx.payload.get("dose_column")
-        if numeric_factor in factors:
-            messages.append("Como há fator numérico/dose no fatorial, rode e interprete a regressão para esse fator quando houver significância.")
 
     if regression:
         selected = regression.get("selected_model") or {}
