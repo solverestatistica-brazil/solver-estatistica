@@ -87,20 +87,44 @@ def _draw_header_footer(canvas_obj, doc) -> None:
     canvas_obj.setFillColor(BRAND_DARK)
     canvas_obj.rect(0, height - 2.2 * cm, width, 2.2 * cm, fill=1, stroke=0)
 
+    # Replica exatamente o SVG do site (viewBox 0-40, rect rx=10, polyline de
+    # tendencia + polyline em L formando a seta na ponta) em vez de um rabisco
+    # a mao livre sem seta - o usuario notou que o logo do PDF ficava diferente
+    # e mais feio que o do site.
     logo_x, logo_y = 1.3 * cm, height - 1.75 * cm
+    logo_size = 1.05 * cm
+    view = 40.0
+    scale = logo_size / view
+
+    def _sp(x: float, y: float) -> Tuple[float, float]:
+        return logo_x + x * scale, logo_y + logo_size - y * scale
+
     canvas_obj.setStrokeColor(BRAND)
-    canvas_obj.setLineWidth(1.3)
-    canvas_obj.roundRect(logo_x, logo_y, 1.05 * cm, 1.05 * cm, 4, fill=0, stroke=1)
+    canvas_obj.setLineWidth(1.6 * scale)
+    canvas_obj.roundRect(logo_x, logo_y, logo_size, logo_size, 10 * scale, fill=0, stroke=1)
+
     canvas_obj.setStrokeColor(BRAND_BRIGHT)
-    canvas_obj.setLineWidth(1.6)
+    canvas_obj.setLineWidth(2.2 * scale)
     canvas_obj.setLineCap(1)
     canvas_obj.setLineJoin(1)
-    path = canvas_obj.beginPath()
-    path.moveTo(logo_x + 0.2 * cm, logo_y + 0.32 * cm)
-    path.lineTo(logo_x + 0.42 * cm, logo_y + 0.62 * cm)
-    path.lineTo(logo_x + 0.58 * cm, logo_y + 0.46 * cm)
-    path.lineTo(logo_x + 0.85 * cm, logo_y + 0.78 * cm)
-    canvas_obj.drawPath(path, stroke=1, fill=0)
+
+    trend = canvas_obj.beginPath()
+    trend_points = [(10, 25), (16, 18), (20, 21), (28, 12)]
+    tx0, ty0 = _sp(*trend_points[0])
+    trend.moveTo(tx0, ty0)
+    for px, py in trend_points[1:]:
+        cx, cy = _sp(px, py)
+        trend.lineTo(cx, cy)
+    canvas_obj.drawPath(trend, stroke=1, fill=0)
+
+    arrowhead = canvas_obj.beginPath()
+    arrow_points = [(23, 12), (28, 12), (28, 17)]
+    ax0, ay0 = _sp(*arrow_points[0])
+    arrowhead.moveTo(ax0, ay0)
+    for px, py in arrow_points[1:]:
+        cx, cy = _sp(px, py)
+        arrowhead.lineTo(cx, cy)
+    canvas_obj.drawPath(arrowhead, stroke=1, fill=0)
 
     canvas_obj.setFillColor(colors.white)
     canvas_obj.setFont("Helvetica-Bold", 15)
