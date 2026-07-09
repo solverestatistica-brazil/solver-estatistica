@@ -761,7 +761,6 @@
       $('meansResultBox').classList.add('hidden');
       renderResults(json);
       setupComparisonPanel(json);
-      checkDoseAdvisory();
       unlockResultsAndExports();
       goToStep('resultados');
       setApiStatus('API ativa', 'ok');
