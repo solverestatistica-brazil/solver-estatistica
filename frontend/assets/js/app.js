@@ -964,10 +964,27 @@
       data: { datasets },
       options: {
         responsive: true,
-        plugins: {legend: {position: 'bottom', labels: {color: '#5C6D64', font: {family: 'Montserrat'}}}},
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: {color: '#3A4A40', font: {family: "'Montserrat', sans-serif", size: 13, weight: '600'}, boxWidth: 14, boxHeight: 14, padding: 18}
+          },
+          tooltip: {
+            titleFont: {family: "'Montserrat', sans-serif", size: 13, weight: '600'},
+            bodyFont: {family: "'Open Sans', sans-serif", size: 12}
+          }
+        },
         scales: {
-          x: {title: {display: true, text: reg.x_label || 'x', color: '#5C6D64'}, grid: {color: '#E7ECE9'}, ticks: {color: '#5C6D64'}},
-          y: {title: {display: true, text: reg.y_label || 'Resposta', color: '#5C6D64'}, grid: {color: '#E7ECE9'}, ticks: {color: '#5C6D64'}}
+          x: {
+            title: {display: true, text: reg.x_label || 'x', color: '#24492E', font: {family: "'Montserrat', sans-serif", size: 13, weight: '600'}},
+            grid: {color: '#E7ECE9'},
+            ticks: {color: '#5C6D64', font: {family: "'Open Sans', sans-serif", size: 12}}
+          },
+          y: {
+            title: {display: true, text: reg.y_label || 'Resposta', color: '#24492E', font: {family: "'Montserrat', sans-serif", size: 13, weight: '600'}},
+            grid: {color: '#E7ECE9'},
+            ticks: {color: '#5C6D64', font: {family: "'Open Sans', sans-serif", size: 12}}
+          }
         }
       }
     });
