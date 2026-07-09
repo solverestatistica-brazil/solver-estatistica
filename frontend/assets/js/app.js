@@ -907,12 +907,25 @@
     }
     box.classList.remove('hidden');
     const selected = reg.selected_model || {};
+    const degreeLabels = {1: 'Linear', 2: 'Quadrático', 3: 'Cúbico'};
+    const superscripts = {2: '²', 3: '³', 4: '⁴'};
+    function buildEquation(coeffs) {
+      if (!coeffs || !coeffs.length) return '';
+      const parts = [format(coeffs[0])];
+      for (let power = 1; power < coeffs.length; power++) {
+        const coef = coeffs[power];
+        const sign = coef >= 0 ? '+' : '−';
+        const varTerm = power === 1 ? 'x' : `x${superscripts[power] || ('^' + power)}`;
+        parts.push(`${sign} ${format(Math.abs(coef))}${varTerm}`);
+      }
+      return 'ŷ = ' + parts.join(' ');
+    }
     [
-      `Modelo: grau ${reg.selected_degree}`,
-      `R2: ${format(selected.r2)}`,
-      `R2 ajustado: ${format(selected.adj_r2)}`,
-      selected.equation || '',
-      selected.optimum ? `Otimo: ${format(selected.optimum.x)} -> ${format(selected.optimum.y)}` : ''
+      `Modelo: ${degreeLabels[reg.selected_degree] || `Grau ${reg.selected_degree}`}`,
+      `R²: ${format(selected.r2)}`,
+      `R² ajustado: ${format(selected.adj_r2)}`,
+      buildEquation(selected.coefficients),
+      selected.optimum ? `Ótimo: ${format(selected.optimum.x)} → ${format(selected.optimum.y)}` : ''
     ].filter(Boolean).forEach((text) => {
       const span = document.createElement('span');
       span.textContent = text;
@@ -1254,8 +1267,12 @@
   }
 
   function format(v) {
-    if (v == null || Number.isNaN(Number(v))) return '-';
-    return Number(v).toLocaleString('pt-BR', {maximumFractionDigits: 4});
+    if (v == null || Number.isNaN(Number(v))) return '—';
+    const num = Number(v);
+    if (Math.abs(num) > 999999) {
+      return num.toLocaleString('pt-BR', {notation: 'scientific', maximumFractionDigits: 4});
+    }
+    return num.toLocaleString('pt-BR', {maximumFractionDigits: 4});
   }
 
   function labelFor(key) {
