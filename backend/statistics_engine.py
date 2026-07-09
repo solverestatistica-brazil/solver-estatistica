@@ -131,6 +131,46 @@ def _parse_numeric_from_text(series: pd.Series) -> pd.Series:
     return series.apply(parse_one)
 
 
+def _dedupe_keep_order(values: Iterable[str]) -> List[str]:
+    seen: set[str] = set()
+    output: List[str] = []
+    for value in values:
+        if value and value not in seen:
+            seen.add(value)
+            output.append(value)
+    return output
+
+
+def _has_blank(series: pd.Series) -> bool:
+    return series.isna().any() or series.astype(str).str.strip().eq("").any()
+
+
+def _factor_key(column: str) -> str:
+    return f'C({_q(column)})'
+
+
+def _anova_source(anova: Dict[str, Any], raw_source: str) -> Optional[Dict[str, Any]]:
+    for row in anova.get("table", []) or []:
+        if row.get("raw_source") == raw_source:
+            return row
+    return None
+
+
+def _is_significant_source(anova: Dict[str, Any], raw_source: str) -> bool:
+    row = _anova_source(anova, raw_source)
+    return bool(row and row.get("significance") in {"1%", "5%"})
+
+
+def _validate_complete_grid(df: pd.DataFrame, keys: List[str], expected: int, label: str) -> None:
+    counts = df.groupby(keys, dropna=False).size()
+    if not counts.empty and counts.max() > 1:
+        raise ValueError(f"{label}: foi encontrada mais de uma observação para a mesma combinação ({' × '.join(keys)}).")
+    if len(counts) < expected:
+        raise ValueError(f"{label}: faltam combinações obrigatórias em {' × '.join(keys)}.")
+    if not (counts == 1).all():
+        raise ValueError(f"{label}: cada combinação em {' × '.join(keys)} deve aparecer exatamente uma vez.")
+
+
 @dataclass
 class AnalysisContext:
     df: pd.DataFrame
@@ -150,11 +190,13 @@ def _prepare_context(payload: Dict[str, Any]) -> AnalysisContext:
     df = pd.DataFrame(data)
     df.columns = [str(c).strip() for c in df.columns]
 
-    response = payload.get("response_column") or "valor"
-    treatment = payload.get("treatment_column") or "tratamento"
+    response = str(payload.get("response_column") or "valor").strip()
+    treatment = str(payload.get("treatment_column") or "tratamento").strip()
     design = (payload.get("design") or "DIC").upper()
     analysis_type = payload.get("analysis_type") or "single"
     goal = payload.get("goal") or "max"
+    payload["response_column"] = response
+    payload["treatment_column"] = treatment
 
     if design not in ALLOWED_DESIGNS:
         raise ValueError(f"Delineamento inválido: {design}. Use DIC, DBC ou DQL.")
@@ -162,6 +204,9 @@ def _prepare_context(payload: Dict[str, Any]) -> AnalysisContext:
         raise ValueError(f"Tipo de análise inválido: {analysis_type}.")
     if goal not in {"max", "min"}:
         raise ValueError("Objetivo inválido. Use 'max' para maior resposta ou 'min' para menor resposta.")
+
+    factor_columns = _dedupe_keep_order([str(c).strip() for c in (payload.get("factor_columns") or []) if str(c).strip()])
+    payload["factor_columns"] = factor_columns
 
     required = [response]
     if analysis_type != "regression":
@@ -171,8 +216,12 @@ def _prepare_context(payload: Dict[str, Any]) -> AnalysisContext:
     if design == "DQL":
         required.extend([payload.get("row_column") or "linha", payload.get("column_column") or "coluna"])
     if analysis_type in {"factorial", "split_plot"}:
-        required.extend(payload.get("factor_columns") or [])
+        required.extend(factor_columns)
+    numeric_col = str(payload.get("numeric_factor_column") or payload.get("dose_column") or "").strip() or None
+    if analysis_type == "regression" and numeric_col:
+        required.append(numeric_col)
 
+    required = _dedupe_keep_order([str(c).strip() for c in required if str(c).strip()])
     missing = [c for c in required if c not in df.columns]
     if missing:
         raise ValueError("Colunas ausentes na base: " + ", ".join(missing))
@@ -182,20 +231,59 @@ def _prepare_context(payload: Dict[str, Any]) -> AnalysisContext:
         bad = int(df[response].isna().sum())
         raise ValueError(f"A coluna de resposta '{response}' contém {bad} valor(es) vazio(s) ou não numérico(s).")
 
+    categorical_required = [c for c in required if c != response and c != numeric_col]
+    for column in categorical_required:
+        if _has_blank(df[column]):
+            raise ValueError(f"A coluna '{column}' contém valor(es) vazio(s).")
+        df[column] = df[column].astype(str).str.strip()
+
     df = df.dropna(subset=[response]).copy()
 
-    if analysis_type != "regression" and df[treatment].nunique() < 2:
-        raise ValueError("A análise precisa de pelo menos 2 tratamentos.")
-
-    if analysis_type != "regression":
+    if analysis_type == "regression":
+        _validate_regression_input(df, payload, response, treatment)
+    else:
+        if df[treatment].nunique() < 2:
+            raise ValueError("A análise precisa de pelo menos 2 tratamentos.")
         _validate_design(df, payload, design, treatment)
     return AnalysisContext(df=df, payload=payload, response=response, treatment=treatment, design=design, analysis_type=analysis_type, goal=goal)
 
 
+def _validate_regression_input(df: pd.DataFrame, payload: Dict[str, Any], response: str, treatment: str) -> None:
+    numeric_col = str(payload.get("numeric_factor_column") or payload.get("dose_column") or "").strip() or None
+    if numeric_col:
+        if numeric_col not in df.columns:
+            raise ValueError(f"Coluna numérica/dose ausente na base: {numeric_col}")
+        x = pd.to_numeric(df[numeric_col], errors="coerce")
+        bad = int(x.isna().sum())
+        if bad:
+            raise ValueError(f"A coluna numérica '{numeric_col}' contém {bad} valor(es) vazio(s) ou não numérico(s).")
+    elif treatment in df.columns:
+        x = _parse_numeric_from_text(df[treatment])
+        bad = int(x.isna().sum())
+        if bad:
+            raise ValueError("Para regressão, informe uma coluna de dose numérica ou use tratamentos com valores numéricos reconhecíveis.")
+    else:
+        raise ValueError("Para regressão, informe a coluna de dose/fator numérico.")
+
+    n_levels = int(pd.Series(x).nunique())
+    if n_levels < 2:
+        raise ValueError("A regressão precisa de pelo menos 2 doses ou níveis numéricos distintos.")
+
+    requested_degree = payload.get("regression_degree")
+    if requested_degree:
+        requested_degree = int(requested_degree)
+        if requested_degree not in {1, 2, 3}:
+            raise ValueError("O grau de regressão deve ser 1, 2 ou 3.")
+        if n_levels < requested_degree + 1:
+            raise ValueError(f"Regressão de grau {requested_degree} exige pelo menos {requested_degree + 1} níveis numéricos distintos.")
+
+
 def _validate_design(df: pd.DataFrame, payload: Dict[str, Any], design: str, treatment: str) -> None:
-    """Valida regras mínimas de cada delineamento experimental."""
+    """Valida regras críticas de cada delineamento experimental."""
+    analysis_type = payload.get("analysis_type") or "single"
+
     if design == "DIC":
-        reps = df.groupby(treatment).size()
+        reps = df.groupby(treatment, dropna=False).size()
         if reps.min() < 1:
             raise ValueError("No DIC, cada tratamento deve ter ao menos uma observação.")
 
@@ -203,12 +291,8 @@ def _validate_design(df: pd.DataFrame, payload: Dict[str, Any], design: str, tre
         block = payload.get("block_column") or "bloco"
         if df[block].nunique() < 2:
             raise ValueError("No DBC, informe pelo menos 2 blocos.")
-        counts = df.groupby([block, treatment]).size()
-        if counts.max() > 1:
-            raise ValueError("No DBC, foi encontrada mais de uma observação para o mesmo tratamento dentro do mesmo bloco. Revise repetições ou agregue os dados.")
-        expected = df[block].nunique() * df[treatment].nunique()
-        if len(counts) < expected:
-            raise ValueError("No DBC, faltam combinações entre blocos e tratamentos.")
+        expected = int(df[block].nunique() * df[treatment].nunique())
+        _validate_complete_grid(df, [block, treatment], expected, "No DBC")
 
     if design == "DQL":
         row = payload.get("row_column") or "linha"
@@ -220,10 +304,29 @@ def _validate_design(df: pd.DataFrame, payload: Dict[str, Any], design: str, tre
             raise ValueError("No DQL, o número de tratamentos, linhas e colunas deve ser igual.")
         if len(df) != n_t * n_t:
             raise ValueError("No DQL, o total de observações deve ser t², onde t é o número de tratamentos.")
-        if not (df.groupby(row).size() == n_t).all() or not (df.groupby(col).size() == n_t).all():
-            raise ValueError("No DQL, cada linha e cada coluna deve conter t observações.")
-        if not (df.groupby(treatment).size() == n_t).all():
-            raise ValueError("No DQL, cada tratamento deve aparecer exatamente t vezes.")
+        _validate_complete_grid(df, [row, col], int(n_t * n_t), "No DQL")
+        _validate_complete_grid(df, [row, treatment], int(n_r * n_t), "No DQL")
+        _validate_complete_grid(df, [col, treatment], int(n_c * n_t), "No DQL")
+
+    if analysis_type in {"factorial", "split_plot"}:
+        factors = payload.get("factor_columns") or []
+        if len(factors) < 2:
+            raise ValueError("Para análise fatorial ou parcelas subdivididas, informe pelo menos dois fatores.")
+        for factor in factors:
+            if df[factor].nunique() < 2:
+                raise ValueError(f"O fator '{factor}' precisa ter pelo menos 2 níveis.")
+        expected_combinations = 1
+        for factor in factors:
+            expected_combinations *= int(df[factor].nunique())
+        combo_counts = df.groupby(factors, dropna=False).size()
+        if len(combo_counts) < expected_combinations:
+            raise ValueError("Faltam combinações entre os níveis dos fatores informados.")
+        if design == "DBC":
+            block = payload.get("block_column") or "bloco"
+            expected = int(df[block].nunique() * expected_combinations)
+            _validate_complete_grid(df, [block] + factors, expected, "Na estrutura fatorial em DBC")
+        elif analysis_type == "split_plot":
+            raise ValueError("Parcelas subdivididas exigem delineamento base DBC neste MVP para validar blocos, parcelas e subparcelas.")
 
 
 def _formula_for(ctx: AnalysisContext) -> Tuple[str, List[str]]:
@@ -376,6 +479,10 @@ def _comparison_tests(table: pd.DataFrame, anova: Dict[str, Any], ctx: AnalysisC
     if mse is None or not df_error or df_error <= 0 or table["treatment"].nunique() < 2:
         return None
 
+    source_key = _factor_key(ctx.treatment)
+    if not _is_significant_source(anova, source_key):
+        return None
+
     test_name = (ctx.payload.get("comparison_test") or "tukey").lower()
     if test_name not in ALLOWED_TESTS:
         test_name = "tukey"
@@ -483,7 +590,7 @@ def _assign_letters(order: List[str], nonsig_pairs: set[Tuple[str, str]]) -> Dic
 def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
     p = ctx.payload
     response = ctx.response
-    numeric_col = p.get("numeric_factor_column") or p.get("dose_column")
+    numeric_col = str(p.get("numeric_factor_column") or p.get("dose_column") or "").strip() or None
     df = ctx.df.copy()
 
     if numeric_col and numeric_col in df.columns:

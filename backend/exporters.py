@@ -335,6 +335,8 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     ]
     for msg in result.get("recommendations", []):
         story.append(Paragraph("• " + msg, bullet))
+    for note in result.get("anova", {}).get("model_notes", []) or []:
+        story.append(Paragraph("• Nota técnica: " + note, bullet))
     story.append(Spacer(1, 0.3 * cm))
 
     anova_rows = [["FV", "GL", "SQ", "QM", "F calc", "F 5%", "F 1%", "p", "Sig"]]
@@ -445,6 +447,12 @@ def build_excel(payload: Dict[str, Any]) -> bytes:
         means_df = pd.DataFrame(result.get("means", {}).get("treatment_means", []))
         means_df.to_excel(writer, index=False, sheet_name="Medias")
         _style_excel_sheet(writer.sheets["Medias"], len(means_df.columns) if not means_df.empty else 1)
+
+        comparison = result.get("means", {}).get("comparison") or {}
+        if comparison.get("comparisons"):
+            comp_df = pd.DataFrame(comparison.get("comparisons", []))
+            comp_df.to_excel(writer, index=False, sheet_name="Comparacoes")
+            _style_excel_sheet(writer.sheets["Comparacoes"], len(comp_df.columns) if not comp_df.empty else 1)
 
         resumo_df = pd.DataFrame({"recomendacao": result.get("recommendations", [])})
         resumo_df.to_excel(writer, index=False, sheet_name="Resumo")

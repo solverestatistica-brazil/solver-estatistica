@@ -8,6 +8,8 @@
   let regressionChart = null;
   let uploadedRows = [];
   let experimentType = 'DBC';
+  let currentResult = null;
+  let currentRegressionPayload = null;
 
   const unlockedSteps = new Set(['modelo', 'dados']);
   let currentStep = 'modelo';
@@ -21,6 +23,7 @@
     bindTypeGrid();
     selectExperimentType('DBC');
     testApi(false);
+    updateExportAvailability(null);
     if (window.location.hash === '#analisar') showApp();
   }
 
@@ -117,8 +120,8 @@
 
     $('downloadPdf').addEventListener('click', () => downloadExport('/api/export/pdf', 'solver-relatorio.pdf'));
     $('downloadExcel').addEventListener('click', () => downloadExport('/api/export/excel', 'solver-resultados.xlsx'));
-    $('downloadPng').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png'));
-    $('downloadPlotPdf').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf'));
+    $('downloadPng').addEventListener('click', () => downloadRegressionExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png'));
+    $('downloadPlotPdf').addEventListener('click', () => downloadRegressionExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf'));
 
     $('switchToRegression').addEventListener('click', () => {
       const col = $('doseAdvisory').dataset.column || '';
@@ -764,8 +767,11 @@
       if (!res.ok) throw new Error(json.detail || 'Erro na analise');
       $('dataErrorMsg').classList.add('hidden');
       $('meansResultBox').classList.add('hidden');
+      currentResult = json;
+      currentRegressionPayload = json?.regression ? payload : null;
       renderResults(json);
       setupComparisonPanel(json);
+      updateExportAvailability(json);
       unlockResultsAndExports();
       goToStep('resultados');
       setApiStatus('API ativa', 'ok');
@@ -781,6 +787,8 @@
   }
 
   function renderResults(result) {
+    currentResult = result || null;
+    updateExportAvailability(currentResult);
     $('emptyResults').classList.add('hidden');
     $('results').classList.remove('hidden');
     const cv = result?.anova?.cv;
@@ -794,6 +802,7 @@
     renderAnovaTable(result?.anova?.table || []);
     renderRecommendations(result?.recommendations || []);
     renderRegression(result?.regression);
+    checkDoseAdvisory();
 
     const firstF = (result?.anova?.table || []).find((r) => r.f_calc != null);
     $('previewCv').textContent = cv == null ? '-' : `${format(cv)}%`;
@@ -1017,6 +1026,27 @@
     return m ? m[1] : null;
   }
 
+  function getSourceRow(result, rawSource) {
+    return (result?.anova?.table || []).find((row) => row.raw_source === rawSource || row.source === rawSource) || null;
+  }
+
+  function isSignificantSource(result, rawSource) {
+    const row = getSourceRow(result, rawSource);
+    return !!row && (row.significance === '1%' || row.significance === '5%');
+  }
+
+  function updateExportAvailability(result) {
+    const hasRegression = !!(result && result.regression && result.regression.selected_model);
+    ['downloadPng', 'downloadPlotPdf'].forEach((id) => {
+      const btn = $(id);
+      if (!btn) return;
+      btn.disabled = !hasRegression;
+      btn.classList.toggle('disabled', !hasRegression);
+      btn.title = hasRegression ? '' : 'Disponível somente depois de uma análise de regressão.';
+      btn.setAttribute('aria-disabled', hasRegression ? 'false' : 'true');
+    });
+  }
+
   function setupComparisonPanel(result) {
     const panel = $('comparisonPanel');
     const container = $('comparisonButtons');
@@ -1033,19 +1063,31 @@
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'btn solid';
+      const raw = `C(Q(\"${result?.meta?.treatment_column || 'tratamento'}\"))`;
+      const sig = isSignificantSource(result, raw);
       btn.textContent = 'Comparar medias';
+      btn.disabled = !sig;
+      btn.title = sig ? '' : 'A comparação de médias só é liberada quando Tratamentos é significativo no teste F.';
       btn.addEventListener('click', () => runComparison(null, null, btn));
       container.appendChild(btn);
+      if (!sig) {
+        const p = document.createElement('p');
+        p.className = 'small-note';
+        p.textContent = 'Tratamentos não foi significativo no teste F; o pós-teste fica bloqueado para evitar conclusão indevida.';
+        container.appendChild(p);
+      }
       return;
     }
 
     let any = false;
+    let anySig = false;
     (result?.anova?.table || []).forEach((row) => {
       if (row.source === 'Total') return;
       const col = extractSingleColumn(row.raw_source);
       if (!col) return;
       any = true;
       const sig = row.significance === '1%' || row.significance === '5%';
+      if (sig) anySig = true;
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'btn';
@@ -1055,7 +1097,7 @@
       btn.addEventListener('click', () => runComparison(col, row.source, btn));
       container.appendChild(btn);
     });
-    if (!any) {
+    if (!any || !anySig) {
       const p = document.createElement('p');
       p.className = 'small-note';
       p.textContent = 'Nenhum fator elegivel foi significativo no teste F - sem comparacao de medias recomendada.';
@@ -1118,6 +1160,13 @@
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.detail || 'Erro na regressao');
+      currentRegressionPayload = json?.regression ? payload : null;
+      if (currentResult) {
+        currentResult.regression = json?.regression || null;
+        updateExportAvailability(currentResult);
+      } else {
+        updateExportAvailability({regression: json?.regression || null});
+      }
       renderRegression(json?.regression);
       setApiStatus('API ativa', 'ok');
     } catch (err) {
@@ -1166,10 +1215,19 @@
     }
   }
 
-  async function downloadExport(endpoint, filename) {
+  async function downloadRegressionExport(endpoint, filename) {
+    if (!currentResult?.regression?.selected_model) {
+      notify('Gráfico disponível somente depois de rodar uma regressão.', 'error');
+      updateExportAvailability(currentResult);
+      return;
+    }
+    return downloadExport(endpoint, filename, currentRegressionPayload);
+  }
+
+  async function downloadExport(endpoint, filename, payloadOverride = null) {
     const base = cleanApiBase(apiInput.value);
     if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
-    const payload = payloadFromUi();
+    const payload = payloadOverride || payloadFromUi();
     try {
       const res = await fetch(`${base}${endpoint}`, {
         method: 'POST',
@@ -1237,14 +1295,44 @@
 
   function parseCsv(text) {
     const cleaned = text.replace(/^﻿/, '');
-    const sep = cleaned.includes(';') ? ';' : ',';
-    const lines = cleaned.trim().split(/\r?\n/).filter(Boolean);
-    const headers = lines.shift().split(sep).map((h) => h.trim());
-    return lines.map((line) => {
-      const values = line.split(sep).map((v) => v.trim());
+    const firstLine = cleaned.split(/\r?\n/).find((line) => line.trim()) || '';
+    const sep = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
+    const rows = [];
+    let current = [];
+    let value = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < cleaned.length; i++) {
+      const char = cleaned[i];
+      const next = cleaned[i + 1];
+      if (char === '"') {
+        if (inQuotes && next === '"') {
+          value += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === sep && !inQuotes) {
+        current.push(value.trim());
+        value = '';
+      } else if ((char === '\n' || char === '\r') && !inQuotes) {
+        if (char === '\r' && next === '\n') i++;
+        current.push(value.trim());
+        value = '';
+        if (current.some((cell) => cell !== '')) rows.push(current);
+        current = [];
+      } else {
+        value += char;
+      }
+    }
+    current.push(value.trim());
+    if (current.some((cell) => cell !== '')) rows.push(current);
+
+    const headers = (rows.shift() || []).map((h) => h.trim());
+    return rows.map((line) => {
       const obj = {};
       headers.forEach((h, i) => {
-        const raw = values[i] ?? '';
+        const raw = line[i] ?? '';
         const numeric = raw.replace(',', '.');
         obj[h] = numeric !== '' && !Number.isNaN(Number(numeric)) ? Number(numeric) : raw;
       });
