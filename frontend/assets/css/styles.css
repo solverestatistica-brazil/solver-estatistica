@@ -157,6 +157,8 @@ h1{font-family:var(--font-display);font-size:clamp(34px,4.2vw,52px);line-height:
 .recommendations{margin:0;padding-left:18px;color:var(--text-l2);line-height:1.7}
 .regression-summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
 .regression-summary span{background:var(--neutral-tint);color:var(--text-l2);font-family:var(--font-heading);font-size:11px;font-weight:700;border-radius:999px;padding:7px 10px}
+.regression-note{flex-basis:100%;margin:2px 0 0;font-family:var(--font-text);font-size:12.5px;color:var(--text-l2);background:var(--surface-subtle);border:1px solid var(--surface-line);border-radius:10px;padding:9px 12px}
+.regression-note.warning{color:var(--accent);background:var(--accent-tint);border-color:rgba(194,112,61,.35);font-weight:600}
 
 .sig-pill{display:inline-block;font-family:var(--font-heading);font-size:10.5px;font-weight:700;border-radius:999px;padding:3px 9px}
 .sig-1{background:var(--success-tint);color:var(--success)}
