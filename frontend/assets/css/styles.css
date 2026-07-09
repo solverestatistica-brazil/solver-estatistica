@@ -240,5 +240,10 @@ input[type="file"]::file-selector-button:hover{background:var(--surface-subtle)}
 .mean-bar-wrap{background:var(--surface-subtle);border-radius:999px;height:11px;width:100%;min-width:90px;overflow:hidden;border:1px solid var(--surface-line)}
 .mean-bar{height:100%;border-radius:999px;transition:width .3s ease}
 
+/* --- Alinhamento das tabelas de resultado --- */
+#anovaTable th:not(:first-child),#anovaTable td:not(:first-child){text-align:center}
+#anovaTable th:first-child,#anovaTable td:first-child{text-align:left}
+#meansTable th,#meansTable td{text-align:center}
+
 @media (max-width:980px){.type-grid{grid-template-columns:repeat(2,1fr)}}
 @media (max-width:640px){.type-grid{grid-template-columns:1fr}.manual-builder-dynamic .manual-builder{grid-template-columns:1fr}}
