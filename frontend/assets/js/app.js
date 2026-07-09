@@ -478,13 +478,14 @@
       setApiStatus('API nao configurada', 'err');
       return;
     }
+    setApiStatus('Verificando API...', '');
     try {
       const res = await fetch(`${base}/health`);
       if (!res.ok) throw new Error('status ' + res.status);
-      setApiStatus('API online', 'ok');
+      setApiStatus('API ativa', 'ok');
       if (showSuccess) notify('Backend salvo e respondendo.', 'success');
     } catch (err) {
-      setApiStatus('API sem resposta', 'err');
+      setApiStatus('API indisponivel', 'err');
       if (showSuccess) notify('Nao consegui conectar. Verifique a URL do Render e o CORS.', 'error');
     }
   }
@@ -492,6 +493,29 @@
   function setApiStatus(text, type) {
     apiStatus.textContent = text;
     apiStatus.className = `status-pill ${type || ''}`;
+    const dot = $('apiDot');
+    if (dot) dot.className = `api-dot ${type === 'ok' ? 'ok' : type === 'err' ? 'err' : ''}`;
+  }
+
+  // --- Feedback de carregamento (spinner + mensagens dinamicas) ---
+
+  function startLoadingSequence(btn, messages) {
+    if (!btn) return () => {};
+    const original = btn.textContent;
+    btn.disabled = true;
+    btn.classList.add('is-loading');
+    let i = 0;
+    btn.textContent = messages[0];
+    const interval = setInterval(() => {
+      i = (i + 1) % messages.length;
+      btn.textContent = messages[i];
+    }, 900);
+    return () => {
+      clearInterval(interval);
+      btn.disabled = false;
+      btn.classList.remove('is-loading');
+      btn.textContent = original;
+    };
   }
 
   function notify(message, type = 'info') {
@@ -719,6 +743,11 @@
     }
 
     const payload = payloadFromUi();
+    const stopLoading = startLoadingSequence($('runAnalysis'), [
+      'Carregando dados...',
+      'Executando ANOVA (teste F)...',
+      'Calculando medias e organizando resultados...'
+    ]);
     try {
       setApiStatus('Processando...', '');
       const res = await fetch(`${base}/api/analyze`, {
@@ -735,13 +764,15 @@
       checkDoseAdvisory();
       unlockResultsAndExports();
       goToStep('resultados');
-      setApiStatus('API online', 'ok');
+      setApiStatus('API ativa', 'ok');
     } catch (err) {
       setApiStatus('Erro na analise', 'err');
       const msg = err.message || 'Erro ao rodar analise.';
       notify(msg, 'error');
       $('dataErrorMsg').textContent = msg;
       $('dataErrorMsg').classList.remove('hidden');
+    } finally {
+      stopLoading();
     }
   }
 
@@ -928,7 +959,7 @@
       btn.type = 'button';
       btn.className = 'btn solid';
       btn.textContent = 'Comparar medias';
-      btn.addEventListener('click', () => runComparison(null, null));
+      btn.addEventListener('click', () => runComparison(null, null, btn));
       container.appendChild(btn);
       return;
     }
@@ -946,7 +977,7 @@
       btn.textContent = `Comparar: ${row.source}`;
       btn.disabled = !sig;
       btn.title = sig ? '' : 'So e possivel comparar fatores significativos no teste F.';
-      btn.addEventListener('click', () => runComparison(col, row.source));
+      btn.addEventListener('click', () => runComparison(col, row.source, btn));
       container.appendChild(btn);
     });
     if (!any) {
@@ -957,12 +988,16 @@
     }
   }
 
-  async function runComparison(colOverride, label) {
+  async function runComparison(colOverride, label, btn) {
     const base = cleanApiBase(apiInput.value);
     if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
     const payload = payloadFromUi();
     payload.comparison_test = $('comparisonTestPost').value;
     if (colOverride) payload.treatment_column = colOverride;
+    const stopLoading = startLoadingSequence(btn, [
+      'Comparando medias...',
+      'Aplicando teste de agrupamento...'
+    ]);
     try {
       setApiStatus('Processando...', '');
       const res = await fetch(`${base}/api/analyze`, {
@@ -975,10 +1010,12 @@
       $('meansResultBox').classList.remove('hidden');
       $('meansFactorLabel').textContent = label ? `Medias e grupos - ${label}` : 'Medias e grupos';
       renderMeansTable(json?.means?.treatment_means || []);
-      setApiStatus('API online', 'ok');
+      setApiStatus('API ativa', 'ok');
     } catch (err) {
       setApiStatus('Erro na comparacao', 'err');
       notify(err.message || 'Erro ao comparar medias.', 'error');
+    } finally {
+      stopLoading();
     }
   }
 
