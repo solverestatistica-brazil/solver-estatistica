@@ -932,6 +932,14 @@
       summary.appendChild(span);
     });
 
+    if (reg.recommendation) {
+      const note = document.createElement('p');
+      const overridden = reg.recommendation.includes('não foi o melhor');
+      note.className = overridden ? 'regression-note warning' : 'regression-note';
+      note.textContent = reg.recommendation;
+      summary.appendChild(note);
+    }
+
     const ctx = $('regressionChart');
     if (regressionChart) regressionChart.destroy();
 
