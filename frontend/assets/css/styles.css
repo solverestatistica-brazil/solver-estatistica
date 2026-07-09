@@ -225,10 +225,16 @@ input[type="file"]::file-selector-button:hover{background:var(--surface-subtle)}
 .manual-builder-dynamic #matrixSizeNote{font-weight:600;color:var(--brand-deep)}
 
 /* --- Distribuicao da tabela de dados --- */
-.data-table th.col-resp,.data-table td.col-resp{background:var(--success-tint)}
-.data-table th.col-resp{color:var(--brand-deep)}
+/* O destaque da coluna resposta precisa ser visivel tanto no cabecalho escuro
+   quanto nas celulas claras. Antes o texto do th ficava verde-escuro sobre
+   fundo quase preto (ilegivel) e o tom da celula (success-tint) era quase
+   identico ao cinza da zebra, ficando praticamente invisivel. */
+.data-table th.col-resp{background:var(--brand-deep);color:var(--brand-bright);position:relative}
+.data-table th.col-resp::after{content:'resposta';display:block;font-size:8px;letter-spacing:.06em;text-transform:uppercase;color:var(--brand-bright);opacity:.75;font-weight:600;margin-top:2px}
+.data-table td.col-resp{background:rgba(62,126,84,.16);border-left:2px solid var(--brand);border-right:2px solid var(--brand)}
+.data-table tbody tr:nth-child(even) td.col-resp{background:rgba(62,126,84,.22)}
 .data-table td input{text-align:left}
-.data-table td.col-resp input{font-weight:700}
+.data-table td.col-resp input{font-weight:700;color:var(--brand-deep)}
 
 /* --- Barra de medias (Tukey e demais testes) --- */
 .mean-bar-wrap{background:var(--surface-subtle);border-radius:999px;height:11px;width:100%;min-width:90px;overflow:hidden;border:1px solid var(--surface-line)}
