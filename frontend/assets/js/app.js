@@ -1215,6 +1215,101 @@
     }
   }
 
+
+
+  function isMobileViewport() {
+    return window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
+  }
+
+  function ensurePdfExportOverlay() {
+    let overlay = $('pdfExportOverlay');
+    if (overlay) return overlay;
+    overlay = document.createElement('div');
+    overlay.id = 'pdfExportOverlay';
+    overlay.className = 'pdf-export-overlay hidden';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-live', 'polite');
+    overlay.innerHTML = `
+      <div class="pdf-export-sheet">
+        <div class="pdf-export-handle"></div>
+        <div class="pdf-export-head">
+          <div class="pdf-export-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v6h5"/><path d="M9 14h6M9 17h4"/></svg>
+          </div>
+          <div class="pdf-export-copy">
+            <p class="pdf-export-title" id="pdfExportTitle">Preparando PDF</p>
+            <p class="pdf-export-subtitle" id="pdfExportSubtitle">Montando capa, ANOVA e recomendações.</p>
+          </div>
+          <button class="pdf-export-close" id="pdfExportClose" type="button" aria-label="Fechar">×</button>
+        </div>
+        <div class="pdf-export-preview" aria-hidden="true">
+          <div class="pdf-page-thumb"><b>SOLVER</b><div class="pdf-page-line"></div><div class="pdf-page-line short"></div><div class="pdf-page-kpis"><i></i><i></i><i></i></div><div class="pdf-page-line"></div><div class="pdf-page-line short"></div></div>
+          <div class="pdf-page-thumb"><b>ANOVA</b><div class="pdf-page-line"></div><div class="pdf-page-line"></div><div class="pdf-page-chart"></div><div class="pdf-page-line short"></div></div>
+        </div>
+        <div class="pdf-export-progress">
+          <div class="pdf-progress-track"><div class="pdf-progress-fill" id="pdfProgressFill"></div></div>
+          <span class="pdf-progress-value" id="pdfProgressValue">0%</span>
+        </div>
+        <ul class="pdf-export-steps">
+          <li id="pdfStepCompile"><i></i><span>Compilando resultados</span></li>
+          <li id="pdfStepCharts"><i></i><span>Inserindo gráficos e tabelas</span></li>
+          <li id="pdfStepFinish"><i></i><span>Finalizando arquivo</span></li>
+        </ul>
+        <div class="pdf-export-actions hidden" id="pdfExportActions">
+          <button class="btn solid" id="pdfExportDone" type="button">Fechar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    $('pdfExportClose').addEventListener('click', () => overlay.classList.add('hidden'));
+    $('pdfExportDone').addEventListener('click', () => overlay.classList.add('hidden'));
+    overlay.addEventListener('click', (event) => {
+      if (event.target === overlay && !$('pdfExportActions').classList.contains('hidden')) overlay.classList.add('hidden');
+    });
+    return overlay;
+  }
+
+  function setPdfProgress(percent, title, subtitle, state = 'running') {
+    const overlay = ensurePdfExportOverlay();
+    overlay.classList.remove('hidden');
+    const value = Math.max(0, Math.min(100, Math.round(percent)));
+    $('pdfProgressFill').style.width = `${value}%`;
+    $('pdfProgressValue').textContent = `${value}%`;
+    if (title) $('pdfExportTitle').textContent = title;
+    if (subtitle) $('pdfExportSubtitle').textContent = subtitle;
+    $('pdfExportActions').classList.toggle('hidden', state !== 'done' && state !== 'error');
+    const compile = $('pdfStepCompile');
+    const charts = $('pdfStepCharts');
+    const finish = $('pdfStepFinish');
+    [compile, charts, finish].forEach((el) => el.classList.remove('done', 'active'));
+    if (value >= 25) compile.classList.add('done'); else compile.classList.add('active');
+    if (value >= 65) charts.classList.add('done'); else if (value >= 25) charts.classList.add('active');
+    if (value >= 100) finish.classList.add('done'); else if (value >= 65) finish.classList.add('active');
+    if (state === 'error') {
+      $('pdfExportTitle').textContent = 'Não foi possível gerar o PDF';
+      $('pdfExportSubtitle').textContent = 'Confira a conexão com o backend e tente novamente.';
+    }
+  }
+
+  function startMobilePdfProgress(filename) {
+    if (!isMobileViewport()) return () => {};
+    let progress = 8;
+    setPdfProgress(progress, 'Preparando PDF', `Gerando ${filename} sem alterar sua análise.`);
+    const timer = setInterval(() => {
+      progress = Math.min(88, progress + Math.ceil(Math.random() * 12));
+      setPdfProgress(progress, 'Preparando PDF', progress < 60 ? 'Compilando resultados e ANOVA.' : 'Inserindo gráficos, médias e recomendações.');
+    }, 420);
+    return (state = 'done') => {
+      clearInterval(timer);
+      if (state === 'done') {
+        setPdfProgress(100, 'PDF pronto para baixar', 'O download foi iniciado automaticamente.', 'done');
+        window.setTimeout(() => ensurePdfExportOverlay().classList.add('hidden'), 2200);
+      } else {
+        setPdfProgress(progress, 'Não foi possível gerar o PDF', 'A exportação não foi concluída.', 'error');
+      }
+    };
+  }
+
   async function downloadRegressionExport(endpoint, filename) {
     if (!currentResult?.regression?.selected_model) {
       notify('Gráfico disponível somente depois de rodar uma regressão.', 'error');
@@ -1228,6 +1323,7 @@
     const base = cleanApiBase(apiInput.value);
     if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
     const payload = payloadOverride || payloadFromUi();
+    const finishMobilePdfProgress = endpoint === '/api/export/pdf' ? startMobilePdfProgress(filename) : () => {};
     try {
       const res = await fetch(`${base}${endpoint}`, {
         method: 'POST',
@@ -1248,7 +1344,9 @@
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      finishMobilePdfProgress('done');
     } catch (err) {
+      finishMobilePdfProgress('error');
       notify(err.message || 'Erro ao exportar.', 'error');
     }
   }
