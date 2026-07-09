@@ -110,6 +110,11 @@
     $('runAnalysis').addEventListener('click', runAnalysis);
     $('fileInput').addEventListener('change', handleFileUpload);
 
+    $('comparisonTestPost').addEventListener('change', () => {
+      const isRegression = $('comparisonTestPost').value === 'regression';
+      $('regressionDegreePostWrap').classList.toggle('hidden', !isRegression);
+    });
+
     $('downloadPdf').addEventListener('click', () => downloadExport('/api/export/pdf', 'solver-relatorio.pdf'));
     $('downloadExcel').addEventListener('click', () => downloadExport('/api/export/excel', 'solver-resultados.xlsx'));
     $('downloadPng').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png'));
@@ -1021,6 +1026,9 @@
   }
 
   async function runComparison(colOverride, label, btn) {
+    if ($('comparisonTestPost').value === 'regression') {
+      return runRegressionFromComparison(colOverride, btn);
+    }
     const base = cleanApiBase(apiInput.value);
     if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
     const payload = payloadFromUi();
@@ -1046,6 +1054,37 @@
     } catch (err) {
       setApiStatus('Erro na comparacao', 'err');
       notify(err.message || 'Erro ao comparar medias.', 'error');
+    } finally {
+      stopLoading();
+    }
+  }
+
+  async function runRegressionFromComparison(colOverride, btn) {
+    const base = cleanApiBase(apiInput.value);
+    if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
+    const payload = payloadFromUi();
+    payload.analysis_type = 'regression';
+    payload.numeric_factor_column = colOverride || $('treatmentColumn').value || 'tratamento';
+    const degree = $('regressionDegreePost').value;
+    payload.regression_degree = degree ? Number(degree) : null;
+    const stopLoading = startLoadingSequence(btn, [
+      'Ajustando regressao...',
+      'Testando graus polinomiais...'
+    ]);
+    try {
+      setApiStatus('Processando...', '');
+      const res = await fetch(`${base}/api/analyze`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || 'Erro na regressao');
+      renderRegression(json?.regression);
+      setApiStatus('API ativa', 'ok');
+    } catch (err) {
+      setApiStatus('Erro na regressao', 'err');
+      notify(err.message || 'Erro ao rodar regressao.', 'error');
     } finally {
       stopLoading();
     }
