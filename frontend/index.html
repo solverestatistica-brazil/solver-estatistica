@@ -15,9 +15,9 @@
 <nav class="nav">
 <a class="logo-group" href="#top" id="logoHome" aria-label="Solver Estatística">
 <svg width="42" height="42" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-<rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="rgba(255,255,255,0.03)" stroke="#3E7E54" stroke-width="1.6"/>
-<polyline points="10,25 16,18 20,21 28,12" stroke="#8FC378" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-<polyline points="23,12 28,12 28,17" stroke="#8FC378" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="rgba(255,255,255,0.03)" style="stroke:var(--brand)" stroke-width="1.6"/>
+<polyline points="10,25 16,18 20,21 28,12" style="stroke:var(--brand-bright)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<polyline points="23,12 28,12 28,17" style="stroke:var(--brand-bright)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 </svg>
 <span>
 <strong>SOLVER</strong>
@@ -61,16 +61,26 @@
 <div class="chart-placeholder">
 <div class="chart-title"><span>Curva ajustada e dose ótima</span><b id="previewDose">124,8 kg/ha</b></div>
 <svg width="100%" height="105" viewBox="0 0 340 105" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-<defs><linearGradient id="areaFillSolver" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#3E7E54" stop-opacity="0.26"/><stop offset="100%" stop-color="#3E7E54" stop-opacity="0"/></linearGradient></defs>
+<defs><linearGradient id="areaFillSolver" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" style="stop-color:var(--brand)" stop-opacity="0.28"/><stop offset="100%" style="stop-color:var(--brand)" stop-opacity="0"/></linearGradient></defs>
+<line x1="8" y1="20" x2="330" y2="20" style="stroke:var(--surface-line)" stroke-width="1"/>
+<line x1="8" y1="52" x2="330" y2="52" style="stroke:var(--surface-line)" stroke-width="1"/>
+<line x1="8" y1="84" x2="330" y2="84" style="stroke:var(--surface-line)" stroke-width="1"/>
 <path d="M8,84 C42,70 66,34 112,28 C150,24 182,39 208,47 C246,55 278,62 330,54 L330,98 L8,98 Z" fill="url(#areaFillSolver)"/>
-<path d="M8,84 C42,70 66,34 112,28 C150,24 182,39 208,47 C246,55 278,62 330,54" fill="none" stroke="#24492E" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/>
-<line x1="112" y1="28" x2="112" y2="96" stroke="#D7DEDA" stroke-width="1.5" stroke-dasharray="3,3"/>
-<circle cx="112" cy="28" r="5.5" fill="#C2703D" stroke="#F6F9F6" stroke-width="2.5"/>
+<path d="M8,84 C42,70 66,34 112,28 C150,24 182,39 208,47 C246,55 278,62 330,54" fill="none" style="stroke:var(--brand-deep)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<line x1="112" y1="28" x2="112" y2="96" style="stroke:var(--surface-line)" stroke-width="1.5" stroke-dasharray="3,3"/>
+<circle cx="112" cy="28" r="9" style="fill:var(--brand)" opacity="0.16"/>
+<circle cx="112" cy="28" r="5.5" style="fill:var(--accent)" stroke="var(--surface)" stroke-width="2.5"/>
 </svg>
 </div>
 <div class="mini-list">
-<div><span>Tratamentos</span><b>Significativo <mark>1%</mark></b></div>
-<div><span>Blocos</span><b>Não significativo <mark class="muted">ns</mark></b></div>
+<div class="mini-list-item">
+<div class="mini-list-top"><span>Tratamentos</span><b>Significativo <mark>1%</mark></b></div>
+<div class="mean-bar-wrap mini"><div class="mean-bar" style="width:96%;background:var(--brand)"></div></div>
+</div>
+<div class="mini-list-item">
+<div class="mini-list-top"><span>Blocos</span><b>Não significativo <mark class="muted">ns</mark></b></div>
+<div class="mean-bar-wrap mini"><div class="mean-bar" style="width:18%;background:var(--neutral)"></div></div>
+</div>
 </div>
 </section>
 </header>
