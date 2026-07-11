@@ -1094,7 +1094,12 @@
       btn.textContent = `Comparar: ${row.source}`;
       btn.disabled = !sig;
       btn.title = sig ? '' : 'So e possivel comparar fatores significativos no teste F.';
-      btn.addEventListener('click', () => runComparison(col, row.source, btn));
+      const hasFactorComparisons = Array.isArray(result?.factor_comparisons) && result.factor_comparisons.length > 0;
+      if (hasFactorComparisons) {
+        btn.addEventListener('click', () => showFactorComparison(col, row.source));
+      } else {
+        btn.addEventListener('click', () => runComparison(col, row.source, btn));
+      }
       container.appendChild(btn);
     });
     if (!any || !anySig) {
@@ -1103,6 +1108,18 @@
       p.textContent = 'Nenhum fator elegivel foi significativo no teste F - sem comparacao de medias recomendada.';
       container.appendChild(p);
     }
+  }
+
+  function showFactorComparison(col, label) {
+    const entry = (currentResult?.factor_comparisons || []).find((f) => f.factor === col);
+    if (!entry) {
+      notify('Comparacao de medias indisponivel para este fator.', 'error');
+      return;
+    }
+    $('meansResultBox').classList.remove('hidden');
+    const errorLabel = entry.error_used === 'a' ? ', Erro (a)' : entry.error_used === 'b' ? ', Erro (b)' : '';
+    $('meansFactorLabel').textContent = `Medias e grupos - ${label} (${entry.test}${errorLabel})`;
+    renderMeansTable(entry.levels || []);
   }
 
   async function runComparison(colOverride, label, btn) {
@@ -1214,8 +1231,6 @@
       advisory.dataset.column = '';
     }
   }
-
-
 
   function isMobileViewport() {
     return window.matchMedia && window.matchMedia('(max-width: 720px)').matches;
@@ -1392,7 +1407,7 @@
   }
 
   function parseCsv(text) {
-    const cleaned = text.replace(/^﻿/, '');
+    const cleaned = text.replace(/^ /, '');
     const firstLine = cleaned.split(/\r?\n/).find((line) => line.trim()) || '';
     const sep = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
     const rows = [];
@@ -1431,11 +1446,27 @@
       const obj = {};
       headers.forEach((h, i) => {
         const raw = line[i] ?? '';
-        const numeric = raw.replace(',', '.');
-        obj[h] = numeric !== '' && !Number.isNaN(Number(numeric)) ? Number(numeric) : raw;
+        obj[h] = toNumericValue(raw);
       });
       return obj;
     });
+  }
+
+  function toNumericValue(raw) {
+    const trimmed = String(raw ?? '').trim();
+    if (trimmed === '') return trimmed;
+    // Padrao brasileiro: milhar com '.', decimal com ',' (ex.: '1.234,56' ou '12,5').
+    if (/^-?\d{1,3}(\.\d{3})*,\d+$/.test(trimmed) || /^-?\d+,\d+$/.test(trimmed)) {
+      const normalized = trimmed.replace(/\./g, '').replace(',', '.');
+      const n = Number(normalized);
+      return Number.isNaN(n) ? raw : n;
+    }
+    // Numero simples (inteiro ou decimal com ponto), sem separador de milhar ambiguo.
+    if (/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      const n = Number(trimmed);
+      return Number.isNaN(n) ? raw : n;
+    }
+    return raw;
   }
 
   function loadExampleData() {
