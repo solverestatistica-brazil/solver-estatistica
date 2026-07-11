@@ -397,9 +397,9 @@ body:has(#view-app:not(.hidden)){background-size:38px 38px,38px 38px,100% 100%,1
 /* --- Preview card v2: anel de CV, tabela ANOVA e acoes rapidas --- */
 .stat-cv{display:flex;flex-direction:column}
 .cv-ring-row{display:flex;align-items:center;gap:10px;margin:4px 0 2px}
-.cv-ring{position:relative;width:50px;height:50px;flex-shrink:0}
-.cv-ring-inner{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:3px;text-align:center}
-.stats-row .cv-ring-inner strong{font-size:10px;line-height:1.08;font-weight:800;color:var(--text-l1)}
+.cv-ring{flex-shrink:0}
+.cv-ring-text{display:flex;flex-direction:column;line-height:1.25;gap:1px}
+.cv-ring-text span{font-size:10.5px;color:var(--text-l2);font-weight:600}
 .stats-row .cv-headline{font-size:16.5px}
 .preview-actions{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--surface-line)}
 .preview-action{display:flex;flex-direction:column;align-items:flex-start}
