@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import re
 from typing import Any, Dict, Optional
 
 import pandas as pd
@@ -125,14 +126,47 @@ def export_regression_plot(payload: AnalyzePayload, fmt: str = "png") -> Respons
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+_BR_NUMBER_RE = re.compile(r"^-?\d{1,3}(\.\d{3})*,\d+$|^-?\d+,\d+$|^-?\d+$")
+
+
+def _looks_brazilian_numeric(series: pd.Series) -> bool:
+    """Detecta coluna com decimal ',' (padrão brasileiro), ex.: '12,5' ou '1.234,56'."""
+    values = series.dropna().astype(str).str.strip()
+    if values.empty:
+        return False
+    has_comma = values.str.contains(",", regex=False)
+    if not has_comma.any():
+        return False
+    return bool(values.apply(lambda v: bool(_BR_NUMBER_RE.match(v))).all())
+
+
+def _normalize_brazilian_decimals(df: pd.DataFrame) -> pd.DataFrame:
+    """Converte colunas de texto com decimal ',' para float, sem mexer em colunas de
+    rótulo (tratamento, bloco etc.). Corrige o 422 relatado quando o CSV vem no padrão
+    brasileiro (separador ';' e decimal ',') e a coluna de resposta chega como texto."""
+    df = df.copy()
+    for col in df.columns:
+        if df[col].dtype == object and _looks_brazilian_numeric(df[col]):
+            df[col] = (
+                df[col]
+                .astype(str)
+                .str.strip()
+                .str.replace(".", "", regex=False)
+                .str.replace(",", ".", regex=False)
+                .astype(float)
+            )
+    return df
+
+
 async def _read_uploaded_table(file: UploadFile) -> pd.DataFrame:
     raw = await file.read()
     name = (file.filename or "").lower()
     if name.endswith(".csv"):
         try:
-            return pd.read_csv(io.BytesIO(raw), sep=None, engine="python")
+            df = pd.read_csv(io.BytesIO(raw), sep=None, engine="python")
         except Exception:
-            return pd.read_csv(io.BytesIO(raw), sep=";")
+            df = pd.read_csv(io.BytesIO(raw), sep=";")
+        return _normalize_brazilian_decimals(df)
     if name.endswith((".xlsx", ".xls")):
         return pd.read_excel(io.BytesIO(raw))
     raise ValueError("Formato não suportado. Envie CSV, XLS ou XLSX.")

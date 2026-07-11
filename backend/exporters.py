@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import io
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib
 
@@ -18,7 +18,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
-from reportlab.platypus import BaseDocTemplate, Frame, Image, KeepTogether, PageTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import BaseDocTemplate, CondPageBreak, Frame, Image, PageTemplate, Paragraph, Spacer, Table, TableStyle
 
 from statistics_engine import analyze
 
@@ -65,7 +65,6 @@ TYPE_LABELS = {
     "regression": "regressão direta",
 }
 
-
 def _fmt(value: Any) -> str:
     if value is None:
         return "—"
@@ -73,12 +72,10 @@ def _fmt(value: Any) -> str:
         return f"{value:.4f}".replace(".", ",")
     return str(value)
 
-
 def _fmt_pct(value: Any) -> str:
     if value is None:
         return "—"
     return f"{value:.2f}%".replace(".", ",")
-
 
 def _draw_header_footer(canvas_obj, doc) -> None:
     """Desenha a faixa de marca no topo e o rodape em toda pagina do PDF."""
@@ -159,7 +156,6 @@ def _draw_header_footer(canvas_obj, doc) -> None:
     canvas_obj.drawRightString(width - 1.3 * cm, 0.75 * cm, f"Página {doc.page}")
     canvas_obj.restoreState()
 
-
 def _kpi_card(label: str, value: str, sub: str) -> Table:
     label_style = ParagraphStyle("KpiLabel", fontName="Helvetica-Bold", fontSize=7.5, textColor=TEXT_L2, leading=9)
     value_style = ParagraphStyle("KpiValue", fontName="Helvetica-Bold", fontSize=18, textColor=TEXT_L1, leading=21, spaceBefore=3)
@@ -179,7 +175,6 @@ def _kpi_card(label: str, value: str, sub: str) -> Table:
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
     ]))
     return card
-
 
 def _kpi_cards(result: Dict[str, Any]) -> Table:
     cv = result.get("anova", {}).get("cv")
@@ -205,7 +200,6 @@ def _kpi_cards(result: Dict[str, Any]) -> Table:
     ]))
     return layout
 
-
 def _sig_colors(value: Optional[str]):
     if value == "1%":
         return SUCCESS_TINT, SUCCESS
@@ -214,7 +208,6 @@ def _sig_colors(value: Optional[str]):
     if value in (None, "—", "-", "ns"):
         return NEUTRAL_TINT, NEUTRAL
     return None, None
-
 
 def _styled_table(rows: List[List[Any]], sig_col: Optional[int] = None) -> Table:
     """Tabela no estilo do dashboard: sem grade vertical, so linhas horizontais
@@ -252,7 +245,6 @@ def _styled_table(rows: List[List[Any]], sig_col: Optional[int] = None) -> Table
     table.setStyle(TableStyle(style))
     return table
 
-
 def _intro_text(result: Dict[str, Any]) -> str:
     meta = result.get("meta", {})
     design = meta.get("design")
@@ -274,14 +266,12 @@ def _intro_text(result: Dict[str, Any]) -> str:
         f"5% e 1% de probabilidade."
     )
 
-
 def _anova_caption(result: Dict[str, Any]) -> str:
     return (
         "Fontes de variação marcadas como <b>1%</b> ou <b>5%</b> apresentam efeito estatisticamente "
         "significativo sobre a variável resposta nesses níveis de probabilidade; <b>ns</b> "
         "(não significativo) indica que não houve evidência estatística de efeito."
     )
-
 
 def _means_caption(result: Dict[str, Any]) -> Optional[str]:
     comparison = (result.get("means") or {}).get("comparison")
@@ -294,7 +284,6 @@ def _means_caption(result: Dict[str, Any]) -> Optional[str]:
         f"Tratamentos seguidos pela mesma letra na coluna <b>Grupo</b> não diferem estatisticamente "
         f"entre si pelo teste de <b>{test_name.title()}</b>, ao nível de {alpha_pct} de significância."
     )
-
 
 def build_pdf(payload: Dict[str, Any]) -> bytes:
     """Gera relatorio tecnico em PDF, com identidade visual Solver, a partir do payload de analise."""
@@ -345,22 +334,22 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
             r.get("source"), _fmt(r.get("df")), _fmt(r.get("sum_sq")), _fmt(r.get("mean_sq")),
             _fmt(r.get("f_calc")), _fmt(r.get("f_5")), _fmt(r.get("f_1")), _fmt(r.get("p_value")), r.get("significance"),
         ])
-    story.append(KeepTogether([
-        Paragraph("Quadro de ANOVA · Teste F", h2),
-        _styled_table(anova_rows, sig_col=8),
-        Paragraph(_anova_caption(result), caption),
-    ]))
+    story.append(CondPageBreak(3.2 * cm))
+    story.append(Paragraph("Quadro de ANOVA · Teste F", h2))
+    story.append(_styled_table(anova_rows, sig_col=8))
+    story.append(Paragraph(_anova_caption(result), caption))
     story.append(Spacer(1, 0.35 * cm))
 
     means_rows = [["Tratamento", "Média", "n", "DP", "Grupo"]]
     for r in result.get("means", {}).get("treatment_means", []):
         means_rows.append([r.get("treatment"), _fmt(r.get("mean")), _fmt(r.get("n")), _fmt(r.get("sd")), r.get("group", "")])
     if len(means_rows) > 1:
-        means_block = [Paragraph("Médias por tratamento", h2), _styled_table(means_rows)]
+        story.append(CondPageBreak(3.2 * cm))
+        story.append(Paragraph("Médias por tratamento", h2))
+        story.append(_styled_table(means_rows))
         means_caption = _means_caption(result)
         if means_caption:
-            means_block.append(Paragraph(means_caption, caption))
-        story.append(KeepTogether(means_block))
+            story.append(Paragraph(means_caption, caption))
         story.append(Spacer(1, 0.3 * cm))
 
     comparison = result.get("means", {}).get("comparison")
@@ -371,13 +360,50 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
                 c.get("group_a"), c.get("group_b"), _fmt(c.get("diff")), _fmt(c.get("critical_diff")),
                 _fmt(c.get("p_value")), "Sim" if c.get("significant") else "Não",
             ])
-        comparison_block = [
-            Paragraph(f"Teste de comparação de médias · {comparison.get('test')} (α = {comparison.get('alpha')})", h2),
-            _styled_table(comp_rows),
-        ]
+        story.append(CondPageBreak(3.2 * cm))
+        story.append(Paragraph(f"Teste de comparação de médias · {comparison.get('test')} (α = {comparison.get('alpha')})", h2))
+        story.append(_styled_table(comp_rows))
         if comparison.get("note"):
-            comparison_block.append(Paragraph(comparison.get("note"), caption))
-        story.append(KeepTogether(comparison_block))
+            story.append(Paragraph(comparison.get("note"), caption))
+        story.append(Spacer(1, 0.3 * cm))
+
+    for fc in result.get("factor_comparisons", []) or []:
+        fc_rows = [["Nível", "Média", "n", "Grupo"]]
+        for lv in fc.get("levels", []):
+            fc_rows.append([lv.get("treatment"), _fmt(lv.get("mean")), _fmt(lv.get("n")), lv.get("group", "")])
+        if len(fc_rows) <= 1:
+            continue
+        error_label = "Erro (a)" if fc.get("error_used") == "a" else "Erro (b)"
+        story.append(CondPageBreak(3.2 * cm))
+        story.append(Paragraph(f"Médias marginais · fator {fc.get('factor')} ({fc.get('test')}, {error_label})", h2))
+        story.append(_styled_table(fc_rows))
+        alpha_pct = f"{fc.get('alpha', 0.05) * 100:.0f}%".replace(".", ",")
+        story.append(Paragraph(
+            f"Médias do fator <b>{fc.get('factor')}</b> seguidas pela mesma letra não diferem "
+            f"estatisticamente entre si (α = {alpha_pct}).", caption,
+        ))
+        story.append(Spacer(1, 0.3 * cm))
+
+    interaction_blocks = result.get("interaction_breakdown", []) or []
+    if interaction_blocks:
+        story.append(CondPageBreak(3.2 * cm))
+        first_block = interaction_blocks[0]
+        story.append(Paragraph(
+            f"Desdobramento da interação · {first_block.get('factor')} × {first_block.get('sub_factor')}", h2,
+        ))
+        story.append(Paragraph(
+            "Interação significativa: cada nível do fator de parcela é analisado separadamente, "
+            "comparando os níveis do outro fator dentro dele (efeitos simples).", caption,
+        ))
+        for block in interaction_blocks:
+            ib_rows = [["Nível", "Média", "n", "Grupo"]]
+            for lv in block.get("levels", []):
+                ib_rows.append([lv.get("treatment"), _fmt(lv.get("mean")), _fmt(lv.get("n")), lv.get("group", "")])
+            if len(ib_rows) <= 1:
+                continue
+            story.append(Spacer(1, 0.15 * cm))
+            story.append(Paragraph(f"{block.get('factor')} = {block.get('level')}", body))
+            story.append(_styled_table(ib_rows))
         story.append(Spacer(1, 0.3 * cm))
 
     reg = result.get("regression")
@@ -387,20 +413,17 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         reg_text = f"{selected.get('equation')} &nbsp;·&nbsp; R² ajustado: <b>{_fmt(selected.get('adj_r2'))}</b>"
         if opt.get("x") is not None:
             reg_text += f" &nbsp;·&nbsp; Ponto ótimo estimado: <b>x = {_fmt(opt.get('x'))}</b>, y = {_fmt(opt.get('y'))}"
-        reg_flowables = [
-            Paragraph("Regressão", h2),
-            Paragraph(reg_text, body),
-        ]
+        story.append(CondPageBreak(3.2 * cm))
+        story.append(Paragraph("Regressão", h2))
+        story.append(Paragraph(reg_text, body))
         plot_b64 = reg.get("plot_png_base64")
         if plot_b64:
             img_buffer = io.BytesIO(base64.b64decode(plot_b64))
-            reg_flowables.append(Spacer(1, 0.25 * cm))
-            reg_flowables.append(Image(img_buffer, width=14 * cm, height=8.1 * cm))
-        story.append(KeepTogether(reg_flowables))
+            story.append(Spacer(1, 0.25 * cm))
+            story.append(Image(img_buffer, width=14 * cm, height=8.1 * cm))
 
     doc.build(story)
     return buffer.getvalue()
-
 
 def _style_excel_sheet(worksheet, n_cols: int) -> None:
     """Aplica cabecalho com a cor da marca, zebra e largura automatica as planilhas exportadas."""
@@ -434,7 +457,6 @@ def _style_excel_sheet(worksheet, n_cols: int) -> None:
     worksheet.freeze_panes = "A2"
     worksheet.row_dimensions[1].height = 20
 
-
 def build_excel(payload: Dict[str, Any]) -> bytes:
     """Gera planilha Excel com abas de ANOVA, medias e recomendacoes, com a identidade visual Solver."""
     result = analyze(payload)
@@ -454,6 +476,32 @@ def build_excel(payload: Dict[str, Any]) -> bytes:
             comp_df.to_excel(writer, index=False, sheet_name="Comparacoes")
             _style_excel_sheet(writer.sheets["Comparacoes"], len(comp_df.columns) if not comp_df.empty else 1)
 
+        factor_rows = []
+        for fc in result.get("factor_comparisons", []) or []:
+            for lv in fc.get("levels", []):
+                factor_rows.append({
+                    "fator": fc.get("factor"), "nivel": lv.get("treatment"),
+                    "media": lv.get("mean"), "n": lv.get("n"), "grupo": lv.get("group", ""),
+                    "teste": fc.get("test"), "alpha": fc.get("alpha"),
+                })
+        if factor_rows:
+            factor_df = pd.DataFrame(factor_rows)
+            factor_df.to_excel(writer, index=False, sheet_name="Fatores")
+            _style_excel_sheet(writer.sheets["Fatores"], len(factor_df.columns))
+
+        interaction_rows = []
+        for block in result.get("interaction_breakdown", []) or []:
+            for lv in block.get("levels", []):
+                interaction_rows.append({
+                    "fator_parcela": block.get("factor"), "nivel_parcela": block.get("level"),
+                    "fator_subparcela": block.get("sub_factor"), "nivel_subparcela": lv.get("treatment"),
+                    "media": lv.get("mean"), "n": lv.get("n"), "grupo": lv.get("group", ""),
+                })
+        if interaction_rows:
+            interaction_df = pd.DataFrame(interaction_rows)
+            interaction_df.to_excel(writer, index=False, sheet_name="Interacao")
+            _style_excel_sheet(writer.sheets["Interacao"], len(interaction_df.columns))
+
         resumo_df = pd.DataFrame({"recomendacao": result.get("recommendations", [])})
         resumo_df.to_excel(writer, index=False, sheet_name="Resumo")
         _style_excel_sheet(writer.sheets["Resumo"], 1)
@@ -463,7 +511,6 @@ def build_excel(payload: Dict[str, Any]) -> bytes:
             reg_df.to_excel(writer, index=False, sheet_name="Regressao")
             _style_excel_sheet(writer.sheets["Regressao"], len(reg_df.columns) if not reg_df.empty else 1)
     return buffer.getvalue()
-
 
 def build_regression_plot(payload: Dict[str, Any], fmt: str = "png") -> bytes:
     """Exporta grafico de regressao em PNG ou PDF vetorial."""

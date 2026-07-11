@@ -34,24 +34,22 @@ from scipy import stats
 from scipy.stats import studentized_range
 from statsmodels.stats.anova import anova_lm
 
-
 ALLOWED_DESIGNS = {"DIC", "DBC", "DQL"}
 ALLOWED_ANALYSIS_TYPES = {"single", "factorial", "split_plot", "regression"}
 ALLOWED_TESTS = {"tukey", "duncan", "dunnett", "snk", "scheffe"}
-
 
 def _q(column: str) -> str:
     """Escapa nomes de colunas para fórmulas patsy/statsmodels."""
     return f'Q("{column}")'
 
-
 def _c(column: str) -> str:
     """Transforma uma coluna em fator categórico para a fórmula."""
     return f'C({_q(column)})'
 
-
 def _clean_value(value: Any) -> Any:
     """Converte NaN/inf para None para permitir serialização JSON."""
+    if isinstance(value, (bool, np.bool_)):
+        return bool(value)
     if isinstance(value, (np.floating, float)):
         if math.isnan(float(value)) or math.isinf(float(value)):
             return None
@@ -64,7 +62,6 @@ def _clean_value(value: Any) -> Any:
         return [_clean_value(v) for v in value]
     return value
 
-
 def _num(value: Any) -> Optional[float]:
     try:
         if value is None:
@@ -75,7 +72,6 @@ def _num(value: Any) -> Optional[float]:
         return v
     except Exception:
         return None
-
 
 def _source_label(index_name: str, payload: Dict[str, Any]) -> str:
     mapping = {
@@ -94,7 +90,6 @@ def _source_label(index_name: str, payload: Dict[str, Any]) -> str:
     label = label.replace(":", " × ")
     return label
 
-
 def _significance(p_value: Optional[float]) -> str:
     if p_value is None:
         return "—"
@@ -103,7 +98,6 @@ def _significance(p_value: Optional[float]) -> str:
     if p_value <= 0.05:
         return "5%"
     return "ns"
-
 
 def _cv_label(cv: Optional[float]) -> str:
     if cv is None:
@@ -115,7 +109,6 @@ def _cv_label(cv: Optional[float]) -> str:
     if cv <= 30:
         return "Moderado"
     return "Alto — revisar variabilidade"
-
 
 def _parse_numeric_from_text(series: pd.Series) -> pd.Series:
     """Extrai primeiro número de textos como 'Dose 120 kg/ha'."""
@@ -130,7 +123,6 @@ def _parse_numeric_from_text(series: pd.Series) -> pd.Series:
 
     return series.apply(parse_one)
 
-
 def _dedupe_keep_order(values: Iterable[str]) -> List[str]:
     seen: set[str] = set()
     output: List[str] = []
@@ -140,14 +132,11 @@ def _dedupe_keep_order(values: Iterable[str]) -> List[str]:
             output.append(value)
     return output
 
-
 def _has_blank(series: pd.Series) -> bool:
     return series.isna().any() or series.astype(str).str.strip().eq("").any()
 
-
 def _factor_key(column: str) -> str:
     return f'C({_q(column)})'
-
 
 def _anova_source(anova: Dict[str, Any], raw_source: str) -> Optional[Dict[str, Any]]:
     for row in anova.get("table", []) or []:
@@ -155,11 +144,9 @@ def _anova_source(anova: Dict[str, Any], raw_source: str) -> Optional[Dict[str, 
             return row
     return None
 
-
 def _is_significant_source(anova: Dict[str, Any], raw_source: str) -> bool:
     row = _anova_source(anova, raw_source)
     return bool(row and row.get("significance") in {"1%", "5%"})
-
 
 def _validate_complete_grid(df: pd.DataFrame, keys: List[str], expected: int, label: str) -> None:
     counts = df.groupby(keys, dropna=False).size()
@@ -170,7 +157,6 @@ def _validate_complete_grid(df: pd.DataFrame, keys: List[str], expected: int, la
     if not (counts == 1).all():
         raise ValueError(f"{label}: cada combinação em {' × '.join(keys)} deve aparecer exatamente uma vez.")
 
-
 @dataclass
 class AnalysisContext:
     df: pd.DataFrame
@@ -180,7 +166,6 @@ class AnalysisContext:
     design: str
     analysis_type: str
     goal: str
-
 
 def _prepare_context(payload: Dict[str, Any]) -> AnalysisContext:
     data = payload.get("data") or []
@@ -247,7 +232,6 @@ def _prepare_context(payload: Dict[str, Any]) -> AnalysisContext:
         _validate_design(df, payload, design, treatment)
     return AnalysisContext(df=df, payload=payload, response=response, treatment=treatment, design=design, analysis_type=analysis_type, goal=goal)
 
-
 def _validate_regression_input(df: pd.DataFrame, payload: Dict[str, Any], response: str, treatment: str) -> None:
     numeric_col = str(payload.get("numeric_factor_column") or payload.get("dose_column") or "").strip() or None
     if numeric_col:
@@ -277,7 +261,6 @@ def _validate_regression_input(df: pd.DataFrame, payload: Dict[str, Any], respon
         if n_levels < requested_degree + 1:
             raise ValueError(f"Regressão de grau {requested_degree} exige pelo menos {requested_degree + 1} níveis numéricos distintos.")
 
-
 def _validate_design(df: pd.DataFrame, payload: Dict[str, Any], design: str, treatment: str) -> None:
     """Valida regras críticas de cada delineamento experimental."""
     analysis_type = payload.get("analysis_type") or "single"
@@ -286,6 +269,12 @@ def _validate_design(df: pd.DataFrame, payload: Dict[str, Any], design: str, tre
         reps = df.groupby(treatment, dropna=False).size()
         if reps.min() < 1:
             raise ValueError("No DIC, cada tratamento deve ter ao menos uma observação.")
+        n_treat = df[treatment].nunique()
+        if len(df) <= n_treat:
+            raise ValueError(
+                "No DIC, é preciso haver ao menos uma repetição a mais do que o número de "
+                "tratamentos, para que sobrem graus de liberdade para estimar o erro (resíduo)."
+            )
 
     if design == "DBC":
         block = payload.get("block_column") or "bloco"
@@ -328,7 +317,6 @@ def _validate_design(df: pd.DataFrame, payload: Dict[str, Any], design: str, tre
         elif analysis_type == "split_plot":
             raise ValueError("Parcelas subdivididas exigem delineamento base DBC neste MVP para validar blocos, parcelas e subparcelas.")
 
-
 def _formula_for(ctx: AnalysisContext) -> Tuple[str, List[str]]:
     p = ctx.payload
     response = ctx.response
@@ -364,8 +352,141 @@ def _formula_for(ctx: AnalysisContext) -> Tuple[str, List[str]]:
     formula = f"{_q(response)} ~ " + " + ".join(terms)
     return formula, notes
 
+def _find_interaction_row(index: Any, key_a: str, key_b: str) -> Optional[str]:
+    """Localiza o termo de interação em um índice de resultado do anova_lm, independente da
+    ordem em que o patsy tenha nomeado o termo (key_a:key_b ou key_b:key_a)."""
+    for candidate in (f"{key_a}:{key_b}", f"{key_b}:{key_a}"):
+        if candidate in index:
+            return candidate
+    return None
+
+
+def _anova_split_plot(ctx: AnalysisContext) -> Dict[str, Any]:
+    """ANOVA de parcelas subdivididas com dois estratos de erro (Gomez & Gomez / Steel &
+    Torrie). O fator de parcela (whole-plot) precisa ser testado contra o Erro (a) = Bloco ×
+    Parcela; o fator de subparcela e a interação Parcela × Subparcela são testados contra o
+    Erro (b) = resíduo. A versão anterior ajustava um único modelo OLS e usava o mesmo
+    resíduo fino para testar todas as fontes, inflando artificialmente o F do fator de
+    parcela (ex.: F=39,60 relatado pela auditoria contra o F=8,13 correto)."""
+    p = ctx.payload
+    response = ctx.response
+    block = p.get("block_column") or "bloco"
+    factors = p.get("factor_columns") or []
+    if len(factors) < 2:
+        raise ValueError("Para parcelas subdivididas, informe fator de parcela e fator de subparcela.")
+    main, sub = factors[0], factors[1]
+
+    notes = [
+        f"Parcelas subdivididas: o fator de parcela ({main}) é testado contra o Erro (a) "
+        f"(interação Bloco × Parcela); o fator de subparcela ({sub}) e a interação "
+        f"{main} × {sub} são testados contra o Erro (b) (resíduo)."
+    ]
+
+    block_key = _c(block)
+    main_key = _c(main)
+    sub_key = _c(sub)
+    formula = f"{_q(response)} ~ {block_key} * {main_key} + {sub_key} + {main_key}:{sub_key}"
+    model = smf.ols(formula, data=ctx.df).fit()
+    table = anova_lm(model, typ=2)
+
+    errA_key = _find_interaction_row(table.index, block_key, main_key)
+    ab_key = _find_interaction_row(table.index, main_key, sub_key)
+    resid_key = "Residual"
+
+    def get_row(key: Optional[str]) -> Optional[Dict[str, Any]]:
+        if key is None or key not in table.index:
+            return None
+        r = table.loc[key]
+        return {"df": _num(r.get("df")), "sum_sq": _num(r.get("sum_sq"))}
+
+    block_r = get_row(block_key)
+    main_r = get_row(main_key)
+    errA_r = get_row(errA_key)
+    sub_r = get_row(sub_key)
+    ab_r = get_row(ab_key)
+    resid_r = get_row(resid_key)
+
+    if not (main_r and errA_r and sub_r and ab_r and resid_r):
+        raise ValueError(
+            "Não foi possível montar a ANOVA de parcelas subdivididas com os dados informados. "
+            "Verifique se o delineamento está balanceado (mesmo número de blocos, parcelas e "
+            "subparcelas em todas as combinações)."
+        )
+
+    def mean_sq(row: Optional[Dict[str, Any]]) -> Optional[float]:
+        if not row or not row.get("df"):
+            return None
+        return row["sum_sq"] / row["df"]
+
+    ms_errA = mean_sq(errA_r)
+    ms_errB = mean_sq(resid_r)
+
+    def f_test(row: Dict[str, Any], err_ms: Optional[float], err_df: Optional[float]):
+        ms = mean_sq(row)
+        if ms is None or err_ms in (None, 0) or not err_df or err_df <= 0 or not row.get("df"):
+            return None, None, None, None
+        f_calc = ms / err_ms
+        f5 = stats.f.ppf(0.95, row["df"], err_df)
+        f1 = stats.f.ppf(0.99, row["df"], err_df)
+        p_value = float(stats.f.sf(f_calc, row["df"], err_df))
+        return f_calc, f5, f1, p_value
+
+    def build_row(source: str, raw_source: str, row: Dict[str, Any], err_ms, err_df) -> Dict[str, Any]:
+        f_calc, f5, f1, p_value = f_test(row, err_ms, err_df)
+        return {
+            "source": source,
+            "raw_source": raw_source,
+            "df": row.get("df"),
+            "sum_sq": row.get("sum_sq"),
+            "mean_sq": mean_sq(row),
+            "f_calc": f_calc,
+            "f_5": f5,
+            "f_1": f1,
+            "p_value": p_value,
+            "significance": _significance(p_value),
+        }
+
+    rows: List[Dict[str, Any]] = []
+    if block_r:
+        rows.append(build_row("Blocos", block_key, block_r, ms_errA, errA_r.get("df")))
+    rows.append(build_row(f"Parcela ({main})", main_key, main_r, ms_errA, errA_r.get("df")))
+    rows.append({
+        "source": "Erro (a) — Bloco × Parcela", "raw_source": errA_key, "df": errA_r.get("df"),
+        "sum_sq": errA_r.get("sum_sq"), "mean_sq": ms_errA, "f_calc": None, "f_5": None,
+        "f_1": None, "p_value": None, "significance": "—",
+    })
+    rows.append(build_row(f"Subparcela ({sub})", sub_key, sub_r, ms_errB, resid_r.get("df")))
+    rows.append(build_row(f"{main} × {sub}", ab_key, ab_r, ms_errB, resid_r.get("df")))
+    rows.append({
+        "source": "Erro (b) — Resíduo", "raw_source": resid_key, "df": resid_r.get("df"),
+        "sum_sq": resid_r.get("sum_sq"), "mean_sq": ms_errB, "f_calc": None, "f_5": None,
+        "f_1": None, "p_value": None, "significance": "—",
+    })
+
+    total_ss = float(((ctx.df[response] - ctx.df[response].mean()) ** 2).sum())
+    rows.append({
+        "source": "Total", "raw_source": "Total", "df": int(len(ctx.df) - 1), "sum_sq": total_ss,
+        "mean_sq": None, "f_calc": None, "f_5": None, "f_1": None, "p_value": None, "significance": "—",
+    })
+
+    mean_response = float(ctx.df[response].mean())
+    cv = (math.sqrt(ms_errB) / abs(mean_response) * 100) if ms_errB is not None and mean_response != 0 else None
+
+    return {
+        "formula": formula,
+        "table": rows,
+        "mse": ms_errB,
+        "df_error": resid_r.get("df"),
+        "error_a": {"mse": ms_errA, "df": errA_r.get("df")},
+        "cv": cv,
+        "cv_label": _cv_label(cv),
+        "model_notes": notes,
+    }
+
 
 def _anova(ctx: AnalysisContext) -> Dict[str, Any]:
+    if ctx.analysis_type == "split_plot":
+        return _anova_split_plot(ctx)
     formula, notes = _formula_for(ctx)
     if not formula:
         return {"table": [], "cv": None, "cv_label": "Indisponível", "model_notes": notes}
@@ -375,7 +496,7 @@ def _anova(ctx: AnalysisContext) -> Dict[str, Any]:
     df_resid = float(model.df_resid)
     mse = float(model.mse_resid) if model.df_resid > 0 else None
     mean_response = float(ctx.df[ctx.response].mean())
-    cv = (math.sqrt(mse) / mean_response * 100) if mse is not None and mean_response != 0 else None
+    cv = (math.sqrt(mse) / abs(mean_response) * 100) if mse is not None and mean_response != 0 else None
 
     rows: List[Dict[str, Any]] = []
     for idx, row in table.iterrows():
@@ -423,7 +544,6 @@ def _anova(ctx: AnalysisContext) -> Dict[str, Any]:
         "model_notes": notes,
     }
 
-
 def _means(ctx: AnalysisContext, anova: Dict[str, Any]) -> Dict[str, Any]:
     if ctx.analysis_type == "regression":
         return {"treatment_means": [], "best": None, "comparison": None}
@@ -458,20 +578,19 @@ def _means(ctx: AnalysisContext, anova: Dict[str, Any]) -> Dict[str, Any]:
         "comparison": comparison,
     }
 
-
 def _resolve_alpha(ctx: AnalysisContext, anova: Dict[str, Any]) -> float:
-    """Alinha o alfa da comparacao de medias ao nivel de significancia do
-    teste F da fonte comparada (ctx.treatment). Nunca comparar medias a 5%
-    quando o teste F so foi significativo a 1%, ou vice-versa: o pos-teste
-    tem que herdar a mesma probabilidade que a ANOVA usou para aquela fonte."""
-    raw_key = f'C({_q(ctx.treatment)})'
-    for row in anova.get("table", []):
-        if row.get("raw_source") == raw_key:
-            if row.get("significance") == "1%":
-                return 0.01
-            return 0.05
-    return 0.05
-
+    """Usa o alfa informado pelo usuário (payload['alpha']) para a comparação de médias.
+    Antes o alfa do pós-teste era recalculado a partir do bucket de significância do teste F
+    (sempre 0,01 ou 0,05, ignorando o valor enviado pelo front-end) — o nível de significância
+    de um pós-teste deve ser o mesmo escolhido a priori pelo usuário para a análise, não um
+    valor derivado do p-valor observado da ANOVA."""
+    try:
+        alpha = float(ctx.payload.get("alpha", 0.05))
+    except (TypeError, ValueError):
+        alpha = 0.05
+    if not (0 < alpha < 1):
+        alpha = 0.05
+    return alpha
 
 def _comparison_tests(table: pd.DataFrame, anova: Dict[str, Any], ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
     mse = anova.get("mse")
@@ -539,7 +658,7 @@ def _comparison_tests(table: pd.DataFrame, anova: Dict[str, Any], ctx: AnalysisC
                     elif test_name == "duncan":
                         alpha_r = 1 - (1 - alpha) ** (range_size - 1)
                         qcrit = studentized_range.ppf(1 - alpha_r, range_size, df_error)
-                    else:  # Tukey-Kramer
+                    else: # Tukey-Kramer
                         qcrit = studentized_range.ppf(1 - alpha, k, df_error)
                     crit = qcrit * se_tukey
                     q_stat = abs(diff) / se_tukey if se_tukey else np.nan
@@ -556,7 +675,6 @@ def _comparison_tests(table: pd.DataFrame, anova: Dict[str, Any], ctx: AnalysisC
         "note": method_note,
     }
 
-
 def _comparison_note(test_name: str) -> str:
     notes = {
         "tukey": "Tukey-Kramer para tamanhos de amostra iguais ou desiguais.",
@@ -566,26 +684,54 @@ def _comparison_note(test_name: str) -> str:
     }
     return notes.get(test_name, "Teste de comparação de médias calculado.")
 
-
 def _assign_letters(order: List[str], nonsig_pairs: set[Tuple[str, str]]) -> Dict[str, str]:
-    """Gera letras compactas simples para médias. Valores sem diferença compartilham letras."""
+    """Gera letras compactas (CLD) via enumeração de cliques maximais (Bron-Kerbosch).
+    A versão anterior era gulosa/sequencial e falha no caso clássico de não transitividade
+    (A≈B, B≈C, A≠C): B precisa herdar as duas letras ('a' de {A,B} e 'b' de {B,C}), mas o
+    algoritmo guloso só comparava cada novo tratamento contra grupos já fechados e nunca
+    reabria um novo grupo {B,C} porque B já tinha sido "colocado" no primeiro grupo."""
     if not order:
         return {}
-    letters = {g: "" for g in order}
-    letter_groups: List[List[str]] = []
+    if len(order) == 1:
+        return {order[0]: "a"}
 
+    def non_significant(a: str, b: str) -> bool:
+        return tuple(sorted((a, b))) in nonsig_pairs
+
+    graph: Dict[str, set] = {g: {h for h in order if h != g and non_significant(g, h)} for g in order}
+
+    cliques: List[set] = []
+
+    def bron_kerbosch(r: set, p: set, x: set) -> None:
+        if not p and not x:
+            if r:
+                cliques.append(set(r))
+            return
+        for v in list(p):
+            bron_kerbosch(r | {v}, p & graph[v], x & graph[v])
+            p = p - {v}
+            x = x | {v}
+
+    bron_kerbosch(set(), set(order), set())
+
+    covered: set = set()
+    for c in cliques:
+        covered |= c
     for g in order:
-        placed = False
-        for idx, members in enumerate(letter_groups):
-            if all(tuple(sorted((g, h))) in nonsig_pairs for h in members):
-                members.append(g)
-                letters[g] += chr(ord("a") + idx)
-                placed = True
-        if not placed:
-            letter_groups.append([g])
-            letters[g] += chr(ord("a") + len(letter_groups) - 1)
-    return letters
+        if g not in covered:
+            cliques.append({g})
 
+    cliques = [c for i, c in enumerate(cliques) if not any(c < other for j, other in enumerate(cliques) if i != j)]
+
+    position = {g: i for i, g in enumerate(order)}
+    cliques.sort(key=lambda c: min(position[g] for g in c))
+
+    letters: Dict[str, str] = {g: "" for g in order}
+    for idx, clique in enumerate(cliques):
+        letter = chr(ord("a") + idx)
+        for g in clique:
+            letters[g] += letter
+    return letters
 
 def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
     p = ctx.payload
@@ -652,12 +798,11 @@ def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
         "plot_png_base64": plot_png,
     }
 
-
 def _fit_poly(x: np.ndarray, y: np.ndarray, degree: int, goal: str) -> Dict[str, Any]:
     X = np.column_stack([x ** i for i in range(1, degree + 1)])
     X = sm.add_constant(X)
     model = sm.OLS(y, X).fit()
-    coeffs = model.params.tolist()  # intercepto, x, x², x³...
+    coeffs = model.params.tolist() # intercepto, x, x², x³...
     equation = _equation_text(coeffs)
     optimum = _poly_optimum(coeffs, float(np.min(x)), float(np.max(x)), goal)
     return {
@@ -671,14 +816,12 @@ def _fit_poly(x: np.ndarray, y: np.ndarray, degree: int, goal: str) -> Dict[str,
         "optimum": optimum,
     }
 
-
 def _predict_poly(coefficients: Iterable[float], x: np.ndarray) -> np.ndarray:
     coeffs = list(coefficients)
     y = np.full_like(x, coeffs[0], dtype=float)
     for power, coef in enumerate(coeffs[1:], start=1):
         y += coef * (x ** power)
     return y
-
 
 def _equation_text(coeffs: List[float]) -> str:
     parts = [f"{coeffs[0]:.4f}"]
@@ -688,17 +831,16 @@ def _equation_text(coeffs: List[float]) -> str:
         parts.append(f" {sign} {abs(coef):.4f}{var}")
     return "ŷ = " + "".join(parts)
 
-
 def _poly_optimum(coeffs: List[float], x_min: float, x_max: float, goal: str) -> Dict[str, Any]:
     candidates = [x_min, x_max]
-    if len(coeffs) == 3:  # quadrático
+    if len(coeffs) == 3: # quadrático
         b = coeffs[1]
         c = coeffs[2]
         if c != 0:
             vertex = -b / (2 * c)
             if x_min <= vertex <= x_max:
                 candidates.append(vertex)
-    elif len(coeffs) == 4:  # cúbico: derivada b + 2cx + 3dx²
+    elif len(coeffs) == 4: # cúbico: derivada b + 2cx + 3dx²
         b, c, d = coeffs[1], coeffs[2], coeffs[3]
         roots = np.roots([3 * d, 2 * c, b]) if d != 0 else []
         for root in roots:
@@ -710,7 +852,6 @@ def _poly_optimum(coeffs: List[float], x_min: float, x_max: float, goal: str) ->
     values = [(float(x), float(_predict_poly(coeffs, np.array([x]))[0])) for x in candidates]
     chosen = max(values, key=lambda t: t[1]) if goal == "max" else min(values, key=lambda t: t[1])
     return {"x": chosen[0], "y": chosen[1], "goal": goal}
-
 
 def _regression_plot_base64(means_df: pd.DataFrame, x_grid: np.ndarray, y_grid: np.ndarray, model: Dict[str, Any]) -> str:
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
@@ -735,13 +876,162 @@ def _regression_plot_base64(means_df: pd.DataFrame, x_grid: np.ndarray, y_grid: 
     plt.close(fig)
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
+def _pairwise_letters(
+    levels: List[str], means: Dict[str, float], ns: Dict[str, int],
+    mse: float, df_error: float, alpha: float, test_name: str,
+) -> Tuple[List[Dict[str, Any]], Dict[str, str]]:
+    """Rotina compartilhada de comparação de médias duas a duas (Tukey-Kramer, Duncan, SNK ou
+    Scheffé), reaproveitada tanto para médias marginais de fator quanto para efeitos simples
+    dentro do desdobramento de interação."""
+    k = len(levels)
+    comparisons: List[Dict[str, Any]] = []
+    nonsig_pairs: set = set()
+    sorted_by_mean = sorted(levels, key=lambda g: means[g], reverse=True)
+    for i, g1 in enumerate(sorted_by_mean):
+        for j, g2 in enumerate(sorted_by_mean[i + 1:], start=i + 1):
+            diff = means[g1] - means[g2]
+            se = math.sqrt(mse / 2 * (1 / ns[g1] + 1 / ns[g2])) if ns[g1] and ns[g2] else None
+            if se is None:
+                continue
+            if test_name == "scheffe":
+                fcrit = stats.f.ppf(1 - alpha, k - 1, df_error)
+                crit = math.sqrt((k - 1) * fcrit * mse * (1 / ns[g1] + 1 / ns[g2]))
+            else:
+                range_size = abs(j - i) + 1
+                if test_name == "snk":
+                    qcrit = studentized_range.ppf(1 - alpha, range_size, df_error)
+                elif test_name == "duncan":
+                    alpha_r = 1 - (1 - alpha) ** (range_size - 1)
+                    qcrit = studentized_range.ppf(1 - alpha_r, range_size, df_error)
+                else:
+                    qcrit = studentized_range.ppf(1 - alpha, k, df_error)
+                crit = qcrit * se
+            significant = abs(diff) > crit
+            if not significant:
+                nonsig_pairs.add(tuple(sorted((g1, g2))))
+            comparisons.append({
+                "group_a": g1, "group_b": g2, "diff": diff,
+                "critical_diff": crit, "significant": bool(significant),
+            })
+    letters = _assign_letters(levels, nonsig_pairs)
+    return comparisons, letters
+
+
+def _factor_comparisons(ctx: AnalysisContext, anova: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Para fatorial/parcelas subdivididas: compara as médias marginais de cada fator quando
+    seu efeito principal é significativo na ANOVA. No split-plot, o fator de parcela usa o
+    Erro (a); o fator de subparcela usa o Erro (b). Ausente na versão anterior, que só
+    comparava os níveis de 'treatment_column' (a combinação completa), sem decompor por fator."""
+    if ctx.analysis_type not in {"factorial", "split_plot"}:
+        return []
+    factors = ctx.payload.get("factor_columns") or []
+    if len(factors) < 2:
+        return []
+    error_a = anova.get("error_a") or {}
+    test_name = (ctx.payload.get("comparison_test") or "tukey").lower()
+    if test_name not in ALLOWED_TESTS:
+        test_name = "tukey"
+    alpha = _resolve_alpha(ctx, anova)
+
+    results: List[Dict[str, Any]] = []
+    for i, factor in enumerate(factors[:2]):
+        raw_key = _c(factor)
+        if not _is_significant_source(anova, raw_key):
+            continue
+        if ctx.analysis_type == "split_plot" and i == 0 and error_a.get("mse") is not None:
+            use_mse, use_df = error_a["mse"], error_a["df"]
+        else:
+            use_mse, use_df = anova.get("mse"), anova.get("df_error")
+        if use_mse is None or not use_df or use_df <= 0:
+            continue
+
+        grouped = ctx.df.groupby(factor)[ctx.response]
+        table = grouped.agg(["mean", "count"]).reset_index().rename(columns={factor: "treatment", "count": "n"})
+        table = table.sort_values("mean", ascending=(ctx.goal == "min"))
+        if table["treatment"].nunique() < 2:
+            continue
+
+        means = {str(r["treatment"]): float(r["mean"]) for _, r in table.iterrows()}
+        ns = {str(r["treatment"]): int(r["n"]) for _, r in table.iterrows()}
+        levels = [str(v) for v in table["treatment"].tolist()]
+        comparisons, letters = _pairwise_letters(levels, means, ns, use_mse, use_df, alpha, test_name)
+        table["group"] = table["treatment"].astype(str).map(letters).fillna("")
+
+        results.append({
+            "factor": factor,
+            "test": test_name.upper(),
+            "alpha": alpha,
+            "error_used": "a" if (ctx.analysis_type == "split_plot" and i == 0) else "b",
+            "levels": table.to_dict(orient="records"),
+            "comparisons": comparisons,
+        })
+    return results
+
+
+def _interaction_breakdown(ctx: AnalysisContext, anova: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """Desdobramento da interação: quando Parcela × Subparcela (ou Fator A × Fator B) é
+    significativa, compara os níveis do segundo fator dentro de cada nível do primeiro
+    (efeitos simples), sempre usando o Erro (b)/resíduo. Recurso ausente na versão anterior."""
+    if ctx.analysis_type not in {"factorial", "split_plot"}:
+        return []
+    factors = ctx.payload.get("factor_columns") or []
+    if len(factors) < 2:
+        return []
+    main, sub = factors[0], factors[1]
+    inter_key = f"{_c(main)}:{_c(sub)}"
+    if not _is_significant_source(anova, inter_key):
+        return []
+
+    mse = anova.get("mse")
+    df_error = anova.get("df_error")
+    if mse is None or not df_error or df_error <= 0:
+        return []
+
+    test_name = (ctx.payload.get("comparison_test") or "tukey").lower()
+    if test_name not in ALLOWED_TESTS:
+        test_name = "tukey"
+    alpha = _resolve_alpha(ctx, anova)
+
+    blocks: List[Dict[str, Any]] = []
+    for level_main, sub_df in ctx.df.groupby(main):
+        grouped = sub_df.groupby(sub)[ctx.response]
+        table = grouped.agg(["mean", "count"]).reset_index().rename(columns={sub: "treatment", "count": "n"})
+        table = table.sort_values("mean", ascending=(ctx.goal == "min"))
+        means = {str(r["treatment"]): float(r["mean"]) for _, r in table.iterrows()}
+        ns = {str(r["treatment"]): int(r["n"]) for _, r in table.iterrows()}
+        levels = [str(v) for v in table["treatment"].tolist()]
+        if len(levels) < 2:
+            table["group"] = "a" if levels else ""
+        else:
+            comparisons, letters = _pairwise_letters(levels, means, ns, mse, df_error, alpha, test_name)
+            table["group"] = table["treatment"].astype(str).map(letters).fillna("")
+        blocks.append({
+            "level": str(level_main),
+            "factor": main,
+            "sub_factor": sub,
+            "test": test_name.upper(),
+            "alpha": alpha,
+            "levels": table.to_dict(orient="records"),
+        })
+    return blocks
+
 
 def analyze(payload: Dict[str, Any]) -> Dict[str, Any]:
     ctx = _prepare_context(payload)
     anova = _anova(ctx)
     means = _means(ctx, anova)
     regression = _regression(ctx) if ctx.analysis_type == "regression" else None
+    factor_comparisons = _factor_comparisons(ctx, anova)
+    interaction_breakdown = _interaction_breakdown(ctx, anova)
     recommendations = _recommendations(ctx, anova, means, regression)
+    if interaction_breakdown:
+        factors = ctx.payload.get("factor_columns") or []
+        if len(factors) >= 2:
+            recommendations.append(
+                f"A interação {factors[0]} × {factors[1]} foi significativa: interprete os "
+                f"efeitos simples (desdobramento da interação) em vez das médias marginais "
+                f"isoladas de cada fator."
+            )
 
     result = {
         "meta": {
@@ -754,11 +1044,12 @@ def analyze(payload: Dict[str, Any]) -> Dict[str, Any]:
         },
         "anova": anova,
         "means": means,
+        "factor_comparisons": factor_comparisons,
+        "interaction_breakdown": interaction_breakdown,
         "regression": regression,
         "recommendations": recommendations,
     }
     return _clean_value(result)
-
 
 def _recommendations(ctx: AnalysisContext, anova: Dict[str, Any], means: Dict[str, Any], regression: Optional[Dict[str, Any]]) -> List[str]:
     messages: List[str] = []
