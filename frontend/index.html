@@ -54,7 +54,7 @@
 <section class="preview-card" aria-label="Prévia do relatório">
 <div class="window-head"><span><i></i><i></i><i></i></span><b>PREVIEW DO RELATÓRIO</b></div>
 <div class="stats-row">
-<div><label>CV experimental</label><strong id="previewCv">8,40%</strong><em>Precisão alta</em></div>
+<div class="stat-cv"><label>CV experimental</label><div class="cv-ring-row"><div class="cv-ring"><svg viewBox="0 0 52 52" width="50" height="50" aria-hidden="true"><circle cx="26" cy="26" r="21" fill="none" style="stroke:var(--surface-line)" stroke-width="6"/><circle cx="26" cy="26" r="21" fill="none" style="stroke:var(--brand)" stroke-width="6" stroke-linecap="round" stroke-dasharray="131.9" stroke-dashoffset="21" transform="rotate(-90 26 26)"/></svg><div class="cv-ring-inner"><strong id="previewCv">8,40%</strong></div></div><strong class="cv-headline">Ótimo</strong></div><em>Precisão alta</em></div>
 <div><label>F calculado</label><strong id="previewF">18,73</strong><em>Sig. 1%</em></div>
 <div><label>R² regressão</label><strong id="previewR2">0,94</strong><em>Ótimo ajuste</em></div>
 </div>
@@ -72,14 +72,28 @@
 <circle cx="112" cy="28" r="5.5" style="fill:var(--accent)" stroke="var(--surface)" stroke-width="2.5"/>
 </svg>
 </div>
-<div class="mini-list">
-<div class="mini-list-item">
-<div class="mini-list-top"><span>Tratamentos</span><b>Significativo <mark>1%</mark></b></div>
-<div class="mean-bar-wrap mini"><div class="mean-bar" style="width:96%;background:var(--brand)"></div></div>
+<div class="mini-anova">
+<div class="mini-anova-head"><span>FV</span><span>F</span><span>Sig.</span></div>
+<div class="mini-anova-row"><span>Tratamentos</span><b>18,73</b><mark>1%</mark></div>
+<div class="mini-anova-row"><span>Blocos</span><b>2,41</b><mark class="muted">ns</mark></div>
+<div class="mini-anova-row"><span>Resíduo</span><b>—</b><mark class="muted">—</mark></div>
 </div>
-<div class="mini-list-item">
-<div class="mini-list-top"><span>Blocos</span><b>Não significativo <mark class="muted">ns</mark></b></div>
-<div class="mean-bar-wrap mini"><div class="mean-bar" style="width:18%;background:var(--neutral)"></div></div>
+<div class="preview-actions">
+<div class="preview-action">
+<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg></div>
+<b>Dados</b><span>CSV ou matriz</span>
+</div>
+<div class="preview-action">
+<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M3 20h18"/></svg></div>
+<b>ANOVA</b><span>Teste F</span>
+</div>
+<div class="preview-action">
+<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="12" height="12" rx="2"/><path d="M9 9h11v11H9z"/></svg></div>
+<b>Pós-teste</b><span>Médias ou curva</span>
+</div>
+<div class="preview-action">
+<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><path d="M9 13h6M9 16.5h6"/></svg></div>
+<b>PDF</b><span>Laudo final</span>
 </div>
 </div>
 </section>
