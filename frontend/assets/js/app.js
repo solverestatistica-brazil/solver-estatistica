@@ -1701,7 +1701,11 @@
     if (Math.abs(num) > 999999) {
       return num.toLocaleString('pt-BR', {notation: 'scientific', maximumFractionDigits: 4});
     }
-    return num.toLocaleString('pt-BR', {maximumFractionDigits: 4});
+    const isInt = Number.isInteger(num);
+    return num.toLocaleString('pt-BR', {
+      minimumFractionDigits: isInt ? 0 : 2,
+      maximumFractionDigits: isInt ? 0 : 4,
+    });
   }
 
   function labelFor(key) {
