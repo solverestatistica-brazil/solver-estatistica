@@ -25,7 +25,7 @@
 </span>
 </a>
 <div class="nav-actions" id="navActionsLanding">
-<a class="btn ghost" href="#formatos">Formato dos dados</a>
+<button class="btn ghost" type="button" id="openFormatosModalNav">Formato dos dados</button>
 <button class="btn solid" id="navOpenApp" type="button">Iniciar análise</button>
 </div>
 <div class="nav-actions hidden" id="navActionsApp">
@@ -42,7 +42,7 @@
 <p>Faça ANOVA para DIC, DBC e DQL, compare médias, avalie regressões e gere relatórios técnicos em PDF ou Excel com visual profissional.</p>
 <div class="cta-row">
 <button class="btn big solid" id="heroOpenApp" type="button">Criar análise</button>
-<a class="btn big ghost" href="#formatos">Ver formato dos dados</a>
+<button class="btn big ghost" type="button" id="openFormatosModalHero">Ver formato dos dados</button>
 </div>
 <div class="feature-grid">
 <article><b>ANOVA</b><span>Teste F interpretado</span></article>
@@ -184,10 +184,13 @@
 </div>
 </section>
 
-<section class="panel" id="formatos">
-<div class="section-head left">
+<dialog id="formatosModal" class="formatos-modal">
+<div class="section-head left formatos-modal-head">
+<div>
 <span>Formato de dados</span>
 <h2>Colunas mínimas por delineamento</h2>
+</div>
+<button class="modal-close" type="button" id="closeFormatosModal" aria-label="Fechar instruções">&times;</button>
 </div>
 <div class="format-grid">
 <article><b>DIC</b><code>tratamento, valor</code><p>Use quando não houver blocos, linhas ou colunas.</p></article>
@@ -195,7 +198,7 @@
 <article><b>DQL</b><code>linha, coluna, tratamento, valor</code><p>Tratamentos, linhas e colunas devem ter o mesmo número de níveis.</p></article>
 <article><b>Regressão</b><code>dose, valor</code><p>Informe o fator numérico para cálculo de dose ótima.</p></article>
 </div>
-</section>
+</dialog>
 </main>
 </div>
 
