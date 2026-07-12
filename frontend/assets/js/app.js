@@ -838,7 +838,8 @@
   function sigPill(value) {
     if (value == null || value === '-' || value === '—') return '<span class="sig-dash">-</span>';
     const cls = value === '1%' ? 'sig-1' : value === '5%' ? 'sig-5' : 'sig-ns';
-    return `<span class="sig-pill ${cls}">${value}</span>`;
+    const label = value === '1%' ? 'p < 0,01' : value === '5%' ? 'p < 0,05' : 'n.s.';
+    return `<span class="sig-pill ${cls}">${label}</span>`;
   }
 
   function renderAnovaTable(rows) {
