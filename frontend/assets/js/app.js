@@ -40,8 +40,8 @@
     });
   }
 
-  function bindFormatosModal() {
-    const modal = $('formatosModal');
+  function bindModal(modalId, openBtnIds, closeBtnId) {
+    const modal = $(modalId);
     if (!modal) return;
     const openModal = (event) => {
       if (event) event.preventDefault();
@@ -52,15 +52,20 @@
       if (typeof modal.close === 'function') modal.close();
       else modal.removeAttribute('open');
     };
-    const navBtn = $('openFormatosModalNav');
-    const heroBtn = $('openFormatosModalHero');
-    const closeBtn = $('closeFormatosModal');
-    if (navBtn) navBtn.addEventListener('click', openModal);
-    if (heroBtn) heroBtn.addEventListener('click', openModal);
+    openBtnIds.forEach((id) => {
+      const btn = $(id);
+      if (btn) btn.addEventListener('click', openModal);
+    });
+    const closeBtn = $(closeBtnId);
     if (closeBtn) closeBtn.addEventListener('click', closeModal);
     modal.addEventListener('click', (event) => {
       if (event.target === modal) closeModal();
     });
+  }
+
+  function bindFormatosModal() {
+    bindModal('formatosModal', ['openFormatosModalNav', 'openFormatosModalHero'], 'closeFormatosModal');
+    bindModal('metodologiaModal', ['openMetodologiaModal'], 'closeMetodologiaModal');
   }
 
   function showApp() {
