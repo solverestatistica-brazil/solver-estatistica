@@ -1115,6 +1115,9 @@
     let anySig = false;
     (result?.anova?.table || []).forEach((row) => {
       if (row.source === 'Total') return;
+      // Blocos/Linhas/Colunas sao controle local (nao tratamento): nao faz sentido
+      // pos-teste de comparacao de medias nessas fontes, entao nao mostramos o botao.
+      if (row.source === 'Blocos' || row.source === 'Linhas' || row.source === 'Colunas') return;
       const col = extractSingleColumn(row.raw_source);
       if (!col) return;
       any = true;
