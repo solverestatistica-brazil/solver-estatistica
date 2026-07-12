@@ -773,10 +773,18 @@ def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
 
     best = sorted(models, key=lambda m: (m.get("adj_r2") if m.get("adj_r2") is not None else -999), reverse=True)[0]
     selected = next((m for m in models if m["degree"] == requested_degree), best) if requested_degree else best
-    recommendation = "Modelo escolhido pelo maior R² ajustado."
     if requested_degree and selected["degree"] != best["degree"]:
-        recommendation = f"O grau solicitado ({requested_degree}) não foi o melhor pelo R² ajustado. Sugestão automática: grau {best['degree']}."
-        selected = best
+        # Antes o backend substituía silenciosamente o grau pedido pelo usuário pelo de
+        # maior R² ajustado (selected = best), mesmo a mensagem soando como um aviso
+        # opcional. Agora o grau escolhido pelo usuário é sempre respeitado; a mensagem
+        # apenas sinaliza que outro grau teve R² ajustado maior.
+        recommendation = (
+            f"Você escolheu o grau {requested_degree} (R² ajustado {selected['adj_r2']:.3f}). "
+            f"O grau {best['degree']} teve R² ajustado maior ({best['adj_r2']:.3f}), "
+            f"mas o grau solicitado foi mantido."
+        )
+    else:
+        recommendation = "Modelo escolhido pelo maior R² ajustado."
 
     x_grid = np.linspace(reg_df["x"].min(), reg_df["x"].max(), 120)
     y_grid = _predict_poly(selected["coefficients"], x_grid)
