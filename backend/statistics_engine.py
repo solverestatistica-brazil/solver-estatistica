@@ -1029,7 +1029,7 @@ def analyze(payload: Dict[str, Any]) -> Dict[str, Any]:
     ctx = _prepare_context(payload)
     anova = _anova(ctx)
     means = _means(ctx, anova)
-    regression = _regression(ctx) if ctx.analysis_type == "regression" else None
+    regression = _regression(ctx) if ctx.analysis_type in {"regression", "single", "factorial"} else None
     factor_comparisons = _factor_comparisons(ctx, anova)
     interaction_breakdown = _interaction_breakdown(ctx, anova)
     recommendations = _recommendations(ctx, anova, means, regression)
