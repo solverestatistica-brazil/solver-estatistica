@@ -15,10 +15,23 @@ import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
-from reportlab.platypus import BaseDocTemplate, CondPageBreak, Frame, Image, KeepTogether, PageTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import (
+    BaseDocTemplate,
+    CondPageBreak,
+    Frame,
+    Image,
+    KeepTogether,
+    NextPageTemplate,
+    PageBreak,
+    PageTemplate,
+    Paragraph,
+    Spacer,
+    Table,
+    TableStyle,
+)
 
 from statistics_engine import analyze
 
@@ -39,6 +52,15 @@ NEUTRAL = colors.HexColor("#94A3B8")
 NEUTRAL_TINT = colors.HexColor("#EEF2F0")
 ACCENT = colors.HexColor("#D16D2E")
 ACCENT_TINT = colors.HexColor("#F1E2D4")
+MUTED_ON_DARK = colors.HexColor("#5C8079")
+
+# Layout: relatorio em A4 retrato (formato padrao de laudo tecnico impresso).
+PAGE_SIZE = A4
+PAGE_W, PAGE_H = PAGE_SIZE
+MARGIN = 1.3 * cm
+CONTENT_W = PAGE_W - 2 * MARGIN
+CARD_W = 5.85 * cm
+CARD_GAP_W = 0.4 * cm
 
 # Hex simples (sem objeto Color) para marcacao inline em Paragraph (<font color="...">).
 BRAND_HEX = "#339D89"
@@ -75,7 +97,8 @@ def _fmt(value: Any) -> str:
     if value is None:
         return "—"
     if isinstance(value, float):
-        return f"{value:.4f}".replace(".", ",")
+        decimals = 2 if abs(value) >= 1000 else 4
+        return f"{value:.{decimals}f}".replace(".", ",")
     return str(value)
 
 def _fmt_pct(value: Any) -> str:
@@ -83,31 +106,29 @@ def _fmt_pct(value: Any) -> str:
         return "—"
     return f"{value:.2f}%".replace(".", ",")
 
-def _draw_header_footer(canvas_obj, doc) -> None:
-    """Desenha a faixa de marca no topo e o rodape em toda pagina do PDF."""
-    canvas_obj.saveState()
-    width, height = landscape(A4)
-
-    canvas_obj.setFillColor(BRAND_DARK)
-    canvas_obj.rect(0, height - 2.2 * cm, width, 2.2 * cm, fill=1, stroke=0)
-
-    # Replica exatamente o SVG do site (viewBox 0-40, rect rx=10, polyline de
-    # tendencia + polyline em L formando a seta na ponta) em vez de um rabisco
-    # a mao livre sem seta - o usuario notou que o logo do PDF ficava diferente
-    # e mais feio que o do site.
-    logo_x, logo_y = 1.3 * cm, height - 1.75 * cm
-    logo_size = 1.05 * cm
+def _draw_logo_mark(
+    canvas_obj,
+    x: float,
+    y: float,
+    size: float,
+    mark_color=BRAND,
+    trend_color=BRAND_BRIGHT,
+    line_scale: float = 1.6,
+) -> None:
+    """Desenha apenas o icone do logo (moldura + linha de tendencia com seta na ponta),
+    replicando o SVG do site. Parametrizado em x/y/size para ser reutilizado tanto no
+    cabecalho pequeno de cada pagina quanto em tamanho grande na capa."""
     view = 40.0
-    scale = logo_size / view
+    scale = size / view
 
-    def _sp(x: float, y: float) -> Tuple[float, float]:
-        return logo_x + x * scale, logo_y + logo_size - y * scale
+    def _sp(px: float, py: float) -> Tuple[float, float]:
+        return x + px * scale, y + size - py * scale
 
-    canvas_obj.setStrokeColor(BRAND)
-    canvas_obj.setLineWidth(1.6 * scale)
-    canvas_obj.roundRect(logo_x, logo_y, logo_size, logo_size, 10 * scale, fill=0, stroke=1)
+    canvas_obj.setStrokeColor(mark_color)
+    canvas_obj.setLineWidth(line_scale * scale)
+    canvas_obj.roundRect(x, y, size, size, 10 * scale, fill=0, stroke=1)
 
-    canvas_obj.setStrokeColor(BRAND_BRIGHT)
+    canvas_obj.setStrokeColor(trend_color)
     canvas_obj.setLineWidth(2.2 * scale)
     canvas_obj.setLineCap(1)
     canvas_obj.setLineJoin(1)
@@ -129,6 +150,19 @@ def _draw_header_footer(canvas_obj, doc) -> None:
         cx, cy = _sp(px, py)
         arrowhead.lineTo(cx, cy)
     canvas_obj.drawPath(arrowhead, stroke=1, fill=0)
+
+def _draw_header_footer(canvas_obj, doc) -> None:
+    """Desenha a faixa de marca no topo e o rodape em toda pagina de conteudo do PDF
+    (nao roda na capa, que tem seu proprio desenho de pagina inteira)."""
+    canvas_obj.saveState()
+    width, height = PAGE_SIZE
+
+    canvas_obj.setFillColor(BRAND_DARK)
+    canvas_obj.rect(0, height - 2.2 * cm, width, 2.2 * cm, fill=1, stroke=0)
+
+    logo_x, logo_y = 1.3 * cm, height - 1.75 * cm
+    logo_size = 1.05 * cm
+    _draw_logo_mark(canvas_obj, logo_x, logo_y, logo_size)
 
     canvas_obj.setFillColor(colors.white)
     canvas_obj.setFont("Helvetica-Bold", 15)
@@ -159,7 +193,84 @@ def _draw_header_footer(canvas_obj, doc) -> None:
         "Solver Estatística Experimental · resultados de MVP devem ser validados antes de uso como laudo técnico oficial.",
     )
     canvas_obj.setFillColor(TEXT_L2)
-    canvas_obj.drawRightString(width - 1.3 * cm, 0.75 * cm, f"Página {doc.page}")
+    canvas_obj.drawRightString(width - 1.3 * cm, 0.75 * cm, f"Página {doc.page - 1}")
+    canvas_obj.restoreState()
+
+def _draw_cover_page(canvas_obj, doc) -> None:
+    """Capa do relatorio: fundo cheio na cor de marca, logo grande, titulo em
+    destaque e uma faixa com os 3 indicadores-chave (eco dos cards do dashboard)."""
+    canvas_obj.saveState()
+    width, height = PAGE_SIZE
+    meta = getattr(doc, "_solver_meta", {}) or {}
+
+    canvas_obj.setFillColor(BRAND_DARK)
+    canvas_obj.rect(0, 0, width, height, fill=1, stroke=0)
+
+    canvas_obj.setStrokeColor(BRAND_DEEP)
+    canvas_obj.setLineWidth(1.1)
+    canvas_obj.circle(width / 2, height - 10.6 * cm, 7.4 * cm, fill=0, stroke=1)
+
+    logo_size = 2.55 * cm
+    logo_x = width / 2 - logo_size / 2
+    logo_y = height - 9.35 * cm
+    _draw_logo_mark(canvas_obj, logo_x, logo_y, logo_size, line_scale=1.5)
+
+    canvas_obj.setFillColor(colors.white)
+    canvas_obj.setFont("Helvetica-Bold", 22)
+    canvas_obj.drawCentredString(width / 2, height - 10.85 * cm, "SOLVER")
+    canvas_obj.setFont("Helvetica", 9.5)
+    canvas_obj.setFillColor(BRAND_BRIGHT)
+    canvas_obj.drawCentredString(width / 2, height - 11.45 * cm, "I N T E L L I G E N C E   F O R   F I E L D   T R I A L S")
+
+    canvas_obj.setFillColor(colors.white)
+    canvas_obj.setFont("Helvetica-Bold", 30)
+    canvas_obj.drawCentredString(width / 2, height - 15.6 * cm, "Relatório Estatístico")
+
+    canvas_obj.setStrokeColor(BRAND)
+    canvas_obj.setLineWidth(2.2)
+    canvas_obj.line(width / 2 - 2.2 * cm, height - 16.35 * cm, width / 2 + 2.2 * cm, height - 16.35 * cm)
+
+    design_label = DESIGN_LABELS.get(meta.get("design"), meta.get("design") or "—")
+    type_label = TYPE_LABELS.get(meta.get("analysis_type"), meta.get("analysis_type") or "—")
+    if meta.get("analysis_type") in (None, "single"):
+        subtitle = design_label
+    else:
+        subtitle = f"{design_label} · {type_label.capitalize()}"
+    canvas_obj.setFont("Helvetica", 13.5)
+    canvas_obj.setFillColor(BRAND_BRIGHT)
+    canvas_obj.drawCentredString(width / 2, height - 17.35 * cm, subtitle)
+
+    stats = getattr(doc, "_solver_cover_stats", []) or []
+    if stats:
+        strip_y = height - 21.7 * cm
+        strip_w = width - 2 * 2.4 * cm
+        n = len(stats)
+        col_w = strip_w / n
+        canvas_obj.setStrokeColor(BRAND_DEEP)
+        canvas_obj.setLineWidth(0.8)
+        canvas_obj.roundRect(2.4 * cm, strip_y, strip_w, 2.55 * cm, 9, fill=0, stroke=1)
+        for i, (label, value) in enumerate(stats):
+            cx = 2.4 * cm + col_w * i + col_w / 2
+            if i > 0:
+                canvas_obj.setStrokeColor(BRAND_DEEP)
+                canvas_obj.setLineWidth(0.6)
+                canvas_obj.line(2.4 * cm + col_w * i, strip_y + 0.35 * cm, 2.4 * cm + col_w * i, strip_y + 2.2 * cm)
+            canvas_obj.setFont("Helvetica-Bold", 15.5)
+            canvas_obj.setFillColor(colors.white)
+            canvas_obj.drawCentredString(cx, strip_y + 1.5 * cm, value)
+            canvas_obj.setFont("Helvetica-Bold", 7.3)
+            canvas_obj.setFillColor(BRAND_BRIGHT)
+            canvas_obj.drawCentredString(cx, strip_y + 0.75 * cm, label.upper())
+
+    canvas_obj.setStrokeColor(BRAND_DEEP)
+    canvas_obj.setLineWidth(0.6)
+    canvas_obj.line(2.4 * cm, 2.35 * cm, width - 2.4 * cm, 2.35 * cm)
+    canvas_obj.setFont("Helvetica", 8.5)
+    canvas_obj.setFillColor(BRAND_BRIGHT)
+    canvas_obj.drawCentredString(width / 2, 1.85 * cm, "Documento gerado automaticamente pela plataforma Solver Estatística Experimental")
+    canvas_obj.setFont("Helvetica", 7.5)
+    canvas_obj.setFillColor(MUTED_ON_DARK)
+    canvas_obj.drawCentredString(width / 2, 1.4 * cm, datetime.now().strftime("Gerado em %d/%m/%Y às %H:%M"))
     canvas_obj.restoreState()
 
 def _kpi_card(label: str, value: str, sub: str) -> Table:
@@ -168,7 +279,7 @@ def _kpi_card(label: str, value: str, sub: str) -> Table:
     sub_style = ParagraphStyle("KpiSub", fontName="Helvetica-Bold", fontSize=8, textColor=SUCCESS, spaceBefore=2)
     card = Table(
         [[Paragraph(label.upper(), label_style)], [Paragraph(value, value_style)], [Paragraph(sub, sub_style)]],
-        colWidths=[8.7 * cm],
+        colWidths=[CARD_W],
     )
     card.setStyle(TableStyle([
         ("BOX", (0, 0), (-1, -1), 0.8, SURFACE_LINE),
@@ -194,8 +305,8 @@ def _kpi_cards(result: Dict[str, Any]) -> Table:
     card2 = _kpi_card("Linhas analisadas", str(n_rows if n_rows is not None else "—"), "Observações")
     card3 = _kpi_card("Melhor tratamento", str(best_label), best_mean)
 
-    card_w = 8.7 * cm
-    gap_w = 0.5 * cm
+    card_w = CARD_W
+    gap_w = CARD_GAP_W
     layout = Table([[card1, "", card2, "", card3]], colWidths=[card_w, gap_w, card_w, gap_w, card_w])
     layout.setStyle(TableStyle([
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
@@ -215,11 +326,26 @@ def _sig_colors(value: Optional[str]):
         return NEUTRAL_TINT, NEUTRAL
     return None, None
 
-def _styled_table(rows: List[List[Any]], sig_col: Optional[int] = None) -> Table:
+def _styled_table(rows: List[List[Any]], sig_col: Optional[int] = None, col0_width: Optional[float] = None) -> Table:
     """Tabela no estilo do dashboard: sem grade vertical, so linhas horizontais
-    finas + zebra, moldura externa arredondada - evita a cara de planilha crua."""
-    table = Table(rows, repeatRows=1)
+    finas + zebra, moldura externa arredondada - evita a cara de planilha crua.
+
+    col0_width: quando informado, fixa a largura da 1a coluna (FV/Tratamento/Nivel)
+    e envolve seu conteudo em Paragraph, para que nomes longos quebrem linha em vez
+    de forcar a tabela a ficar mais larga que o frame (relevante no A4 retrato, onde
+    a largura util e bem menor do que era na paisagem)."""
     n_rows = len(rows)
+    col_widths = None
+    if col0_width is not None and rows:
+        n_cols = len(rows[0])
+        other_w = (CONTENT_W - col0_width) / max(n_cols - 1, 1)
+        col_widths = [col0_width] + [other_w] * (n_cols - 1)
+        col0_style = ParagraphStyle("TableCol0", fontName="Helvetica-Bold", fontSize=8.5, textColor=TEXT_L1, leading=10.5)
+        rows = [rows[0]] + [
+            [Paragraph(str(row[0]), col0_style)] + list(row[1:])
+            for row in rows[1:]
+        ]
+    table = Table(rows, colWidths=col_widths, repeatRows=1)
     style = [
         ("BACKGROUND", (0, 0), (-1, 0), BRAND_DEEP),
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -428,18 +554,31 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     """Gera relatorio tecnico em PDF, com identidade visual Solver, a partir do payload de analise."""
     result = analyze(payload)
     buffer = io.BytesIO()
-    page_size = landscape(A4)
     doc = BaseDocTemplate(
         buffer,
-        pagesize=page_size,
-        leftMargin=1.3 * cm,
-        rightMargin=1.3 * cm,
+        pagesize=PAGE_SIZE,
+        leftMargin=MARGIN,
+        rightMargin=MARGIN,
         topMargin=2.6 * cm,
         bottomMargin=1.55 * cm,
         title="Relatório Solver Estatística",
     )
-    frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="solver-frame")
-    doc.addPageTemplates([PageTemplate(id="solver", frames=[frame], onPage=_draw_header_footer)])
+    content_frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="solver-frame")
+    cover_frame = Frame(MARGIN, MARGIN, doc.width, PAGE_H - 2 * MARGIN, id="solver-cover-frame")
+    doc.addPageTemplates([
+        PageTemplate(id="cover", frames=[cover_frame], onPage=_draw_cover_page),
+        PageTemplate(id="solver", frames=[content_frame], onPage=_draw_header_footer),
+    ])
+
+    meta_for_cover = result.get("meta", {})
+    cv_for_cover = result.get("anova", {}).get("cv")
+    best_for_cover = (result.get("means") or {}).get("best")
+    doc._solver_meta = meta_for_cover
+    doc._solver_cover_stats = [
+        ("Observações", str(meta_for_cover.get("n_rows", "—"))),
+        ("CV experimental", _fmt_pct(cv_for_cover) if cv_for_cover is not None else "—"),
+        ("Melhor tratamento", str(best_for_cover.get("treatment")) if best_for_cover else "—"),
+    ]
 
     styles = getSampleStyleSheet()
     meta_style = ParagraphStyle("SolverMeta", parent=styles["BodyText"], fontSize=9.5, textColor=TEXT_L2, spaceAfter=4)
@@ -450,6 +589,9 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
 
     meta = result.get("meta", {})
     story: List[Any] = [
+        NextPageTemplate("solver"),
+        Spacer(1, 1),
+        PageBreak(),
         Paragraph(
             f"Delineamento <b>{meta.get('design')}</b> · Tipo <b>{meta.get('analysis_type')}</b> · "
             f"{meta.get('n_rows')} linhas analisadas",
@@ -476,7 +618,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     if len(anova_rows) > 1:
         anova_block: List[Any] = [
             Paragraph(_accent_heading("Quadro de ANOVA · Teste F"), h2),
-            _styled_table(anova_rows, sig_col=8),
+            _styled_table(anova_rows, sig_col=8, col0_width=4.6 * cm),
         ]
         anova_narrative = _anova_narrative(result)
         if anova_narrative:
@@ -581,7 +723,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         if plot_b64:
             img_buffer = io.BytesIO(base64.b64decode(plot_b64))
             story.append(Spacer(1, 0.25 * cm))
-            story.append(Image(img_buffer, width=14 * cm, height=8.1 * cm))
+            story.append(Image(img_buffer, width=17.5 * cm, height=10.13 * cm))
 
     doc.build(story)
     return buffer.getvalue()
