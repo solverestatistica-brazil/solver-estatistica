@@ -435,6 +435,26 @@
         usedHeaders.add(guess);
       }
     });
+
+    // factorColumns (fatorial/parcelas subdivididas) fica de fora do loop acima porque
+    // e um campo de multiplos valores, nao tem hint de fuzzyMatches. Sem isso, um
+    // arquivo com nomes de fator diferentes do default ("fator_a,fator_b" etc.) sempre
+    // dava "Colunas ausentes na base", mesmo com os fatores presentes no arquivo.
+    const type = $('analysisType').value;
+    if (type === 'factorial' || type === 'split_plot') {
+      const configuredFactors = splitColumns($('factorColumns').value);
+      const allConfigured = configuredFactors.length === 2 && configuredFactors.every((f) => headers.includes(f));
+      if (allConfigured) {
+        configuredFactors.forEach((f) => usedHeaders.add(f));
+      } else {
+        const leftovers = headers.filter((h) => !usedHeaders.has(h));
+        if (leftovers.length >= 2) {
+          const picked = leftovers.slice(0, 2);
+          $('factorColumns').value = picked.join(',');
+          picked.forEach((h) => usedHeaders.add(h));
+        }
+      }
+    }
   }
 
   function updateFieldVisibility() {
