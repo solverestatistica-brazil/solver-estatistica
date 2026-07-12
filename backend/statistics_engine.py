@@ -253,16 +253,16 @@ def _validate_regression_input(df: pd.DataFrame, payload: Dict[str, Any], respon
         raise ValueError("Para regressão, informe a coluna de dose/fator numérico.")
 
     n_levels = int(pd.Series(x).nunique())
-    if n_levels < 2:
-        raise ValueError("A regressão precisa de pelo menos 2 doses ou níveis numéricos distintos.")
+    if n_levels < 3:
+        raise ValueError("A regressão precisa de pelo menos 3 doses ou níveis numéricos distintos, para manter 1 grau de liberdade residual e evitar curvas superajustadas (ajuste perfeito).")
 
     requested_degree = payload.get("regression_degree")
     if requested_degree:
         requested_degree = int(requested_degree)
         if requested_degree not in {1, 2, 3}:
             raise ValueError("O grau de regressão deve ser 1, 2 ou 3.")
-        if n_levels < requested_degree + 1:
-            raise ValueError(f"Regressão de grau {requested_degree} exige pelo menos {requested_degree + 1} níveis numéricos distintos.")
+        if n_levels < requested_degree + 2:
+            raise ValueError(f"Regressão de grau {requested_degree} exige pelo menos {requested_degree + 2} níveis numéricos distintos, para manter 1 grau de liberdade residual e evitar curvas superajustadas.")
 
 def _validate_design(df: pd.DataFrame, payload: Dict[str, Any], design: str, treatment: str) -> None:
     """Valida regras críticas de cada delineamento experimental."""
@@ -746,7 +746,7 @@ def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
         return None
 
     reg_df = pd.DataFrame({"x": x, "y": df[response]}).dropna()
-    if reg_df["x"].nunique() < 2:
+    if reg_df["x"].nunique() < 3:
         return None
 
     means_df = (
@@ -760,7 +760,12 @@ def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
 
     requested_degree = p.get("regression_degree")
     requested_degree = int(requested_degree) if requested_degree else None
-    max_degree = min(3, int(reg_df["x"].nunique()) - 1)
+    # Mantem ao menos 1 grau de liberdade residual (nunique >= degree + 2):
+    # sem isso o ajuste fica perfeito/superajustado e a curva oscila de forma
+    # instavel fora dos pontos observados ("curva infinita").
+    max_degree = min(3, int(reg_df["x"].nunique()) - 2)
+    if max_degree < 1:
+        return None
     models: List[Dict[str, Any]] = []
 
     for degree in range(1, max_degree + 1):
@@ -1082,5 +1087,7 @@ def _recommendations(ctx: AnalysisContext, anova: Dict[str, Any], means: Dict[st
         if opt.get("x") is not None:
             messages.append(f"Regressão sugerida: grau {regression['selected_degree']} com R² ajustado {selected.get('adj_r2'):.3f}; ponto ótimo estimado em x={opt['x']:.3f}.")
         messages.append(regression.get("recommendation", ""))
+    elif ctx.analysis_type == "regression":
+        messages.append("Regressão não foi calculada: são necessários ao menos 3 níveis numéricos distintos do fator, com 1 grau de liberdade residual, para evitar curvas superajustadas.")
 
     return [m for m in messages if m]
