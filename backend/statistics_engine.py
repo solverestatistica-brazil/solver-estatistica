@@ -276,7 +276,7 @@ def _validate_design(df: pd.DataFrame, payload: Dict[str, Any], design: str, tre
                 "tratamentos, para que sobrem graus de liberdade para estimar o erro (resíduo)."
             )
 
-    if design == "DBC":
+    if design == "DBC" and analysis_type not in ("factorial", "split_plot"):
         block = payload.get("block_column") or "bloco"
         if df[block].nunique() < 2:
             raise ValueError("No DBC, informe pelo menos 2 blocos.")
