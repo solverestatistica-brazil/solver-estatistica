@@ -78,26 +78,26 @@ O GitHub Pages é ideal para HTML, CSS e JavaScript estático. Ele não executa 
 5. Testes unitários com bases conhecidas e conferência contra softwares estatísticos.
 6. Relatórios com logo vetorial oficial.
 
-## Referencias cientificas
+## Referências científicas
 
-Os calculos de ANOVA (teste F), os delineamentos (DIC/DBC/DQL/fatorial/parcelas
-subdivididas) e os testes de comparacao de medias (Tukey, Duncan, Dunnett, SNK, Scheffe)
-implementados em `statistics_engine.py` seguem a formulacao classica descrita nas
-referencias abaixo. Verificadas via busca em julho de 2026.
+Os cálculos de ANOVA (teste F), os delineamentos (DIC/DBC/DQL/fatorial/parcelas
+subdivididas) e os testes de comparação de médias (Tukey, Duncan, Dunnett, SNK, Scheffé)
+implementados em `statistics_engine.py` seguem a formulação clássica descrita nas
+referências abaixo. Verificadas via busca em julho de 2026.
 
-**Livros-texto (base das formulas e tabelas usadas no app):**
+**Livros-texto (base das fórmulas e tabelas usadas no app):**
 
-- GOMES, F. P. *Curso de Estatistica Experimental*. 15. ed. Piracicaba: FEALQ/ESALQ, 2022.
-  ISBN 978-85-7133-055-9. Referencia brasileira classica; cobre DIC, DBC, DQL, fatorial,
+- GOMES, F. P. *Curso de Estatística Experimental*. 15. ed. Piracicaba: FEALQ/ESALQ, 2022.
+  ISBN 978-85-7133-055-9. Referência brasileira clássica; cobre DIC, DBC, DQL, fatorial,
   parcelas subdivididas e as tabelas do teste de Tukey usadas no app.
-- BANZATTO, D. A.; KRONKA, S. N. *Experimentacao Agricola*. 4. ed. Jaboticabal: FUNEP, 2006.
-  ISBN 85-87632-71-X. Cobre os mesmos delineamentos e regressao por polinomios ortogonais,
-  base do modulo de regressao/dose otima.
+- BANZATTO, D. A.; KRONKA, S. N. *Experimentação Agrícola*. 4. ed. Jaboticabal: FUNEP, 2006.
+  ISBN 85-87632-71-X. Cobre os mesmos delineamentos e regressão por polinômios ortogonais,
+  base do módulo de regressão/dose ótima.
 - STEEL, R. G. D.; TORRIE, J. H.; DICKEY, D. A. *Principles and Procedures of Statistics:
-  A Biometrical Approach*. 3. ed. New York: McGraw-Hill, 1997. Referencia internacional
-  equivalente, usada para conferencia cruzada das formulas.
+  A Biometrical Approach*. 3. ed. New York: McGraw-Hill, 1997. Referência internacional
+  equivalente, usada para conferência cruzada das fórmulas.
 
-**Artigos originais dos pos-testes de comparacao de medias:**
+**Artigos originais dos pós-testes de comparação de médias:**
 
 - TUKEY, J. W. Comparing individual means in the analysis of variance. *Biometrics*, v. 5,
   n. 2, p. 99-114, 1949. DOI 10.2307/3001913.
@@ -110,14 +110,14 @@ referencias abaixo. Verificadas via busca em julho de 2026.
   terms of an independent estimate of standard deviation. *Biometrika*, v. 31, n. 1-2,
   p. 20-30, 1939; KEULS, M. The use of the "studentized range" in connection with an
   analysis of variance. *Euphytica*, v. 1, p. 112-122, 1952. (base do teste SNK)
-- SCHEFFE, H. A method for judging all contrasts in the analysis of variance. *Biometrika*,
+- SCHEFFÉ, H. A method for judging all contrasts in the analysis of variance. *Biometrika*,
   v. 40, n. 1-2, p. 87-110, 1953.
 
 **Origem do teste F / ANOVA:**
 
 - FISHER, R. A. *Statistical Methods for Research Workers*. Edinburgh: Oliver and Boyd, 1925.
 
-Essas referencias documentam a origem das formulas e tabelas, mas nao substituem
-verificacao numerica linha a linha: o item 5 de "Pontos para evolucao" acima (testes
-unitarios contra bases conhecidas e conferencia contra outros softwares estatisticos)
-continua sendo a forma mais confiavel de validar a implementacao.
+Essas referências documentam a origem das fórmulas e tabelas, mas não substituem
+verificação numérica linha a linha: o item 5 de "Pontos para evolução" acima (testes
+unitários contra bases conhecidas e conferência contra outros softwares estatísticos)
+continua sendo a forma mais confiável de validar a implementação.
