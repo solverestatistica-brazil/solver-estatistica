@@ -29,6 +29,7 @@
 <button class="btn solid" id="navOpenApp" type="button">Iniciar análise</button>
 </div>
 <div class="nav-actions hidden" id="navActionsApp">
+<button class="btn ghost" id="newAnalysisBtn" type="button">↺ Nova análise</button>
 <button class="btn ghost" id="navBackToSite" type="button">← Voltar ao site</button>
 </div>
 </nav>
@@ -346,7 +347,7 @@
 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
 </div>
 <b>Enviar arquivo</b>
-<span>CSV ou XLSX já preenchido</span>
+<span>CSV (;) já preenchido</span>
 </button>
 <button class="choice-card" id="chooseManual" type="button">
 <div class="icon-circle small">
@@ -359,8 +360,9 @@
 <p class="small-note center">Só quer testar? <button class="link-btn" id="loadExample" type="button">Carregar um exemplo pronto</button>.</p>
 
 <div class="data-subpanel hidden" id="dataUploadPanel">
-<label for="fileInput">Upload CSV/XLSX</label>
-<input id="fileInput" type="file" accept=".csv,.xlsx,.xls" />
+<label for="fileInput">Upload CSV (separado por ponto e vírgula)</label>
+<input id="fileInput" type="file" accept=".csv" />
+<p class="small-note">Apenas arquivos .csv com colunas separadas por ponto e vírgula (;), no padrão do Excel em português.</p>
 <div id="columnMapping" class="hidden" style="margin-top:14px"></div>
 </div>
 <div class="data-subpanel hidden" id="dataManualPanel">
@@ -376,6 +378,7 @@
 </div>
 <p class="small-note" id="rowCount">Nenhuma linha carregada.</p>
 <p class="inline-error hidden" id="dataErrorMsg"></p>
+<button class="btn ghost hidden" id="restartAnalysis" type="button">↺ Iniciar nova análise</button>
 
 <div class="step-nav">
 <button class="btn ghost" data-back="modelo" type="button">← Voltar ao modelo</button>
@@ -473,7 +476,6 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/app.js"></script>
 </body>
