@@ -809,10 +809,23 @@ def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
     }
 
 def _fit_poly(x: np.ndarray, y: np.ndarray, degree: int, goal: str) -> Dict[str, Any]:
-    X = np.column_stack([x ** i for i in range(1, degree + 1)])
+    # Centraliza x (x - media) antes de ajustar: evita mal-condicionamento
+    # numerico do polinomio em escala bruta (ex.: 120**3 = 1.728.000), que
+    # gera curvas instaveis/"infinitas" mesmo com graus de liberdade validos.
+    # Os coeficientes sao convertidos de volta para a escala original de x
+    # no final, entao equation/optimum/fitted_curve continuam em x bruto.
+    x_mean = float(np.mean(x))
+    u = x - x_mean
+    X = np.column_stack([u ** i for i in range(1, degree + 1)])
     X = sm.add_constant(X)
     model = sm.OLS(y, X).fit()
-    coeffs = model.params.tolist() # intercepto, x, x², x³...
+    centered_coeffs = model.params.tolist()  # intercepto, u, u², u³... (u = x - x_mean)
+    p_u = np.poly1d(list(reversed(centered_coeffs)))
+    p_x = p_u(np.poly1d([1, -x_mean]))
+    raw_coeffs = list(reversed(np.atleast_1d(p_x.coefficients).tolist()))
+    while len(raw_coeffs) < len(centered_coeffs):
+        raw_coeffs.append(0.0)
+    coeffs = raw_coeffs # intercepto, x, x², x³...
     equation = _equation_text(coeffs)
     optimum = _poly_optimum(coeffs, float(np.min(x)), float(np.max(x)), goal)
     return {
