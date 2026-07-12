@@ -264,6 +264,9 @@ identico ao cinza da zebra, ficando praticamente invisivel. */
 #anovaTable th:not(:first-child),#anovaTable td:not(:first-child){text-align:center}
 #anovaTable th:first-child,#anovaTable td:first-child{text-align:left}
 #meansTable th,#meansTable td{text-align:center}
+/* Colunas numericas encolhem ao conteudo (nao ficam esticadas); a 1a coluna (FV/Tratamento) e a barra visual absorvem o espaco restante. */
+#anovaTable th:not(:first-child),#anovaTable td:not(:first-child){width:1%;white-space:nowrap}
+#meansTable th:not(:first-child):not(:last-child),#meansTable td:not(:first-child):not(:last-child){width:1%;white-space:nowrap}
 
 /* --- Preview do relatorio (capa): harmonizacao com a paleta e acabamento --- */
 .window-head span i:nth-child(1){background:var(--error)}
