@@ -434,3 +434,20 @@ body:has(#view-app:not(.hidden)){background-size:38px 38px,38px 38px,100% 100%,1
 .dose-callout b{font-size:8.6px;font-weight:700;color:var(--accent)}
 .preview-action .icon-circle{width:32px;height:32px;margin-bottom:5px}
 .preview-action .icon-circle svg{width:16px;height:16px}
+
+/* --- Rodape: credito, GitHub e reportar problema --- */
+.site-footer{border-top:1px solid var(--border-dark);margin-top:56px;padding:22px 0 6px}
+.site-footer-inner{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.footer-credit{color:var(--text-d3);font-family:var(--font-text);font-size:12.5px}
+.footer-credit b{color:var(--text-d2);font-weight:600}
+.footer-links{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.footer-link{display:inline-flex;align-items:center;gap:7px;padding:8px 14px;border-radius:999px;border:1px solid var(--border-dark);background:rgba(255,255,255,.03);color:var(--text-d2);font-family:var(--font-heading);font-weight:700;font-size:12px;text-decoration:none;transition:.18s ease}
+.footer-link svg{flex:none}
+.footer-link:hover{transform:translateY(-1px);border-color:var(--brand);color:var(--text-d1)}
+.footer-link-report{color:var(--accent);border-color:rgba(209,109,46,.35)}
+.footer-link-report:hover{transform:translateY(-1px);border-color:var(--accent);color:var(--accent)}
+@media(max-width:720px){
+.site-footer-inner{flex-direction:column;align-items:flex-start;gap:12px}
+.footer-links{width:100%}
+.footer-link{flex:1;justify-content:center}
+}
