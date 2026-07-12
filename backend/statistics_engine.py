@@ -100,8 +100,12 @@ def _significance(p_value: Optional[float]) -> str:
     return "ns"
 
 def _cv_label(cv: Optional[float]) -> str:
+    # [FIX 3.4] CV abaixo de 0,5 % é sinal de dados agregados/sinteticos,
+    # nao de precisao excelente. Distinguimos essa faixa antes de rotular como "Otimo".
     if cv is None:
         return "Indisponível"
+    if cv < 0.5:
+        return "Muito baixo — verifique variabilidade"
     if cv <= 10:
         return "Ótimo"
     if cv <= 20:
@@ -122,6 +126,19 @@ def _parse_numeric_from_text(series: pd.Series) -> pd.Series:
         return float(match.group(0)) if match else None
 
     return series.apply(parse_one)
+
+
+
+def _coerce_categorical(df: pd.DataFrame, columns: Iterable[str]) -> None:
+    """[FIX 3.1] Forca colunas categoricas a str.
+
+    Elimina o KeyError '90' em fatorial/split-plot com fator numerico.
+    O numeric_factor_column continua sendo lido via pd.to_numeric na regressao.
+    """
+    for col in columns:
+        if col and col in df.columns:
+            df[col] = df[col].astype(str)
+
 
 def _dedupe_keep_order(values: Iterable[str]) -> List[str]:
     seen: set[str] = set()
@@ -226,6 +243,22 @@ def _prepare_context(payload: Dict[str, Any]) -> AnalysisContext:
         df[column] = df[column].astype(str).str.strip()
 
     df = df.dropna(subset=[response]).copy()
+
+    # [FIX 3.1] coerce_categorical: garante que colunas usadas como fator
+    # categorico (treatment/block/row/column/factor_columns) sejam string,
+    # eliminando a incompatibilidade int/str que causava KeyError '90'.
+    _cat_cols = set()
+    if analysis_type != "regression":
+        _cat_cols.add(treatment)
+    if design == "DBC":
+        _cat_cols.add(payload.get("block_column") or "bloco")
+    if design == "DQL":
+        _cat_cols.add(payload.get("row_column") or "linha")
+        _cat_cols.add(payload.get("column_column") or "coluna")
+    if analysis_type in {"factorial", "split_plot"}:
+        for _f in (payload.get("factor_columns") or []):
+            _cat_cols.add(_f)
+    _coerce_categorical(df, [c for c in _cat_cols if c])
 
     if analysis_type == "regression":
         _validate_regression_input(df, payload, response, treatment)
@@ -498,8 +531,21 @@ def _anova(ctx: AnalysisContext) -> Dict[str, Any]:
     table = anova_lm(model, typ=2)
     df_resid = float(model.df_resid)
     mse = float(model.mse_resid) if model.df_resid > 0 else None
+
+    # [FIX 3.2] Guarda contra residuo numericamente nulo. Quando MSE eh
+    # ordens de magnitude menor que a variancia total, F/p sao ruido de
+    # ponto flutuante e nao devem ser publicados como resultado estatistico.
+    _total_var_ = float(ctx.df[ctx.response].var(ddof=0)) or 1.0
+    _residual_is_singular_ = mse is not None and mse < 1e-10 * _total_var_
+    if _residual_is_singular_:
+        notes.append(
+            "Resíduo praticamente nulo (MSE ≈ 0). Os valores de F e p são "
+            "numericamente instáveis — provavelmente os dados são aditivos "
+            "entre blocos e tratamentos, sem variabilidade dentro de célula. "
+            "Refaça com dados reais de campo."
+        )
     mean_response = float(ctx.df[ctx.response].mean())
-    cv = (math.sqrt(mse) / abs(mean_response) * 100) if mse is not None and mean_response != 0 else None
+    cv = None if _residual_is_singular_ else ((math.sqrt(mse) / abs(mean_response) * 100) if mse is not None and mean_response != 0 else None)
 
     rows: List[Dict[str, Any]] = []
     for idx, row in table.iterrows():
@@ -508,6 +554,10 @@ def _anova(ctx: AnalysisContext) -> Dict[str, Any]:
         mean_sq = (sum_sq / dfv) if sum_sq is not None and dfv not in (None, 0) else None
         f_value = _num(row.get("F"))
         p_value = _num(row.get("PR(>F)"))
+        # [FIX 3.2] Se o residuo eh singular, F/p das fontes reais sao ruido.
+        if _residual_is_singular_ and str(idx) != "Residual":
+            f_value = None
+            p_value = None
         f5 = stats.f.ppf(0.95, dfv, df_resid) if idx != "Residual" and dfv and df_resid > 0 else None
         f1 = stats.f.ppf(0.99, dfv, df_resid) if idx != "Residual" and dfv and df_resid > 0 else None
         rows.append({
@@ -542,6 +592,7 @@ def _anova(ctx: AnalysisContext) -> Dict[str, Any]:
         "table": rows,
         "mse": mse,
         "df_error": df_resid,
+        "residual_is_singular": _residual_is_singular_,
         "cv": cv,
         "cv_label": _cv_label(cv),
         "model_notes": notes,
@@ -834,6 +885,7 @@ def _fit_poly(x: np.ndarray, y: np.ndarray, degree: int, goal: str) -> Dict[str,
         "aic": float(model.aic),
         "bic": float(model.bic),
         "p_model": float(model.f_pvalue) if model.f_pvalue is not None and not np.isnan(model.f_pvalue) else None,
+        "p_top_term": (float(model.pvalues[-1]) if len(list(model.pvalues)) > 0 and not (math.isnan(float(model.pvalues[-1])) or math.isinf(float(model.pvalues[-1]))) else None),  # [FIX 3.3]
         "coefficients": [float(v) for v in coeffs],
         "equation": equation,
         "optimum": optimum,
