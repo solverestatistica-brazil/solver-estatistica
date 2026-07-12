@@ -32,7 +32,15 @@ class AnalyzePayload(BaseModel):
     control_group: Optional[str] = None
     regression_degree: Optional[int] = None
     goal: str = "max"
-    alpha: float = 0.05
+    alpha: float = Field(
+        0.05,
+        description=(
+            "Não é mais usado para o pós-teste de comparação de médias: o nível de "
+            "significância (1% ou 5%) agora é herdado automaticamente do teste F de cada "
+            "fonte de variação (tratamento, fator ou interação). Campo mantido só por "
+            "compatibilidade de API."
+        ),
+    )
     data: list[dict[str, Any]]
 
 
@@ -74,7 +82,7 @@ def analyze_endpoint(payload: AnalyzePayload) -> Dict[str, Any]:
 
 @app.post("/api/analyze-upload")
 async def analyze_upload(config: str = Form(...), file: UploadFile = File(...)) -> Dict[str, Any]:
-    """Recebe CSV/XLSX e um JSON de configuração para análise."""
+    """Recebe CSV (separado por ;) e um JSON de configuração para análise."""
     try:
         payload = json.loads(config)
         df = await _read_uploaded_table(file)
@@ -159,14 +167,31 @@ def _normalize_brazilian_decimals(df: pd.DataFrame) -> pd.DataFrame:
 
 
 async def _read_uploaded_table(file: UploadFile) -> pd.DataFrame:
+    """Lê o arquivo enviado pelo usuário. Entrada padronizada: somente CSV separado por
+    ponto e vírgula (;), o padrão do Excel em português (BR), onde a vírgula já é o
+    separador decimal. A versão anterior tentava adivinhar o separador (sep=None) e ainda
+    aceitava XLS/XLSX; isso deixava a causa de um erro de formatação difícil de identificar."""
     raw = await file.read()
     name = (file.filename or "").lower()
-    if name.endswith(".csv"):
-        try:
-            df = pd.read_csv(io.BytesIO(raw), sep=None, engine="python")
-        except Exception:
-            df = pd.read_csv(io.BytesIO(raw), sep=";")
-        return _normalize_brazilian_decimals(df)
-    if name.endswith((".xlsx", ".xls")):
-        return pd.read_excel(io.BytesIO(raw))
-    raise ValueError("Formato não suportado. Envie CSV, XLS ou XLSX.")
+    if not name.endswith(".csv"):
+        raise ValueError(
+            "Formato não suportado. Envie um arquivo CSV separado por ponto e vírgula (;)."
+        )
+    try:
+        text = raw.decode("utf-8-sig")
+    except UnicodeDecodeError as exc:
+        raise ValueError(
+            "Não foi possível ler a codificação do arquivo. Salve o CSV como UTF-8 e tente novamente."
+        ) from exc
+    try:
+        df = pd.read_csv(io.StringIO(text), sep=";")
+    except Exception as exc:
+        raise ValueError(
+            "Não foi possível ler o CSV. Confirme que as colunas estão separadas por ponto e vírgula (;)."
+        ) from exc
+    if df.shape[1] < 2:
+        raise ValueError(
+            "O arquivo parece ter uma única coluna. Confirme que o separador usado é ponto e vírgula (;), não vírgula."
+        )
+    df.columns = [str(c).strip() for c in df.columns]
+    return _normalize_brazilian_decimals(df)
