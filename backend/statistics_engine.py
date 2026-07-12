@@ -470,7 +470,7 @@ def _anova_split_plot(ctx: AnalysisContext) -> Dict[str, Any]:
         ms = mean_sq(row)
         if ms is None or err_ms in (None, 0) or not err_df or err_df <= 0 or not row.get("df"):
             return None, None, None, None
-        f_calc = None if _sp_singular_ else (ms / err_ms)  # [FIX 3.2-sp]
+        f_calc = ms / err_ms
         f5 = stats.f.ppf(0.95, row["df"], err_df)
         f1 = stats.f.ppf(0.99, row["df"], err_df)
         p_value = float(stats.f.sf(f_calc, row["df"], err_df))
