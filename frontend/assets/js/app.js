@@ -201,11 +201,13 @@
     $('dataUploadPanel').classList.toggle('hidden', mode !== 'upload');
     $('dataManualPanel').classList.toggle('hidden', mode !== 'manual');
     $('dataErrorMsg').classList.add('hidden');
-    hideColumnMapping();
+    // Trocar de modo sempre invalida dados do modo anterior - evita que uma
+    // tentativa de upload com erro deixe uploadedRows "preso" e contamine a
+    // proxima analise (manual ou de outro arquivo).
+    uploadedRows = [];
     if (mode === 'upload') {
       $('dataTableTools').style.display = 'none';
       $('dataTableWrap').style.display = 'none';
-      uploadedRows = [];
       $('rowCount').textContent = 'Nenhum arquivo carregado.';
     }
   }
@@ -373,59 +375,6 @@
     box.innerHTML = '';
   }
 
-  function showColumnMapping(missing, headers) {
-    const box = $('columnMapping');
-    if (!box) return;
-    box.innerHTML = '';
-    box.classList.remove('hidden');
-
-    const title = document.createElement('p');
-    title.className = 'small-note';
-    title.innerHTML = '<b>Os nomes das colunas do seu arquivo nao batem com a configuracao.</b> Indique qual coluna corresponde a cada campo:';
-    box.appendChild(title);
-
-    const usedHeaders = new Set();
-    missing.forEach((f) => {
-      const wrap = document.createElement('label');
-      wrap.style.display = 'block';
-      wrap.style.marginTop = '10px';
-      wrap.appendChild(document.createTextNode(f.label));
-
-      const select = document.createElement('select');
-      select.dataset.target = f.id;
-      select.style.marginTop = '6px';
-
-      const emptyOpt = document.createElement('option');
-      emptyOpt.value = '';
-      emptyOpt.textContent = 'Selecione a coluna do arquivo...';
-      select.appendChild(emptyOpt);
-
-      headers.forEach((h) => {
-        const opt = document.createElement('option');
-        opt.value = h;
-        opt.textContent = h;
-        select.appendChild(opt);
-      });
-
-      const guess = headers.find((h) => !usedHeaders.has(h) && fuzzyMatches(h, f.id));
-      if (guess) {
-        select.value = guess;
-        usedHeaders.add(guess);
-      }
-
-      wrap.appendChild(select);
-      box.appendChild(wrap);
-    });
-
-    const applyBtn = document.createElement('button');
-    applyBtn.type = 'button';
-    applyBtn.className = 'btn solid';
-    applyBtn.style.marginTop = '14px';
-    applyBtn.textContent = 'Aplicar mapeamento e iniciar analise';
-    applyBtn.addEventListener('click', applyColumnMapping);
-    box.appendChild(applyBtn);
-  }
-
   function fuzzyMatches(header, fieldId) {
     const h = header.trim().toLowerCase();
     const hints = {
@@ -439,20 +388,25 @@
     return (hints[fieldId] || []).some((hint) => h.includes(hint));
   }
 
-  function applyColumnMapping() {
-    const box = $('columnMapping');
-    if (!box) return;
-    const selects = Array.from(box.querySelectorAll('select'));
-    const incomplete = selects.some((s) => !s.value);
-    if (incomplete) {
-      notify('Selecione todas as colunas antes de continuar.', 'error');
-      return;
-    }
-    selects.forEach((s) => { $(s.dataset.target).value = s.value; });
-    hideColumnMapping();
-    $('dataErrorMsg').classList.add('hidden');
-    notify('Colunas mapeadas.', 'success');
-    runAnalysis();
+  // Sem etapa manual de mapeamento: se os nomes das colunas do arquivo nao
+  // baterem com a configuracao, tenta encaixar automaticamente por
+  // aproximacao (fuzzyMatches) e segue direto para a analise. Se algo
+  // essencial realmente nao existir no arquivo, o backend retorna um erro
+  // claro ("Colunas ausentes na base: ...") pelo caminho normal de erro.
+  function autoMapColumns(headers) {
+    const usedHeaders = new Set();
+    requiredColumnFields().forEach((f) => {
+      const configured = $(f.id).value.trim();
+      if (configured && headers.includes(configured)) {
+        usedHeaders.add(configured);
+        return;
+      }
+      const guess = headers.find((h) => !usedHeaders.has(h) && fuzzyMatches(h, f.id));
+      if (guess) {
+        $(f.id).value = guess;
+        usedHeaders.add(guess);
+      }
+    });
   }
 
   function updateFieldVisibility() {
@@ -742,12 +696,7 @@
     if (!rows.length) return notify('Insira ou carregue dados antes de analisar.', 'error');
 
     if (uploadedRows.length) {
-      const missing = missingColumnFields(currentHeaders);
-      if (missing.length) {
-        showColumnMapping(missing, currentHeaders);
-        notify('Confira o mapeamento de colunas antes de rodar a analise.', 'error');
-        return;
-      }
+      autoMapColumns(currentHeaders);
     }
 
     const payload = payloadFromUi();
@@ -803,14 +752,10 @@
     renderRecommendations(result?.recommendations || []);
     renderRegression(result?.regression);
     checkDoseAdvisory();
-
-    const firstF = (result?.anova?.table || []).find((r) => r.f_calc != null);
-    $('previewCv').textContent = cv == null ? '-' : `${format(cv)}%`;
-    $('previewF').textContent = firstF ? format(firstF.f_calc) : '-';
-    const reg = result?.regression?.selected_model;
-    $('previewR2').textContent = reg?.r2 == null ? '-' : format(reg.r2);
-    const opt = reg?.optimum;
-    $('previewDose').textContent = opt?.x == null ? '-' : `${format(opt.x)} ${result?.regression?.x_label || ''}`;
+    // Nota: o preview do hero (#previewCv/#previewF/#previewR2/#previewDose e o
+    // mini-anova) e' um exemplo fixo, ilustrativo, escrito direto no HTML - ele
+    // nunca deve refletir o resultado real do usuario, entao propositalmente
+    // nao atualizamos esses elementos aqui.
   }
 
   function sigPill(value) {
@@ -1390,17 +1335,9 @@
       $('dataTableTools').style.display = 'none';
       $('dataTableWrap').style.display = 'none';
       $('dataErrorMsg').classList.add('hidden');
-
-      const missing = missingColumnFields(currentHeaders);
-      if (missing.length) {
-        $('rowCount').textContent = `${rows.length} linha(s) carregada(s) de "${file.name}". Confira o mapeamento de colunas abaixo.`;
-        showColumnMapping(missing, currentHeaders);
-        notify('Arquivo carregado. Os nomes das colunas nao batem com a configuracao - confira o mapeamento abaixo.', 'info');
-      } else {
-        $('rowCount').textContent = `${rows.length} linha(s) carregada(s) de "${file.name}". Clique em Iniciar analise.`;
-        hideColumnMapping();
-        notify('Arquivo carregado. Clique em Iniciar analise.', 'success');
-      }
+      autoMapColumns(currentHeaders);
+      $('rowCount').textContent = `${rows.length} linha(s) carregada(s) de "${file.name}". Clique em Iniciar analise.`;
+      notify('Arquivo carregado. Clique em Iniciar analise.', 'success');
     } catch (err) {
       notify(err.message || 'Erro ao ler arquivo.', 'error');
     }
