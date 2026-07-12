@@ -800,7 +800,9 @@
     renderAnovaTable(result?.anova?.table || []);
     renderRecommendations(result?.recommendations || []);
     renderRegression(result?.regression);
-    checkDoseAdvisory();
+    // checkDoseAdvisory() removido: a opcao "Regressao" ja fica disponivel direto no
+    // dropdown "Teste de comparacao" (runFactorComparison/runComparison), entao o
+    // banner separado sugerindo trocar o tipo de analise inteiro ficava redundante.
     // Nota: o preview do hero (#previewCv/#previewF/#previewR2/#previewDose e o
     // mini-anova) e' um exemplo fixo, ilustrativo, escrito direto no HTML - ele
     // nunca deve refletir o resultado real do usuario, entao propositalmente
@@ -1090,7 +1092,7 @@
       btn.title = sig ? '' : 'So e possivel comparar fatores significativos no teste F.';
       const hasFactorComparisons = Array.isArray(result?.factor_comparisons) && result.factor_comparisons.length > 0;
       if (hasFactorComparisons) {
-        btn.addEventListener('click', () => showFactorComparison(col, row.source));
+        btn.addEventListener('click', () => runFactorComparison(col, row.source, btn));
       } else {
         btn.addEventListener('click', () => runComparison(col, row.source, btn));
       }
@@ -1104,16 +1106,49 @@
     }
   }
 
-  function showFactorComparison(col, label) {
-    const entry = (currentResult?.factor_comparisons || []).find((f) => f.factor === col);
-    if (!entry) {
-      notify('Comparacao de medias indisponivel para este fator.', 'error');
-      return;
+  async function runFactorComparison(col, label, btn) {
+    // Antes usava o resultado pre-computado da analise inicial (sempre com o teste
+    // default), entao trocar o teste no dropdown (inclusive "Regressao") nao tinha
+    // nenhum efeito nos botoes "Comparar: <fator>" de fatorial/parcelas subdivididas.
+    // Agora re-executa a comparacao com o teste atualmente selecionado, igual ao
+    // fluxo de comparacao simples (runComparison).
+    if ($('comparisonTestPost').value === 'regression') {
+      return runRegressionFromComparison(col, btn);
     }
-    $('meansResultBox').classList.remove('hidden');
-    const errorLabel = entry.error_used === 'a' ? ', Erro (a)' : entry.error_used === 'b' ? ', Erro (b)' : '';
-    $('meansFactorLabel').textContent = `Medias e grupos - ${label} (${entry.test}${errorLabel})`;
-    renderMeansTable(entry.levels || []);
+    const base = cleanApiBase(apiInput.value);
+    if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
+    const payload = payloadFromUi();
+    payload.comparison_test = $('comparisonTestPost').value;
+    const stopLoading = startLoadingSequence(btn, [
+      'Comparando medias...',
+      'Aplicando teste de agrupamento...'
+    ]);
+    try {
+      setApiStatus('Processando...', '');
+      const res = await fetch(`${base}/api/analyze`, {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.detail || 'Erro na comparacao');
+      const entry = (json?.factor_comparisons || []).find((f) => f.factor === col);
+      if (!entry) {
+        notify('Comparacao de medias indisponivel para este fator com o teste selecionado.', 'error');
+        return;
+      }
+      currentResult = json;
+      $('meansResultBox').classList.remove('hidden');
+      const errorLabel = entry.error_used === 'a' ? ', Erro (a)' : entry.error_used === 'b' ? ', Erro (b)' : '';
+      $('meansFactorLabel').textContent = `Medias e grupos - ${label} (${entry.test}${errorLabel})`;
+      renderMeansTable(entry.levels || []);
+      setApiStatus('API ativa', 'ok');
+    } catch (err) {
+      setApiStatus('Erro na comparacao', 'err');
+      notify(err.message || 'Erro ao comparar medias.', 'error');
+    } finally {
+      stopLoading();
+    }
   }
 
   async function runComparison(colOverride, label, btn) {
