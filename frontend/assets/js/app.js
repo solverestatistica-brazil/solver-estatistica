@@ -18,6 +18,7 @@
     const savedApi = localStorage.getItem('solver_api_base_url') || window.SOLVER_API_BASE_URL || '';
     apiInput.value = savedApi;
     bindViewSwitch();
+    bindFormatosModal();
     bindStepper();
     bindActions();
     bindTypeGrid();
@@ -36,6 +37,29 @@
         event.preventDefault();
         showLanding();
       }
+    });
+  }
+
+  function bindFormatosModal() {
+    const modal = $('formatosModal');
+    if (!modal) return;
+    const openModal = (event) => {
+      if (event) event.preventDefault();
+      if (typeof modal.showModal === 'function') modal.showModal();
+      else modal.setAttribute('open', 'open');
+    };
+    const closeModal = () => {
+      if (typeof modal.close === 'function') modal.close();
+      else modal.removeAttribute('open');
+    };
+    const navBtn = $('openFormatosModalNav');
+    const heroBtn = $('openFormatosModalHero');
+    const closeBtn = $('closeFormatosModal');
+    if (navBtn) navBtn.addEventListener('click', openModal);
+    if (heroBtn) heroBtn.addEventListener('click', openModal);
+    if (closeBtn) closeBtn.addEventListener('click', closeModal);
+    modal.addEventListener('click', (event) => {
+      if (event.target === modal) closeModal();
     });
   }
 
