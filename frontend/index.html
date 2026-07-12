@@ -55,7 +55,7 @@
 <section class="preview-card" aria-label="Prévia do relatório">
 <div class="window-head"><span><i></i><i></i><i></i></span><b>PREVIEW DO RELATÓRIO</b></div>
 <div class="stats-row">
-<div class="stat-cv"><label>CV experimental</label><div class="cv-ring-row"><svg class="cv-ring" viewBox="0 0 52 52" width="42" height="42" aria-hidden="true"><circle cx="26" cy="26" r="21" fill="none" style="stroke:var(--surface-line)" stroke-width="6"/><circle cx="26" cy="26" r="21" fill="none" style="stroke:var(--brand)" stroke-width="6" stroke-linecap="round" stroke-dasharray="131.9" stroke-dashoffset="21" transform="rotate(-90 26 26)"/></svg><div class="cv-ring-text"><strong class="cv-headline">Ótimo</strong><span id="previewCv">8,40%</span></div></div><em>Precisão alta</em></div>
+<div class="stat-cv"><label>CV experimental</label><div class="cv-ring-row"><svg class="cv-ring" viewBox="0 0 52 52" width="36" height="36" aria-hidden="true"><circle cx="26" cy="26" r="21" fill="none" style="stroke:var(--surface-line)" stroke-width="6"/><circle cx="26" cy="26" r="21" fill="none" style="stroke:var(--brand)" stroke-width="6" stroke-linecap="round" stroke-dasharray="131.9" stroke-dashoffset="21" transform="rotate(-90 26 26)"/></svg><div class="cv-ring-text"><strong class="cv-headline">Ótimo</strong><span id="previewCv">8,40%</span></div></div><em>Precisão alta</em></div>
 <div><label>F calculado</label><strong id="previewF">41,32</strong><em>Tukey: 4 grupos</em></div>
 <div><label>R² regressão</label><strong id="previewR2">0,95</strong><em>Ótimo ajuste</em></div>
 </div>
@@ -64,7 +64,7 @@
 <div class="chart-title"><span>Curva ajustada e dose ótima</span></div>
 <div class="chart-wrap">
 <div class="dose-callout" style="left:27.9%"><b id="previewDose">124,8 kg/ha</b></div>
-<svg width="100%" height="72" viewBox="0 0 340 90" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="100%" height="112" viewBox="0 0 340 90" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
 <path d="M8,70 C38,56 60,28 95,20 L95,78 L8,78 Z" style="fill:var(--brand)" opacity="0.14"/>
 <path d="M95,20 C112,18 120,44 148,40 C168,38 178,26 205,24 C250,22 290,46 330,58 L330,78 L95,78 Z" style="fill:var(--accent)" opacity="0.1"/>
 <path d="M8,70 C38,56 60,28 95,20" fill="none" style="stroke:var(--brand)" stroke-width="2.2" stroke-linecap="round"/>
@@ -355,7 +355,7 @@
 
 <div class="hint-card">
 <b>Regra do Solver</b>
-<p>Se uma regressão solicitada não for a melhor para os dados, o backend recomenda automaticamente o modelo com maior R² ajustado. O teste de comparação de médias você escolhe depois, já vendo a ANOVA.</p>
+<p>Se uma regressão solicitada não for a melhor para os dados, o backend recomenda automaticamente o modelo com maior R² ajustado. O teste de comparação de médias você escolhe depois, já vendo a ANOVA. A regressão só é calculada quando há um fator numérico (dose) com pelo menos 3 níveis distintos e 1 grau de liberdade residual — isso evita curvas superajustadas/instáveis fora dos pontos observados.</p>
 </div>
 <div class="step-nav">
 <span></span>
