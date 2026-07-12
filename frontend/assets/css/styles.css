@@ -468,3 +468,36 @@ body:has(#view-app:not(.hidden)){background-size:38px 38px,38px 38px,100% 100%,1
 .export-card.loading{cursor:wait;opacity:.72;pointer-events:none}
 .export-card .btn-spinner{display:inline-block;width:13px;height:13px;border:2px solid var(--surface-line);border-top-color:var(--brand);border-radius:50%;vertical-align:-2px;margin-right:6px;animation:solverSpin .7s linear infinite}
 @keyframes solverSpin{to{transform:rotate(360deg)}}
+
+
+/* --- Legibilidade dos cards de resultado + tabelas (ajuste solicitado) --- */
+.result-cards article{
+  border:1px solid var(--border-dark);
+  padding:16px 18px;
+  display:flex;
+  flex-direction:column;
+  gap:6px;
+}
+.result-cards article span{
+  font-size:12px;
+  text-transform:none;
+  letter-spacing:.1px;
+  opacity:.85;
+}
+.result-cards article strong{
+  font-size:26px;
+  line-height:1.15;
+  margin:2px 0;
+}
+.result-cards article em{
+  font-size:13px;
+  font-style:normal;
+  opacity:.85;
+}
+#anovaTable td,#meansTable td{
+  font-variant-numeric:tabular-nums;
+}
+#anovaTable th:not(:first-child),#anovaTable td:not(:first-child),
+#meansTable th:not(:first-child),#meansTable td:not(:first-child){
+  text-align:right;
+}
