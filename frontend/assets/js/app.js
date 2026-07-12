@@ -175,10 +175,10 @@
       $('regressionDegreePostWrap').classList.toggle('hidden', !isRegression);
     });
 
-    $('downloadPdf').addEventListener('click', () => downloadExport('/api/export/pdf', 'solver-relatorio.pdf'));
-    $('downloadExcel').addEventListener('click', () => downloadExport('/api/export/excel', 'solver-resultados.xlsx'));
-    $('downloadPng').addEventListener('click', () => downloadRegressionExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png'));
-    $('downloadPlotPdf').addEventListener('click', () => downloadRegressionExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf'));
+    $('downloadPdf').addEventListener('click', (event) => downloadExport('/api/export/pdf', 'solver-relatorio.pdf', null, event.currentTarget));
+    $('downloadExcel').addEventListener('click', (event) => downloadExport('/api/export/excel', 'solver-resultados.xlsx', null, event.currentTarget));
+    $('downloadPng').addEventListener('click', (event) => downloadRegressionExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png', event.currentTarget));
+    $('downloadPlotPdf').addEventListener('click', (event) => downloadRegressionExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf', event.currentTarget));
 
     $('switchToRegression').addEventListener('click', () => {
       const col = $('doseAdvisory').dataset.column || '';
@@ -1422,20 +1422,36 @@
     };
   }
 
-  async function downloadRegressionExport(endpoint, filename) {
+  async function downloadRegressionExport(endpoint, filename, button = null) {
     if (!currentResult?.regression?.selected_model) {
       notify('Gráfico disponível somente depois de rodar uma regressão.', 'error');
       updateExportAvailability(currentResult);
       return;
     }
-    return downloadExport(endpoint, filename, currentRegressionPayload);
+    return downloadExport(endpoint, filename, currentRegressionPayload, button);
   }
 
-  async function downloadExport(endpoint, filename, payloadOverride = null) {
+  function setExportLoading(button, loading) {
+    if (!button) return;
+    const label = button.querySelector('b');
+    if (loading) {
+      button.dataset.originalLabel = label ? label.textContent : '';
+      button.disabled = true;
+      button.classList.add('loading');
+      if (label) label.innerHTML = '<span class="btn-spinner"></span>Gerando...';
+    } else {
+      button.disabled = false;
+      button.classList.remove('loading');
+      if (label && button.dataset.originalLabel) label.textContent = button.dataset.originalLabel;
+    }
+  }
+
+  async function downloadExport(endpoint, filename, payloadOverride = null, button = null) {
     const base = cleanApiBase(apiInput.value);
     if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
     const payload = payloadOverride || payloadFromUi();
     const finishMobilePdfProgress = endpoint === '/api/export/pdf' ? startMobilePdfProgress(filename) : () => {};
+    setExportLoading(button, true);
     try {
       const res = await fetch(`${base}${endpoint}`, {
         method: 'POST',
@@ -1460,6 +1476,8 @@
     } catch (err) {
       finishMobilePdfProgress('error');
       notify(err.message || 'Erro ao exportar.', 'error');
+    } finally {
+      setExportLoading(button, false);
     }
   }
 
