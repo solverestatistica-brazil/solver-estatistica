@@ -1472,15 +1472,115 @@
   function loadExampleData() {
     uploadedRows = [];
     hideColumnMapping();
-    selectExperimentType('DBC');
-    const rows = [
-      {bloco:'B1', tratamento:'T1', valor:58.2}, {bloco:'B1', tratamento:'T2', valor:61.4}, {bloco:'B1', tratamento:'T3', valor:66.8}, {bloco:'B1', tratamento:'T4', valor:64.7},
-      {bloco:'B2', tratamento:'T1', valor:57.6}, {bloco:'B2', tratamento:'T2', valor:60.1}, {bloco:'B2', tratamento:'T3', valor:66.4}, {bloco:'B2', tratamento:'T4', valor:63.1},
-      {bloco:'B3', tratamento:'T1', valor:59.4}, {bloco:'B3', tratamento:'T2', valor:62.0}, {bloco:'B3', tratamento:'T3', valor:67.2}, {bloco:'B3', tratamento:'T4', valor:65.9},
-      {bloco:'B4', tratamento:'T1', valor:59.7}, {bloco:'B4', tratamento:'T2', valor:63.6}, {bloco:'B4', tratamento:'T3', valor:68.9}, {bloco:'B4', tratamento:'T4', valor:66.1}
-    ]
-    renderEditableTable(['bloco','tratamento','valor'], rows);
-    notify('Exemplo DBC carregado.', 'success');
+    selectDataMode('manual');
+    updateManualFieldsUI();
+
+    const type = experimentType;
+    const base = $('baseDesign').value || 'DBC';
+    const response = $('responseColumn').value || 'valor';
+    const treatment = $('treatmentColumn').value || 'tratamento';
+    const block = $('blockColumn').value || 'bloco';
+    const row = $('rowColumn').value || 'linha';
+    const col = $('columnColumn').value || 'coluna';
+    const numeric = $('numericFactorColumn').value.trim();
+    const factors = splitColumns($('factorColumns').value);
+    const jitter = [0, 0.8, -0.6, 1.1, -0.9, 0.5];
+    const jit = (i) => jitter[i % jitter.length];
+    const r1 = (v) => Math.round(v * 10) / 10;
+
+    let headers = [];
+    const rows = [];
+    let label = 'DBC';
+
+    if (type === 'DIC') {
+      const means = { 1: 58.2, 2: 61.4, 3: 66.8, 4: 64.7 };
+      headers = unique([treatment, response]);
+      let k = 0;
+      for (let t = 1; t <= 4; t++) {
+        for (let rep = 1; rep <= 4; rep++) {
+          rows.push({ [treatment]: `T${t}`, [response]: r1(means[t] + jit(k++)) });
+        }
+      }
+      label = 'DIC';
+    } else if (type === 'DQL') {
+      const means = { 1: 58.4, 2: 61.6, 3: 66.9, 4: 64.5 };
+      const n = 4;
+      headers = unique([row, col, treatment, response]);
+      let k = 0;
+      for (let r = 1; r <= n; r++) {
+        for (let c = 1; c <= n; c++) {
+          const idx = ((r + c - 2) % n) + 1;
+          rows.push({ [row]: `L${r}`, [col]: `C${c}`, [treatment]: `T${idx}`, [response]: r1(means[idx] + jit(k++)) });
+        }
+      }
+      label = 'DQL';
+    } else if (type === 'regression') {
+      const doseCol = numeric || 'dose';
+      const doses = [0, 50, 100, 150, 200];
+      headers = unique([doseCol, response]);
+      let k = 0;
+      doses.forEach((dose) => {
+        for (let rep = 1; rep <= 4; rep++) {
+          const val = 40 + 0.5 * dose - 0.0013 * dose * dose;
+          rows.push({ [doseCol]: dose, [response]: r1(val + jit(k++)) });
+        }
+      });
+      label = 'Regressão';
+    } else if (type === 'factorial') {
+      const fa = factors[0] || 'fator_a';
+      const fb = factors[1] || 'fator_b';
+      const means = { '1-1': 58, '1-2': 64, '2-1': 63, '2-2': 72 };
+      const blockDrift = [0, 0.8, -0.5, 1.2];
+      headers = base === 'DBC' ? unique([block, fa, fb, treatment, response]) : unique([fa, fb, treatment, response]);
+      let k = 0;
+      for (let r = 1; r <= 4; r++) {
+        for (let i = 1; i <= 2; i++) {
+          for (let j = 1; j <= 2; j++) {
+            const obj = {};
+            if (base === 'DBC') obj[block] = `B${r}`;
+            obj[fa] = `A${i}`;
+            obj[fb] = `B${j}`;
+            obj[treatment] = `A${i}B${j}`;
+            obj[response] = r1(means[`${i}-${j}`] + blockDrift[r - 1] + jit(k++) * 0.3);
+            rows.push(obj);
+          }
+        }
+      }
+      label = 'Fatorial';
+    } else if (type === 'split_plot') {
+      const fp = factors[0] || 'fator_parcela';
+      const fs = factors[1] || 'fator_subparcela';
+      const means = { '1-1': 55, '1-2': 61, '2-1': 63, '2-2': 71 };
+      const blockDrift = [0, 0.6, -0.4, 1.0];
+      headers = unique([block, fp, fs, treatment, response]);
+      let k = 0;
+      for (let r = 1; r <= 4; r++) {
+        for (let i = 1; i <= 2; i++) {
+          for (let j = 1; j <= 2; j++) {
+            rows.push({
+              [block]: `B${r}`, [fp]: `P${i}`, [fs]: `S${j}`, [treatment]: `P${i}S${j}`,
+              [response]: r1(means[`${i}-${j}`] + blockDrift[r - 1] + jit(k++) * 0.3)
+            });
+          }
+        }
+      }
+      label = 'Parcelas subdivididas';
+    } else {
+      // DBC (padrao)
+      const means = { 1: 58.2, 2: 61.4, 3: 66.8, 4: 64.7 };
+      const blockDrift = [0, -0.6, 0.4, 0.9];
+      headers = unique([block, treatment, response]);
+      for (let r = 1; r <= 4; r++) {
+        for (let t = 1; t <= 4; t++) {
+          rows.push({ [block]: `B${r}`, [treatment]: `T${t}`, [response]: r1(means[t] + blockDrift[r - 1]) });
+        }
+      }
+      label = 'DBC';
+    }
+
+    renderEditableTable(headers, rows);
+    updateMatrixSizeNote();
+    notify(`Exemplo ${label} carregado.`, 'success');
   }
 
   function splitColumns(value) {
