@@ -509,19 +509,16 @@
 
   // --- Feedback de carregamento (spinner + mensagens dinamicas) ---
 
-  function startLoadingSequence(btn, messages) {
+  function startLoadingSequence(btn) {
+    // Antes o texto do botao trocava entre varias mensagens a cada 900ms, mudando o
+    // tamanho do botao (jitter) - ja existe o indicador "Processando..." fixo na barra
+    // de status, entao o botao so precisa sinalizar estado ocupado com texto estatico.
     if (!btn) return () => {};
     const original = btn.textContent;
     btn.disabled = true;
     btn.classList.add('is-loading');
-    let i = 0;
-    btn.textContent = messages[0];
-    const interval = setInterval(() => {
-      i = (i + 1) % messages.length;
-      btn.textContent = messages[i];
-    }, 900);
+    btn.textContent = 'Executando...';
     return () => {
-      clearInterval(interval);
       btn.disabled = false;
       btn.classList.remove('is-loading');
       btn.textContent = original;
@@ -948,27 +945,56 @@
     const ctx = $('regressionChart');
     if (regressionChart) regressionChart.destroy();
 
-    // Cores da marca Solver, para o grafico nao ficar com o azul/vermelho
-    // padrao do Chart.js (destoando do resto do site).
+    // Cores lidas das CSS custom properties do proprio site, para o grafico sempre
+    // usar a paleta atual da marca (antes eram hex fixos de uma paleta antiga que
+    // ficou destoando quando o tema mudou para o verde-azulado/teal atual).
+    const rootStyles = getComputedStyle(document.documentElement);
+    const cssVar = (name, fallback) => (rootStyles.getPropertyValue(name) || '').trim() || fallback;
+    const hexToRgba = (hex, alpha) => {
+      const h = String(hex).replace('#', '');
+      const r = parseInt(h.substring(0, 2), 16) || 0;
+      const g = parseInt(h.substring(2, 4), 16) || 0;
+      const b = parseInt(h.substring(4, 6), 16) || 0;
+      return `rgba(${r},${g},${b},${alpha})`;
+    };
+    const cBrand = cssVar('--brand', '#339D89');
+    const cBrandDeep = cssVar('--brand-deep', '#194B41');
+    const cBrandBright = cssVar('--brand-bright', '#88D8C9');
+    const cAccent = cssVar('--accent', '#D16D2E');
+    const cTextL1 = cssVar('--text-l1', '#16423A');
+    const cTextL2 = cssVar('--text-l2', '#339D89');
+    const cSurfaceLine = cssVar('--surface-line', '#E7ECE9');
+
+    const canvasCtx = ctx.getContext && ctx.getContext('2d');
+    let fillGradient = hexToRgba(cBrand, 0.16);
+    if (canvasCtx) {
+      const grad = canvasCtx.createLinearGradient(0, 0, 0, ctx.height || 260);
+      grad.addColorStop(0, hexToRgba(cBrand, 0.28));
+      grad.addColorStop(1, hexToRgba(cBrand, 0.02));
+      fillGradient = grad;
+    }
+
     const datasets = [
       {
         label: 'Observado',
         data: (reg.points || []).map((p) => ({x: p.x, y: p.y})),
-        backgroundColor: 'rgba(62,126,84,.55)',
-        borderColor: '#3E7E54',
-        borderWidth: 1.5,
-        pointRadius: 4,
-        pointHoverRadius: 5
+        backgroundColor: cBrandBright,
+        borderColor: cBrandDeep,
+        borderWidth: 2,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        pointHoverBorderWidth: 2
       },
       {
         label: 'Ajustado',
         type: 'line',
         data: (reg.fitted_curve || []).map((p) => ({x: p.x, y: p.y})),
         pointRadius: 0,
-        borderWidth: 2.5,
-        borderColor: '#24492E',
-        backgroundColor: 'rgba(36,73,46,.08)',
-        tension: 0.15
+        borderWidth: 3,
+        borderColor: cBrand,
+        backgroundColor: fillGradient,
+        fill: true,
+        tension: 0.35
       }
     ];
     const optimum = selected.optimum;
@@ -976,11 +1002,12 @@
       datasets.push({
         label: 'Ponto ótimo',
         data: [{x: optimum.x, y: optimum.y}],
-        backgroundColor: '#C2703D',
+        backgroundColor: cAccent,
         borderColor: '#ffffff',
-        borderWidth: 2,
-        pointRadius: 6,
-        pointHoverRadius: 7,
+        borderWidth: 2.5,
+        pointRadius: 7,
+        pointHoverRadius: 9,
+        pointStyle: 'rectRot',
         showLine: false
       });
     }
@@ -990,26 +1017,35 @@
       data: { datasets },
       options: {
         responsive: true,
+        maintainAspectRatio: false,
+        interaction: {mode: 'nearest', intersect: false},
         plugins: {
           legend: {
             position: 'bottom',
-            labels: {color: '#3A4A40', font: {family: "'Montserrat', sans-serif", size: 13, weight: '600'}, boxWidth: 14, boxHeight: 14, padding: 18}
+            labels: {usePointStyle: true, pointStyle: 'circle', color: cTextL1, font: {family: "'Montserrat', sans-serif", size: 12.5, weight: '600'}, boxWidth: 9, boxHeight: 9, padding: 18}
           },
           tooltip: {
-            titleFont: {family: "'Montserrat', sans-serif", size: 13, weight: '600'},
-            bodyFont: {family: "'Open Sans', sans-serif", size: 12}
+            backgroundColor: cBrandDeep,
+            titleFont: {family: "'Montserrat', sans-serif", size: 12.5, weight: '700'},
+            bodyFont: {family: "'Open Sans', sans-serif", size: 12},
+            padding: 10,
+            cornerRadius: 10,
+            displayColors: false,
+            callbacks: {
+              label: (item) => `${format(item.parsed.x)} \u2192 ${format(item.parsed.y)}`
+            }
           }
         },
         scales: {
           x: {
-            title: {display: true, text: reg.x_label || 'x', color: '#24492E', font: {family: "'Montserrat', sans-serif", size: 13, weight: '600'}},
-            grid: {color: '#E7ECE9'},
-            ticks: {color: '#5C6D64', font: {family: "'Open Sans', sans-serif", size: 12}}
+            title: {display: true, text: reg.x_label || 'x', color: cTextL1, font: {family: "'Montserrat', sans-serif", size: 12.5, weight: '700'}},
+            grid: {color: cSurfaceLine, drawTicks: false},
+            ticks: {color: cTextL2, font: {family: "'Open Sans', sans-serif", size: 11.5}, padding: 8}
           },
           y: {
-            title: {display: true, text: reg.y_label || 'Resposta', color: '#24492E', font: {family: "'Montserrat', sans-serif", size: 13, weight: '600'}},
-            grid: {color: '#E7ECE9'},
-            ticks: {color: '#5C6D64', font: {family: "'Open Sans', sans-serif", size: 12}}
+            title: {display: true, text: reg.y_label || 'Resposta', color: cTextL1, font: {family: "'Montserrat', sans-serif", size: 12.5, weight: '700'}},
+            grid: {color: cSurfaceLine, drawTicks: false},
+            ticks: {color: cTextL2, font: {family: "'Open Sans', sans-serif", size: 11.5}, padding: 8}
           }
         }
       }
