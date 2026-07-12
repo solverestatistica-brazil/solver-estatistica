@@ -194,6 +194,9 @@ def _prepare_context(payload: Dict[str, Any]) -> AnalysisContext:
     payload["factor_columns"] = factor_columns
 
     required = [response]
+    if analysis_type in {"factorial", "split_plot"} and treatment not in df.columns and factor_columns:
+        if all(f in df.columns for f in factor_columns):
+            df[treatment] = df[factor_columns].astype(str).agg(" x ".join, axis=1)
     if analysis_type != "regression":
         required.append(treatment)
     if design == "DBC":
@@ -578,19 +581,13 @@ def _means(ctx: AnalysisContext, anova: Dict[str, Any]) -> Dict[str, Any]:
         "comparison": comparison,
     }
 
-def _resolve_alpha(ctx: AnalysisContext, anova: Dict[str, Any]) -> float:
-    """Usa o alfa informado pelo usuário (payload['alpha']) para a comparação de médias.
-    Antes o alfa do pós-teste era recalculado a partir do bucket de significância do teste F
-    (sempre 0,01 ou 0,05, ignorando o valor enviado pelo front-end) — o nível de significância
-    de um pós-teste deve ser o mesmo escolhido a priori pelo usuário para a análise, não um
-    valor derivado do p-valor observado da ANOVA."""
-    try:
-        alpha = float(ctx.payload.get("alpha", 0.05))
-    except (TypeError, ValueError):
-        alpha = 0.05
-    if not (0 < alpha < 1):
-        alpha = 0.05
-    return alpha
+def _alpha_for_row(row: Optional[Dict[str, Any]]) -> float:
+    """Deriva o alfa do pós-teste diretamente da significância (1% ou 5%) da fonte de
+    variação no teste F, em vez de usar um valor fixo enviado pelo front-end."""
+    sig = (row or {}).get("significance")
+    if sig == "1%":
+        return 0.01
+    return 0.05
 
 def _comparison_tests(table: pd.DataFrame, anova: Dict[str, Any], ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
     mse = anova.get("mse")
@@ -605,7 +602,7 @@ def _comparison_tests(table: pd.DataFrame, anova: Dict[str, Any], ctx: AnalysisC
     test_name = (ctx.payload.get("comparison_test") or "tukey").lower()
     if test_name not in ALLOWED_TESTS:
         test_name = "tukey"
-    alpha = _resolve_alpha(ctx, anova)
+    alpha = _alpha_for_row(_anova_source(anova, source_key))
 
     means = {str(r["treatment"]): float(r["mean"]) for _, r in table.iterrows()}
     ns = {str(r["treatment"]): int(r["n"]) for _, r in table.iterrows()}
@@ -931,13 +928,12 @@ def _factor_comparisons(ctx: AnalysisContext, anova: Dict[str, Any]) -> List[Dic
     test_name = (ctx.payload.get("comparison_test") or "tukey").lower()
     if test_name not in ALLOWED_TESTS:
         test_name = "tukey"
-    alpha = _resolve_alpha(ctx, anova)
-
     results: List[Dict[str, Any]] = []
     for i, factor in enumerate(factors[:2]):
         raw_key = _c(factor)
         if not _is_significant_source(anova, raw_key):
             continue
+        alpha = _alpha_for_row(_anova_source(anova, raw_key))
         if ctx.analysis_type == "split_plot" and i == 0 and error_a.get("mse") is not None:
             use_mse, use_df = error_a["mse"], error_a["df"]
         else:
@@ -990,7 +986,7 @@ def _interaction_breakdown(ctx: AnalysisContext, anova: Dict[str, Any]) -> List[
     test_name = (ctx.payload.get("comparison_test") or "tukey").lower()
     if test_name not in ALLOWED_TESTS:
         test_name = "tukey"
-    alpha = _resolve_alpha(ctx, anova)
+    alpha = _alpha_for_row(_anova_source(anova, inter_key))
 
     blocks: List[Dict[str, Any]] = []
     for level_main, sub_df in ctx.df.groupby(main):
