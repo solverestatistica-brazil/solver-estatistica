@@ -456,12 +456,21 @@ def _anova_split_plot(ctx: AnalysisContext) -> Dict[str, Any]:
 
     ms_errA = mean_sq(errA_r)
     ms_errB = mean_sq(resid_r)
+    # [FIX 3.2-sp] Guarda contra residuo singular no split-plot.
+    _sp_total_var_ = float(ctx.df[ctx.response].var(ddof=0)) or 1.0
+    _sp_singular_ = (ms_errB is not None and ms_errB < 1e-10 * _sp_total_var_) or (ms_errA is not None and ms_errA < 1e-10 * _sp_total_var_)
+    if _sp_singular_:
+        notes.append(
+            "Split-plot: erro (a) e/ou erro (b) sao praticamente nulos (MSE ~ 0). "
+            "F e p sao numericamente instaveis; refaca com dados de campo reais "
+            "que tenham variabilidade dentro de cada bloco x tratamento."
+        )
 
     def f_test(row: Dict[str, Any], err_ms: Optional[float], err_df: Optional[float]):
         ms = mean_sq(row)
         if ms is None or err_ms in (None, 0) or not err_df or err_df <= 0 or not row.get("df"):
             return None, None, None, None
-        f_calc = ms / err_ms
+        f_calc = None if _sp_singular_ else (ms / err_ms)  # [FIX 3.2-sp]
         f5 = stats.f.ppf(0.95, row["df"], err_df)
         f1 = stats.f.ppf(0.99, row["df"], err_df)
         p_value = float(stats.f.sf(f_calc, row["df"], err_df))
@@ -506,7 +515,7 @@ def _anova_split_plot(ctx: AnalysisContext) -> Dict[str, Any]:
     })
 
     mean_response = float(ctx.df[response].mean())
-    cv = (math.sqrt(ms_errB) / abs(mean_response) * 100) if ms_errB is not None and mean_response != 0 else None
+    cv = None if _sp_singular_ else ((math.sqrt(ms_errB) / abs(mean_response) * 100) if ms_errB is not None and mean_response != 0 else None)
 
     return {
         "formula": formula,
