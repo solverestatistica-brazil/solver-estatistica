@@ -57,6 +57,32 @@
     history.replaceState(null, '', '#top');
   }
 
+  function resetAnalysis() {
+    // Limpa dados carregados, resultado anterior e erro, e volta ao passo 1.
+    // Sem isso, um erro (ex.: opcao errada de delineamento) obrigava a voltar
+    // etapa por etapa manualmente para tentar de novo.
+    uploadedRows = [];
+    currentResult = null;
+    currentRegressionPayload = null;
+    currentHeaders = ['bloco', 'tratamento', 'valor'];
+    $('fileInput').value = '';
+    renderEditableTable(currentHeaders, []);
+    $('dataTableTools').style.display = 'none';
+    $('dataTableWrap').style.display = 'none';
+    $('rowCount').textContent = 'Nenhuma linha carregada.';
+    $('dataErrorMsg').textContent = '';
+    $('dataErrorMsg').classList.add('hidden');
+    $('restartAnalysis').classList.add('hidden');
+    $('results').classList.add('hidden');
+    $('emptyResults').classList.remove('hidden');
+    unlockedSteps.clear();
+    unlockedSteps.add('modelo');
+    unlockedSteps.add('dados');
+    updateExportAvailability(null);
+    goToStep('modelo');
+    notify('Nova analise iniciada.', 'success');
+  }
+
   function bindStepper() {
     document.querySelectorAll('.step-pill').forEach((btn) => {
       btn.addEventListener('click', () => goToStep(btn.dataset.step));
@@ -112,6 +138,8 @@
     $('loadExample').addEventListener('click', loadExampleData);
     $('runAnalysis').addEventListener('click', runAnalysis);
     $('fileInput').addEventListener('change', handleFileUpload);
+    $('newAnalysisBtn').addEventListener('click', resetAnalysis);
+    $('restartAnalysis').addEventListener('click', resetAnalysis);
 
     $('comparisonTestPost').addEventListener('change', () => {
       const isRegression = $('comparisonTestPost').value === 'regression';
@@ -730,6 +758,7 @@
       notify(msg, 'error');
       $('dataErrorMsg').textContent = msg;
       $('dataErrorMsg').classList.remove('hidden');
+      $('restartAnalysis').classList.remove('hidden');
     } finally {
       stopLoading();
     }
@@ -1316,18 +1345,11 @@
     if (!file) return;
     const ext = file.name.split('.').pop().toLowerCase();
     try {
-      let rows;
-      if (ext === 'csv') {
-        const text = await file.text();
-        rows = parseCsv(text);
-      } else if (['xlsx','xls'].includes(ext)) {
-        const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, {type:'array'});
-        const sheet = workbook.Sheets[workbook.SheetNames[0]];
-        rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
-      } else {
-        throw new Error('Formato nao suportado. Use CSV, XLS ou XLSX.');
+      if (ext !== 'csv') {
+        throw new Error('Formato não suportado. Envie um arquivo .csv separado por ponto e vírgula (;).');
       }
+      const text = await file.text();
+      let rows = parseCsv(text);
       rows = normalizeHeaders(rows);
       if (!rows.length) throw new Error('O arquivo nao tem linhas de dados.');
       uploadedRows = rows;
@@ -1344,9 +1366,12 @@
   }
 
   function parseCsv(text) {
-    const cleaned = text.replace(/^ /, '');
+    const cleaned = text.replace(/^\uFEFF/, '').replace(/^ /, '');
     const firstLine = cleaned.split(/\r?\n/).find((line) => line.trim()) || '';
-    const sep = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ';' : ',';
+    if (!firstLine.includes(';')) {
+      throw new Error('O arquivo não parece separado por ponto e vírgula (;). Confirme o formato e tente novamente.');
+    }
+    const sep = ';';
     const rows = [];
     let current = [];
     let value = '';
