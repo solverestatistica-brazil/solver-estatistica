@@ -18,39 +18,45 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
-from reportlab.platypus import BaseDocTemplate, CondPageBreak, Frame, Image, PageTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.platypus import BaseDocTemplate, CondPageBreak, Frame, Image, KeepTogether, PageTemplate, Paragraph, Spacer, Table, TableStyle
 
 from statistics_engine import analyze
 
-# Paleta identica a assets/css/styles.css (identidade visual Solver).
-BRAND_DARK = colors.HexColor("#081C13")
-BRAND_DEEP = colors.HexColor("#24492E")
-BRAND = colors.HexColor("#3E7E54")
-BRAND_BRIGHT = colors.HexColor("#8FC378")
-TEXT_L1 = colors.HexColor("#14211A")
-TEXT_L2 = colors.HexColor("#5C6D64")
+# Paleta identica a assets/css/styles.css (identidade visual Solver, v3 harmonizada).
+BRAND_DARK = colors.HexColor("#061210")
+BRAND_DEEP = colors.HexColor("#194B41")
+BRAND = colors.HexColor("#339D89")
+BRAND_BRIGHT = colors.HexColor("#88D8C9")
+TEXT_L1 = colors.HexColor("#16423A")
+TEXT_L2 = colors.HexColor("#339D89")
 SURFACE_LINE = colors.HexColor("#E7ECE9")
 SURFACE_SUBTLE = colors.HexColor("#F4F7F5")
-SUCCESS = colors.HexColor("#4C8E50")
-SUCCESS_TINT = colors.HexColor("#E3ECE0")
-WARNING = colors.HexColor("#B8863C")
+SUCCESS = colors.HexColor("#459586")
+SUCCESS_TINT = colors.HexColor("#E0ECEA")
+WARNING = colors.HexColor("#C6892E")
 WARNING_TINT = colors.HexColor("#F2E7D2")
 NEUTRAL = colors.HexColor("#94A3B8")
 NEUTRAL_TINT = colors.HexColor("#EEF2F0")
+ACCENT = colors.HexColor("#D16D2E")
+ACCENT_TINT = colors.HexColor("#F1E2D4")
+
+# Hex simples (sem objeto Color) para marcacao inline em Paragraph (<font color="...">).
+BRAND_HEX = "#339D89"
+BRAND_DEEP_HEX = "#194B41"
 
 HEX = {
-    "brand_deep": "24492E",
-    "brand": "3E7E54",
+    "brand_deep": "194B41",
+    "brand": "339D89",
     "surface_line": "E7ECE9",
     "surface_subtle": "F4F7F5",
-    "success": "4C8E50",
-    "success_tint": "E3ECE0",
-    "warning": "B8863C",
+    "success": "459586",
+    "success_tint": "E0ECEA",
+    "warning": "C6892E",
     "warning_tint": "F2E7D2",
     "neutral": "94A3B8",
     "neutral_tint": "EEF2F0",
-    "text_l1": "14211A",
-    "text_l2": "5C6D64",
+    "text_l1": "16423A",
+    "text_l2": "339D89",
 }
 
 DESIGN_LABELS = {
@@ -231,7 +237,7 @@ def _styled_table(rows: List[List[Any]], sig_col: Optional[int] = None) -> Table
         ("RIGHTPADDING", (0, 0), (-1, -1), 10),
         ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
         ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
-        ("TEXTCOLOR", (0, 1), (0, -1), TEXT_L1),
+        ("TEXTCOLOR", (0, 1), (-1, -1), TEXT_L1),
     ]
     if sig_col is not None:
         for row_idx in range(1, n_rows):
@@ -285,6 +291,139 @@ def _means_caption(result: Dict[str, Any]) -> Optional[str]:
         f"entre si pelo teste de <b>{test_name.title()}</b>, ao nível de {alpha_pct} de significância."
     )
 
+def _fmt_p(value: Any) -> str:
+    if value is None:
+        return "—"
+    if value < 0.0001:
+        return "p &lt; 0,0001"
+    return f"p = {_fmt(value)}"
+
+def _accent_heading(text: str) -> str:
+    """Prefixa titulos de secao com um marcador colorido (acabamento do site)."""
+    return f'<font color="{BRAND_HEX}">■</font>&nbsp;&nbsp;{text}'
+
+def _anova_narrative(result: Dict[str, Any]) -> Optional[str]:
+    """Paragrafo cientifico que interpreta o teste F para as fontes de variacao reais do experimento."""
+    anova = result.get("anova", {})
+    table = anova.get("table", []) or []
+    cv = anova.get("cv")
+    cv_label = (anova.get("cv_label") or "").strip()
+    named_rows = [r for r in table if r.get("source") not in (None, "Total", "Resíduo", "Residual")]
+    sig_rows = [r for r in named_rows if r.get("significance") in ("1%", "5%")]
+    ns_rows = [r for r in named_rows if r.get("significance") == "ns"]
+    if not table:
+        return None
+
+    parts: List[str] = []
+    if sig_rows:
+        clauses = [f"{r['source']} (F = {_fmt(r.get('f_calc'))}; {_fmt_p(r.get('p_value'))})" for r in sig_rows]
+        levels = sorted({r["significance"] for r in sig_rows})
+        parts.append(
+            "O teste F indica efeito estatisticamente significativo de " + " e ".join(clauses) +
+            f" sobre a variável resposta, a {' e '.join(levels)} de probabilidade."
+        )
+    else:
+        parts.append("O teste F não indicou efeito estatisticamente significativo para nenhuma fonte de variação testada, a 5% de probabilidade.")
+    if ns_rows:
+        names = ", ".join(r["source"] for r in ns_rows)
+        verb2 = "Não houve" if len(ns_rows) > 1 else "Não houve"
+        parts.append(f"{verb2} evidência estatística de efeito para {names} (ns).")
+    if cv is not None:
+        qualifier = {
+            "ótimo": "reforça a confiabilidade das conclusões",
+            "bom": "indica boa precisão experimental",
+            "moderado": "sugere precisão experimental moderada — interprete as diferenças com cautela",
+        }.get(cv_label.lower(), "deve ser considerado ao interpretar as diferenças observadas")
+        parts.append(f"O coeficiente de variação experimental (CV = {_fmt_pct(cv)}, {cv_label.lower()}) {qualifier}.")
+    return " ".join(parts)
+
+def _means_narrative(result: Dict[str, Any]) -> Optional[str]:
+    """Paragrafo que contextualiza o melhor e o pior tratamento com base na comparacao de medias real."""
+    means = result.get("means", {}) or {}
+    rows = means.get("treatment_means", []) or []
+    comparison = means.get("comparison")
+    if len(rows) < 2 or not comparison:
+        return None
+    best, worst = rows[0], rows[-1]
+    test_name = str(comparison.get("test", "Tukey")).title()
+    same_group = best.get("group") and best.get("group") == worst.get("group")
+    if same_group:
+        return (
+            f"O tratamento <b>{best['treatment']}</b> apresentou a maior média ({_fmt(best.get('mean'))}), mas não "
+            f"difere estatisticamente de <b>{worst['treatment']}</b> ({_fmt(worst.get('mean'))}) pelo teste de "
+            f"{test_name}, ambos no grupo '{best.get('group')}'."
+        )
+    diff = None
+    pct_txt = ""
+    try:
+        diff = float(best.get("mean")) - float(worst.get("mean"))
+        if worst.get("mean"):
+            pct = diff / float(worst["mean"]) * 100
+            pct_txt = f" (+{pct:.1f}%)".replace(".", ",")
+    except Exception:
+        diff = None
+    diff_txt = f", uma diferença de {_fmt(diff)} unidades{pct_txt}" if diff is not None else ""
+    return (
+        f"O tratamento <b>{best['treatment']}</b> apresentou a maior média ({_fmt(best.get('mean'))}, grupo "
+        f"'{best.get('group','')}'), estatisticamente superior a <b>{worst['treatment']}</b> "
+        f"({_fmt(worst.get('mean'))}, grupo '{worst.get('group','')}') pelo teste de {test_name}{diff_txt}."
+    )
+
+def _regression_narrative(result: Dict[str, Any]) -> Optional[str]:
+    """Paragrafo que interpreta o modelo de regressao selecionado e o ponto otimo estimado."""
+    reg = result.get("regression")
+    if not reg:
+        return None
+    selected = reg.get("selected_model", {}) or {}
+    opt = selected.get("optimum") or {}
+    r2 = selected.get("adj_r2")
+    x_label = reg.get("x_label") or "x"
+    y_label = reg.get("y_label") or "resposta"
+    parts = [
+        f"O modelo de regressão de grau {reg.get('selected_degree')} apresentou o melhor ajuste entre os "
+        f"candidatos avaliados (R² ajustado = {_fmt(r2)}), descrevendo a relação entre {x_label} e {y_label}."
+    ]
+    if opt.get("x") is not None:
+        goal_word = "máxima" if opt.get("goal") == "max" else "mínima"
+        parts.append(
+            f" A resposta {goal_word} estimada pelo modelo ocorre em {x_label} = {_fmt(opt.get('x'))}, com valor "
+            f"previsto de {_fmt(opt.get('y'))} para {y_label}."
+        )
+    return "".join(parts)
+
+def _executive_summary_box(messages: List[str], width: float) -> Table:
+    """Caixa destacada (callout) para o resumo executivo, com barra de acento a esquerda,
+    no lugar de uma lista solta de marcadores - visual mais premium/relatorio de verdade."""
+    head_style = ParagraphStyle("ExecHead", fontName="Helvetica-Bold", fontSize=12, textColor=BRAND_DEEP, spaceAfter=9)
+    item_style = ParagraphStyle("ExecItem", fontName="Helvetica", fontSize=9.5, leading=14, textColor=TEXT_L1, spaceAfter=3)
+    content: List[Any] = [Paragraph(_accent_heading("Resumo executivo"), head_style)]
+    for msg in messages:
+        content.append(Paragraph("•&nbsp;&nbsp;" + msg, item_style))
+    inner = Table([[c] for c in content], colWidths=[width - 0.9 * cm])
+    inner.setStyle(TableStyle([
+        ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+        ("TOPPADDING", (0, 0), (-1, -1), 1),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ("BOTTOMPADDING", (0, 0), (0, 0), 9),
+    ]))
+    bar = Table([[""]], colWidths=[0.14 * cm], rowHeights=[inner.wrap(width - 0.9 * cm, 1000)[1]])
+    bar.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), BRAND)]))
+    outer = Table([[bar, inner]], colWidths=[0.14 * cm, width - 0.14 * cm])
+    outer.setStyle(TableStyle([
+        ("BACKGROUND", (1, 0), (1, -1), SUCCESS_TINT),
+        ("LEFTPADDING", (1, 0), (1, -1), 16),
+        ("RIGHTPADDING", (1, 0), (1, -1), 16),
+        ("TOPPADDING", (1, 0), (1, -1), 14),
+        ("BOTTOMPADDING", (1, 0), (1, -1), 14),
+        ("LEFTPADDING", (0, 0), (0, -1), 0),
+        ("RIGHTPADDING", (0, 0), (0, -1), 0),
+        ("TOPPADDING", (0, 0), (0, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (0, -1), 0),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+    ]))
+    return outer
+
 def build_pdf(payload: Dict[str, Any]) -> bytes:
     """Gera relatorio tecnico em PDF, com identidade visual Solver, a partir do payload de analise."""
     result = analyze(payload)
@@ -319,14 +458,14 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         Paragraph(_intro_text(result), body),
         Spacer(1, 0.3 * cm),
         _kpi_cards(result),
-        Spacer(1, 0.45 * cm),
-        Paragraph("Resumo executivo", h2),
+        Spacer(1, 0.4 * cm),
     ]
-    for msg in result.get("recommendations", []):
-        story.append(Paragraph("• " + msg, bullet))
+    exec_messages = list(result.get("recommendations", []))
     for note in result.get("anova", {}).get("model_notes", []) or []:
-        story.append(Paragraph("• Nota técnica: " + note, bullet))
-    story.append(Spacer(1, 0.3 * cm))
+        exec_messages.append("Nota técnica: " + note)
+    if exec_messages:
+        story.append(_executive_summary_box(exec_messages, doc.width))
+    story.append(Spacer(1, 0.4 * cm))
 
     anova_rows = [["FV", "GL", "SQ", "QM", "F calc", "F 5%", "F 1%", "p", "Sig"]]
     for r in result.get("anova", {}).get("table", []):
@@ -334,22 +473,37 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
             r.get("source"), _fmt(r.get("df")), _fmt(r.get("sum_sq")), _fmt(r.get("mean_sq")),
             _fmt(r.get("f_calc")), _fmt(r.get("f_5")), _fmt(r.get("f_1")), _fmt(r.get("p_value")), r.get("significance"),
         ])
-    story.append(CondPageBreak(3.2 * cm))
-    story.append(Paragraph("Quadro de ANOVA · Teste F", h2))
-    story.append(_styled_table(anova_rows, sig_col=8))
-    story.append(Paragraph(_anova_caption(result), caption))
-    story.append(Spacer(1, 0.35 * cm))
+    if len(anova_rows) > 1:
+        anova_block: List[Any] = [
+            Paragraph(_accent_heading("Quadro de ANOVA · Teste F"), h2),
+            _styled_table(anova_rows, sig_col=8),
+        ]
+        anova_narrative = _anova_narrative(result)
+        if anova_narrative:
+            anova_block.append(Spacer(1, 0.14 * cm))
+            anova_block.append(Paragraph(anova_narrative, body))
+        anova_block.append(Paragraph(_anova_caption(result), caption))
+        story.append(CondPageBreak(3.2 * cm))
+        story.append(KeepTogether(anova_block))
+        story.append(Spacer(1, 0.35 * cm))
 
     means_rows = [["Tratamento", "Média", "n", "DP", "Grupo"]]
     for r in result.get("means", {}).get("treatment_means", []):
         means_rows.append([r.get("treatment"), _fmt(r.get("mean")), _fmt(r.get("n")), _fmt(r.get("sd")), r.get("group", "")])
     if len(means_rows) > 1:
-        story.append(CondPageBreak(3.2 * cm))
-        story.append(Paragraph("Médias por tratamento", h2))
-        story.append(_styled_table(means_rows))
+        means_block: List[Any] = [
+            Paragraph(_accent_heading("Médias por tratamento"), h2),
+            _styled_table(means_rows),
+        ]
+        means_narrative = _means_narrative(result)
+        if means_narrative:
+            means_block.append(Spacer(1, 0.14 * cm))
+            means_block.append(Paragraph(means_narrative, body))
         means_caption = _means_caption(result)
         if means_caption:
-            story.append(Paragraph(means_caption, caption))
+            means_block.append(Paragraph(means_caption, caption))
+        story.append(CondPageBreak(3.2 * cm))
+        story.append(KeepTogether(means_block))
         story.append(Spacer(1, 0.3 * cm))
 
     comparison = result.get("means", {}).get("comparison")
@@ -360,11 +514,14 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
                 c.get("group_a"), c.get("group_b"), _fmt(c.get("diff")), _fmt(c.get("critical_diff")),
                 _fmt(c.get("p_value")), "Sim" if c.get("significant") else "Não",
             ])
-        story.append(CondPageBreak(3.2 * cm))
-        story.append(Paragraph(f"Teste de comparação de médias · {comparison.get('test')} (α = {comparison.get('alpha')})", h2))
-        story.append(_styled_table(comp_rows))
+        comp_block: List[Any] = [
+            Paragraph(_accent_heading(f"Teste de comparação de médias · {comparison.get('test')} (α = {comparison.get('alpha')})"), h2),
+            _styled_table(comp_rows),
+        ]
         if comparison.get("note"):
-            story.append(Paragraph(comparison.get("note"), caption))
+            comp_block.append(Paragraph(comparison.get("note"), caption))
+        story.append(CondPageBreak(3.2 * cm))
+        story.append(KeepTogether(comp_block))
         story.append(Spacer(1, 0.3 * cm))
 
     for fc in result.get("factor_comparisons", []) or []:
@@ -375,7 +532,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
             continue
         error_label = "Erro (a)" if fc.get("error_used") == "a" else "Erro (b)"
         story.append(CondPageBreak(3.2 * cm))
-        story.append(Paragraph(f"Médias marginais · fator {fc.get('factor')} ({fc.get('test')}, {error_label})", h2))
+        story.append(Paragraph(_accent_heading(f"Médias marginais · fator {fc.get('factor')} ({fc.get('test')}, {error_label})"), h2))
         story.append(_styled_table(fc_rows))
         alpha_pct = f"{fc.get('alpha', 0.05) * 100:.0f}%".replace(".", ",")
         story.append(Paragraph(
@@ -388,8 +545,8 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     if interaction_blocks:
         story.append(CondPageBreak(3.2 * cm))
         first_block = interaction_blocks[0]
-        story.append(Paragraph(
-            f"Desdobramento da interação · {first_block.get('factor')} × {first_block.get('sub_factor')}", h2,
+        story.append(Paragraph(_accent_heading(
+            f"Desdobramento da interação · {first_block.get('factor')} × {first_block.get('sub_factor')}"), h2,
         ))
         story.append(Paragraph(
             "Interação significativa: cada nível do fator de parcela é analisado separadamente, "
@@ -414,8 +571,12 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         if opt.get("x") is not None:
             reg_text += f" &nbsp;·&nbsp; Ponto ótimo estimado: <b>x = {_fmt(opt.get('x'))}</b>, y = {_fmt(opt.get('y'))}"
         story.append(CondPageBreak(3.2 * cm))
-        story.append(Paragraph("Regressão", h2))
+        story.append(Paragraph(_accent_heading("Regressão"), h2))
         story.append(Paragraph(reg_text, body))
+        reg_narrative = _regression_narrative(result)
+        if reg_narrative:
+            story.append(Spacer(1, 0.12 * cm))
+            story.append(Paragraph(reg_narrative, body))
         plot_b64 = reg.get("plot_png_base64")
         if plot_b64:
             img_buffer = io.BytesIO(base64.b64decode(plot_b64))
@@ -522,12 +683,12 @@ def build_regression_plot(payload: Dict[str, Any], fmt: str = "png") -> bytes:
     curve = pd.DataFrame(reg["fitted_curve"])
     selected = reg["selected_model"]
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=200)
-    ax.scatter(points["x"], points["y"], label="Observado", color="#3E7E54")
-    ax.plot(curve["x"], curve["y"], label=f"Grau {reg['selected_degree']} · R²aj {selected['adj_r2']:.3f}", color="#24492E")
+    ax.scatter(points["x"], points["y"], label="Observado", color="#339D89")
+    ax.plot(curve["x"], curve["y"], label=f"Grau {reg['selected_degree']} · R²aj {selected['adj_r2']:.3f}", color="#194B41")
     opt = selected.get("optimum") or {}
     if opt.get("x") is not None:
-        ax.axvline(opt["x"], linestyle="--", linewidth=1, color="#C2703D")
-        ax.scatter([opt["x"]], [opt["y"]], marker="o", s=55, label="Ótimo", color="#C2703D")
+        ax.axvline(opt["x"], linestyle="--", linewidth=1, color="#D16D2E")
+        ax.scatter([opt["x"]], [opt["y"]], marker="o", s=55, label="Ótimo", color="#D16D2E")
     ax.set_xlabel(reg.get("x_label", "x"))
     ax.set_ylabel(reg.get("y_label", "Resposta"))
     ax.set_title("Regressão Solver")
