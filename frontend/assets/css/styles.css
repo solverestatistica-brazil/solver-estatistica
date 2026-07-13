@@ -578,3 +578,46 @@ body:has(#view-app:not(.hidden)){background-size:38px 38px,38px 38px,100% 100%,1
     transition: none !important;
   }
 }
+
+
+/* ================================================================
+   Solver v20260714 - Hero preview polish (remover laranja + refinamento)
+   ================================================================ */
+
+/* Dose callout: tinha borda e texto laranja (--accent). Trocamos por
+   verde brand-bright para ficar coeso com a paleta. */
+.preview-card .dose-callout {
+  border-color: var(--brand-bright) !important;
+  background: rgba(136, 216, 177, 0.15) !important;
+}
+.preview-card .dose-callout b {
+  color: var(--brand-deep) !important;
+}
+
+/* Stats row: melhor consistencia visual entre os 4 cards */
+.preview-card .stats-row > * {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Mini-anova: um leve destaque nas linhas para nao ficar denso */
+.preview-card .mini-anova-row + .mini-anova-row {
+  border-top: 1px solid rgba(51, 157, 105, 0.08);
+}
+
+/* Preview actions (Dados/ANOVA/Pos-teste/PDF): hover sutil */
+.preview-card .preview-action {
+  transition: transform 0.16s ease;
+}
+.preview-card .preview-action:hover {
+  transform: translateY(-2px);
+}
+
+/* Preview card ganha shadow verde sutil no hover */
+.preview-card {
+  transition: box-shadow 0.25s ease;
+}
+.preview-card:hover {
+  box-shadow: 0 18px 42px rgba(51, 157, 105, 0.14);
+}
