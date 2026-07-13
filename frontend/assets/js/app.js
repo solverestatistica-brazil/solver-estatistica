@@ -781,19 +781,10 @@
     ]);
     try {
       setApiStatus('Processando...', '');
-      const res = (() => {
-      // [FIX 3.7] Aviso de cold-start do Render apos 2s
-      window.__solver_cold_hint_timer = setTimeout(() => {
-        try {
-          const s = document.getElementById("apiStatus");
-          if (s) { s.textContent = "Servidor gratuito acordando (ate 30s)..."; s.className = "status-pill warn"; }
-        } catch(_) {}
-      }, 2000);
-    })(); /* cold-start-hint */
-   await fetch(`${base}/api/analyze`, {
+      const res = await fetch(`${base}/api/analyze`, {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload); clearTimeout(window.__solver_cold_hint_timer)
+        body: JSON.stringify(payload)
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.detail || 'Erro na analise');
