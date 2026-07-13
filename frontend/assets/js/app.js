@@ -824,6 +824,7 @@
     $('resBestMean').textContent = best?.mean == null ? '-' : `Media ${format(best.mean)}`;
 
     renderAnovaTable(result?.anova?.table || []);
+    renderAnovaStatusBanner(result?.anova);          // [FIX P0-5]
     renderRecommendations(result?.recommendations || []);
     renderRegression(result?.regression);
     // checkDoseAdvisory() removido: a opcao "Regressao" ja fica disponivel direto no
@@ -873,6 +874,52 @@
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
+  }
+
+  // [FIX P0-5] O backend ja devolve anova.model_notes e anova.residual_is_singular.
+  // O frontend descartava as duas — o usuario nunca via os avisos que o proprio
+  // motor estatistico emitiu.
+  function renderAnovaStatusBanner(anova) {
+    const old = document.getElementById('anovaStatusBanner');
+    if (old) old.remove();
+    if (!anova) return;
+
+    const singular = anova.residual_is_singular === true;
+    const notes = Array.isArray(anova.model_notes) ? anova.model_notes.filter(Boolean) : [];
+    if (!singular && !notes.length) return;
+
+    const table = document.getElementById('anovaTable');
+    if (!table || !table.parentNode) return;
+
+    const box = document.createElement('div');
+    box.id = 'anovaStatusBanner';
+    box.className = singular ? 'solver-banner is-danger' : 'solver-banner is-info';
+    box.setAttribute('role', singular ? 'alert' : 'note');
+
+    if (singular) {
+      const t = document.createElement('p');
+      t.className = 'solver-banner-title';
+      t.textContent = 'Resultado indeterminado — isto NÃO é "não significativo"';
+      box.appendChild(t);
+
+      const b = document.createElement('p');
+      b.textContent =
+        'O quadrado médio do resíduo é praticamente zero. Como o teste F é '
+        + 'QM(tratamento) ÷ QM(resíduo), ele vira uma divisão por zero: o F não existe. '
+        + 'Isso não quer dizer que não há efeito — quer dizer que os dados não têm '
+        + 'variabilidade dentro das células do experimento. Nenhuma conclusão estatística '
+        + 'pode ser tirada. Confira a coleta.';
+      box.appendChild(b);
+    }
+
+    notes.forEach((n) => {
+      const p = document.createElement('p');
+      p.className = 'solver-banner-note';
+      p.textContent = n;
+      box.appendChild(p);
+    });
+
+    table.parentNode.insertBefore(box, table);
   }
 
   function renderMeansTable(rows) {
@@ -1132,10 +1179,17 @@
       btn.title = sig ? '' : 'A comparação de médias só é liberada quando Tratamentos é significativo no teste F.';
       btn.addEventListener('click', () => runComparison(null, null, btn));
       container.appendChild(btn);
+      // [FIX P0-5] O pos-teste pode ser bloqueado por DOIS motivos diferentes, e o app
+      // tratava os dois como um so:
+      //   (a) F calculado e NAO significativo -> conclusao valida: sem efeito detectado
+      //   (b) F INDETERMINADO (residuo nulo)  -> nenhuma conclusao e possivel
+      const indeterminate = result?.anova?.residual_is_singular === true;
       if (!sig) {
         const p = document.createElement('p');
-        p.className = 'small-note';
-        p.textContent = 'Tratamentos não foi significativo no teste F; o pós-teste fica bloqueado para evitar conclusão indevida.';
+        p.className = indeterminate ? 'small-note is-danger' : 'small-note';
+        p.textContent = indeterminate
+          ? 'Teste F indeterminado (resíduo nulo): não é possível afirmar nem efeito, nem ausência de efeito. O pós-teste está bloqueado porque não existe erro experimental para servir de referência.'
+          : 'Tratamentos não foi significativo no teste F; o pós-teste fica bloqueado para evitar conclusão indevida.';
         container.appendChild(p);
       }
       return;
@@ -1168,9 +1222,14 @@
       container.appendChild(btn);
     });
     if (!any || !anySig) {
+      // [FIX P0-5] Mesma distincao do ramo 'single': residuo singular e' indeterminado,
+      // nao "nao significativo".
+      const indeterminate = result?.anova?.residual_is_singular === true;
       const p = document.createElement('p');
-      p.className = 'small-note';
-      p.textContent = 'Nenhum fator elegivel foi significativo no teste F - sem comparacao de medias recomendada.';
+      p.className = indeterminate ? 'small-note is-danger' : 'small-note';
+      p.textContent = indeterminate
+        ? 'Teste F indeterminado (resíduo nulo): não é possível afirmar nem efeito, nem ausência de efeito para nenhum fator. O pós-teste está bloqueado porque não existe erro experimental para servir de referência.'
+        : 'Nenhum fator elegivel foi significativo no teste F - sem comparacao de medias recomendada.';
       container.appendChild(p);
     }
   }
@@ -1670,13 +1729,22 @@
       }
       label = 'Parcelas subdivididas';
     } else {
-      // DBC (padrao)
-      const means = { 1: 58.2, 2: 61.4, 3: 66.8, 4: 64.7 };
-      const blockDrift = [0, -0.6, 0.4, 0.9];
+      // DBC (padrao) — produtividade de cultivares de soja (sc/ha), dataset real
+      // (mesmo de examples/dbc_exemplo.csv). [FIX P0-4] O gerador anterior era
+      // media[tratamento] + drift[bloco], ou seja, PERFEITAMENTE ADITIVO: SQ residuo
+      // = 0, F indefinido, e o app publicava "nenhuma fonte foi significativa" para
+      // todo visitante novo. Valores literais para reproduzir exatamente a tabela de
+      // aceite (F=14,412 a 1% em Tratamentos, CV=6,21%).
+      const valores = {
+        B1: { 1: 52.4, 2: 54.6, 3: 60.9, 4: 58.0 },
+        B2: { 1: 56.6, 2: 57.3, 3: 72.0, 4: 54.5 },
+        B3: { 1: 59.6, 2: 59.0, 3: 80.9, 4: 59.7 },
+        B4: { 1: 61.6, 2: 59.6, 3: 77.5, 4: 67.6 },
+      };
       headers = unique([block, treatment, response]);
       for (let r = 1; r <= 4; r++) {
         for (let t = 1; t <= 4; t++) {
-          rows.push({ [block]: `B${r}`, [treatment]: `T${t}`, [response]: r1(means[t] + blockDrift[r - 1]) });
+          rows.push({ [block]: `B${r}`, [treatment]: `T${t}`, [response]: valores[`B${r}`][t] });
         }
       }
       label = 'DBC';

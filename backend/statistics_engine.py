@@ -470,6 +470,12 @@ def _anova_split_plot(ctx: AnalysisContext) -> Dict[str, Any]:
         )
 
     def f_test(row: Dict[str, Any], err_ms: Optional[float], err_df: Optional[float]):
+        # [FIX P0-3] Se o erro (a) ou (b) e singular, F e p sao ruido de ponto flutuante
+        # (divisao por MSE~0 gera valores astronomicos tipo F=2e27, p=0.0, publicados
+        # como se fossem resultado real). A versao anterior calculava e publicava esses
+        # valores mesmo assim, so anexando uma nota que o frontend ignorava.
+        if _sp_singular_:
+            return None, None, None, None
         ms = mean_sq(row)
         if ms is None or err_ms in (None, 0) or not err_df or err_df <= 0 or not row.get("df"):
             return None, None, None, None
@@ -526,6 +532,7 @@ def _anova_split_plot(ctx: AnalysisContext) -> Dict[str, Any]:
         "mse": ms_errB,
         "df_error": resid_r.get("df"),
         "error_a": {"mse": ms_errA, "df": errA_r.get("df")},
+        "residual_is_singular": _sp_singular_,   # o frontend precisa dessa flag
         "cv": cv,
         "cv_label": _cv_label(cv),
         "model_notes": notes,
@@ -538,7 +545,7 @@ def _anova(ctx: AnalysisContext) -> Dict[str, Any]:
         return _anova_split_plot(ctx)
     formula, notes = _formula_for(ctx)
     if not formula:
-        return {"table": [], "cv": None, "cv_label": "Indisponível", "model_notes": notes}
+        return {"table": [], "cv": None, "cv_label": "Indisponível", "residual_is_singular": False, "model_notes": notes}
 
     model = smf.ols(formula, data=ctx.df).fit()
     table = anova_lm(model, typ=2)
@@ -804,7 +811,14 @@ def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
     if numeric_col and numeric_col in df.columns:
         x = pd.to_numeric(df[numeric_col], errors="coerce")
         x_label = numeric_col
-    elif ctx.treatment in df.columns:
+    elif ctx.analysis_type == "regression" and ctx.treatment in df.columns:
+        # [FIX P0-2] Esta extracao de numero do ROTULO do tratamento so faz sentido
+        # quando o usuario escolheu explicitamente o design "Regressao" — af, ele
+        # ja declarou que o eixo e quantitativo. Para single/factorial (DBC/DIC com
+        # tratamentos categoricos como T1..T4) isso inventava um eixo numerico a
+        # partir do INDICE do rotulo (T1->1, T2->2...) e publicava "dose otima em
+        # x=3,44" para um fator que nao e dose nenhuma. Verificado em producao com
+        # o exemplo oficial do site.
         x = _parse_numeric_from_text(df[ctx.treatment])
         x_label = ctx.treatment
     else:
@@ -1217,7 +1231,23 @@ def _recommendations(ctx: AnalysisContext, anova: Dict[str, Any], means: Dict[st
 
     anova_table = anova.get("table", [])
     significant_sources = [r for r in anova_table if r.get("significance") in {"1%", "5%"}]
-    if anova_table:
+
+    # [FIX P0] Residuo singular NAO e "nao significativo". O F e INDEFINIDO
+    # (divisao por zero), nao baixo. Confundir os dois faz o app afirmar ausencia
+    # de efeito onde ha separacao perfeita entre tratamentos — o erro mais grave
+    # possivel num app de estatistica.
+    # Este ramo TEM que vir antes de qualquer leitura de significancia.
+    if anova.get("residual_is_singular"):
+        messages.append(
+            "RESULTADO INDETERMINADO — nao 'nao significativo'. O quadrado medio do "
+            "residuo e praticamente zero, entao o teste F (QM_tratamento / QM_residuo) "
+            "e uma divisao por zero e nao existe. Isso NAO significa ausencia de efeito: "
+            "significa que os dados nao tem variabilidade dentro das celulas do "
+            "experimento (dados perfeitamente aditivos, sinteticos, arredondados ou "
+            "duplicados). Nenhuma conclusao estatistica pode ser tirada destes dados. "
+            "Verifique a coleta e refaca com dados reais de campo."
+        )
+    elif anova_table:
         if significant_sources:
             for row in significant_sources:
                 if row.get("source") != "Total":
