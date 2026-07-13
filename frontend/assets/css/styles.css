@@ -501,3 +501,80 @@ body:has(#view-app:not(.hidden)){background-size:38px 38px,38px 38px,100% 100%,1
 #meansTable th:not(:first-child),#meansTable td:not(:first-child){
   text-align:right;
 }
+
+
+/* ================================================================
+   Solver v20260713 - Regression-chart bug fix + polish
+   ================================================================ */
+
+/* CRITICAL: Chart.js com maintainAspectRatio:false + parent sem altura
+   fixa faz o canvas crescer infinito. Aqui limitamos duro. */
+#regressionChart {
+  max-height: 380px !important;
+  height: 380px !important;
+  width: 100% !important;
+}
+#regressionBox {
+  max-height: 560px;
+  overflow: hidden;
+}
+
+/* Type cards: hover lift para dar sensacao 'moderna' */
+.type-card {
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.type-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--brand);
+  box-shadow: 0 8px 24px rgba(51, 157, 105, 0.18);
+}
+.type-card:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Result cards: hover sutil de profundidade */
+.result-box {
+  transition: box-shadow .2s ease;
+}
+.result-box:hover {
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
+}
+
+/* ANOVA e result tables: numeros com tabular-nums e alinhados a direita */
+#anovaTable td, #anovaTable th,
+#meansTable td, #meansTable th {
+  font-variant-numeric: tabular-nums;
+}
+#anovaTable td:not(:first-child),
+#anovaTable th:not(:first-child),
+#meansTable td:not(:first-child):not(:last-child),
+#meansTable th:not(:first-child):not(:last-child) {
+  text-align: right;
+}
+
+/* Fade entre passos do wizard */
+.step {
+  animation: solverFadeIn 0.22s ease both;
+}
+@keyframes solverFadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Botao 'Iniciar analise' com sutil respiro quando habilitado */
+#runAnalysis:not(:disabled) {
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+#runAnalysis:not(:disabled):hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 22px rgba(51, 157, 105, 0.32);
+}
+
+/* prefers-reduced-motion: respeita usuarios que desabilitam animacoes */
+@media (prefers-reduced-motion: reduce) {
+  .step, .type-card, .result-box, #runAnalysis {
+    animation: none !important;
+    transition: none !important;
+  }
+}
