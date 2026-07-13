@@ -761,3 +761,9 @@ body:has(#view-app:not(.hidden)){background-size:38px 38px,38px 38px,100% 100%,1
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+
+
+/* Solver v20260718 - Curva de regressao mais fina no preview */
+.preview-card .chart-wrap svg path[fill="none"] {
+  stroke-width: 1.5 !important;
+}
