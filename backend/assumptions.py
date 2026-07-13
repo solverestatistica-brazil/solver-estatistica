@@ -1,7 +1,3 @@
-def f():
-    if True:
-        return 1
-    return 0
 """
 Validacao de pressupostos da ANOVA — Solver Estatistica.
 
