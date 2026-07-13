@@ -535,39 +535,24 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="assets/js/config.js?v=20260713"></script>
 <script src="assets/js/app.js?v=20260713"></script>
-
 <script>
-// [FIX chart-init-resize] v20260713
-// Bug: Chart.js desenha o grafico de regressao quando o container ainda
-// tem dimensoes 0 (results acabou de sair de display:none). Resultado: canvas
-// fica com width/height=0 e o grafico aparece como um ponto. Solucao: assim
-// que o canvas aparece no DOM ou muda, disparar resize para Chart.js redimensionar.
+// [FIX chart-init-resize] v20260713b - smart polling until canvas has real dimensions
 (function(){
-  let scheduled = false;
-  function nudge(){
-    if (scheduled) return;
-    scheduled = true;
-    requestAnimationFrame(() => {
-      scheduled = false;
-      window.dispatchEvent(new Event('resize'));
-    });
-  }
-  function watch(){
+  function tick(){
     const c = document.getElementById('regressionChart');
-    if (!c) return;
-    if (window.__solverChartWatched === c) return;
-    window.__solverChartWatched = c;
-    // Trigger a few resize nudges spread over 1s to cover cold layouts
-    [0, 60, 200, 600, 1200].forEach(t => setTimeout(nudge, t));
-    // Also observe container size changes
-    if (typeof ResizeObserver !== 'undefined'){
-      const ro = new ResizeObserver(nudge);
-      ro.observe(c.parentElement);
+    if (!c){ setTimeout(tick, 400); return; }
+    if (c.width < 100){
+      window.dispatchEvent(new Event('resize'));
+      setTimeout(tick, 180);
+    } else {
+      setTimeout(tick, 1500); // still keep an eye on it
     }
   }
-  const globalObs = new MutationObserver(watch);
-  globalObs.observe(document.documentElement, {childList: true, subtree: true});
-  document.addEventListener('DOMContentLoaded', watch);
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', tick);
+  } else {
+    tick();
+  }
 })();
 </script>
 </body>
