@@ -656,3 +656,74 @@ body:has(#view-app:not(.hidden)){background-size:38px 38px,38px 38px,100% 100%,1
   backdrop-filter: blur(2px);
   -webkit-backdrop-filter: blur(2px);
 }
+
+
+/* ================================================================
+   Solver v20260716 - Preview layout ajustes finais + panels ainda mais transparentes
+   ================================================================ */
+
+/* PREVIEW CARD: callout de dose otima estava com posicao absoluta fixa
+   em pixels (left: 132px) - quando o chart alarga, o callout continua
+   apontando pro pixel fixo em vez do pico da curva. Reposiciona via % */
+.preview-card .dose-callout {
+  left: 28% !important;
+  transform: translateX(-50%) !important;
+  top: 8px !important;
+  font-size: 11px !important;
+  padding: 4px 10px !important;
+  line-height: 1.2 !important;
+}
+
+/* Ajuste fino nas alturas para o preview parecer mais equilibrado */
+.preview-card .stats-row > * {
+  min-height: 62px !important;
+  max-height: 72px !important;
+  padding: 8px 12px !important;
+}
+.preview-card .stats-row strong,
+.preview-card .cv-headline {
+  font-size: 18px !important;
+}
+.preview-card .stats-row em {
+  font-size: 10.5px !important;
+  margin-top: 3px !important;
+}
+
+/* Chart e mini-anova: altura um pouco menor para o card total nao
+   estourar e as actions do fundo respirarem */
+.preview-card .preview-split,
+.preview-card .chart-placeholder,
+.preview-card .mini-anova-card {
+  min-height: 190px !important;
+}
+.preview-card .chart-placeholder svg {
+  height: 155px !important;
+}
+.preview-card .chart-wrap {
+  min-height: 155px !important;
+}
+
+/* Actions do fundo: menos altas, mais compactas */
+.preview-card .preview-actions {
+  padding-top: 8px !important;
+  gap: 4px !important;
+}
+.preview-card .preview-action {
+  padding: 6px 4px !important;
+}
+.preview-card .preview-action .icon-circle {
+  width: 30px !important;
+  height: 30px !important;
+}
+
+/* PANELS ainda mais transparentes conforme pedido */
+.panel#capacidades,
+.panel#publico {
+  background: rgba(11, 35, 30, 0.18) !important;
+  border-color: rgba(51, 157, 105, 0.15) !important;
+}
+.panel#capacidades article,
+.panel#publico article {
+  background: rgba(11, 35, 30, 0.12) !important;
+  border-color: rgba(51, 157, 105, 0.22) !important;
+}
