@@ -161,6 +161,60 @@ def test_bug_3_3_regressao_expoe_p_top_term():
         assert "p_top_term" in model, f"p_top_term ausente no grau {model['degree']}"
 
 
+def test_integracao_pressupostos_exposto_no_analyze():
+    """assumptions.py deve estar plugado em analyze(): toda análise DBC/single com
+    resíduos disponíveis precisa devolver a chave 'pressupostos' com um veredito."""
+    result = analyze({
+        "design": "DBC",
+        "analysis_type": "single",
+        "response_column": "Valor",
+        "treatment_column": "Tratamento",
+        "block_column": "Bloco",
+        "numeric_factor_column": "Tratamento",
+        "comparison_test": "tukey",
+        "goal": "max",
+        "alpha": 0.05,
+        "data": DBC_SINGLE,
+    })
+    assert result["anova"]["residuals"] is not None
+    pressupostos = result["pressupostos"]
+    assert pressupostos is not None
+    assert pressupostos["veredito"] in {"ok", "atencao", "violado", "indeterminado"}
+    assert set(pressupostos["testes"]) >= {"normalidade", "homocedasticidade", "independencia", "outliers", "aditividade"}
+    # Dataset é perfeitamente aditivo por construção -> aditividade cai em ATENCAO,
+    # não gera sugestão de transformação (só VIOLADO dispara transformacao_sugerida).
+    assert "transformacao_sugerida" in result
+
+
+def test_integracao_transformacao_sugerida_quando_pressuposto_violado():
+    """Quando homocedasticidade/normalidade são violadas, transformations.py deve ser
+    acionado a partir de statistics_engine e devolver um método aplicado com sucesso."""
+    random.seed(1)
+    means_sds = {"A": (10, 0.2), "B": (10, 15), "C": (10, 0.3)}
+    data = []
+    for t, (m, sd) in means_sds.items():
+        for b in range(1, 9):
+            data.append({"Trat": t, "Bloco": b, "Valor": round(max(0.01, random.gauss(m, sd)), 3)})
+
+    result = analyze({
+        "design": "DBC",
+        "analysis_type": "single",
+        "response_column": "Valor",
+        "treatment_column": "Trat",
+        "block_column": "Bloco",
+        "comparison_test": "tukey",
+        "goal": "max",
+        "alpha": 0.05,
+        "data": data,
+    })
+    assert result["pressupostos"]["veredito"] == "violado"
+    transformacao = result["transformacao_sugerida"]
+    assert transformacao is not None
+    assert transformacao["metodo"] in {"log_x1", "raiz_x05", "arcsin_percentual", "box_cox"}
+    assert transformacao["aplicado"] is True
+    assert "normalidade_apos" in transformacao and "homocedasticidade_apos" in transformacao
+
+
 def test_smoke_dbc_com_dados_realistas():
     """Sanidade: DBC com CV realista (5-15%%) roda e devolve estatistica valida."""
     random.seed(42)

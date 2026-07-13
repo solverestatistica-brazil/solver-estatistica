@@ -34,6 +34,9 @@ from scipy import stats
 from scipy.stats import studentized_range
 from statsmodels.stats.anova import anova_lm
 
+import assumptions
+import transformations
+
 ALLOWED_DESIGNS = {"DIC", "DBC", "DQL"}
 ALLOWED_ANALYSIS_TYPES = {"single", "factorial", "split_plot", "regression"}
 ALLOWED_TESTS = {"tukey", "duncan", "dunnett", "snk", "scheffe"}
@@ -526,6 +529,7 @@ def _anova_split_plot(ctx: AnalysisContext) -> Dict[str, Any]:
         "cv": cv,
         "cv_label": _cv_label(cv),
         "model_notes": notes,
+        "residuals": model.resid.to_numpy(float).tolist(),
     }
 
 
@@ -605,6 +609,7 @@ def _anova(ctx: AnalysisContext) -> Dict[str, Any]:
         "cv": cv,
         "cv_label": _cv_label(cv),
         "model_notes": notes,
+        "residuals": model.resid.to_numpy(float).tolist(),
     }
 
 def _means(ctx: AnalysisContext, anova: Dict[str, Any]) -> Dict[str, Any]:
@@ -1099,6 +1104,73 @@ def _interaction_breakdown(ctx: AnalysisContext, anova: Dict[str, Any]) -> List[
     return blocks
 
 
+def _pressupostos_e_transformacao(ctx: AnalysisContext, anova: Dict[str, Any]) -> Tuple[Optional[Dict[str, Any]], Optional[Dict[str, Any]]]:
+    """Roda assumptions.verificar_pressupostos() sobre os resíduos do modelo já ajustado
+    em _anova()/_anova_split_plot() e, se algum pressuposto estiver violado, aplica a
+    transformação sugerida (transformations.py) e reajusta o mesmo modelo com a coluna
+    transformada — só para mostrar se ela de fato resolveu a violação, sem propagar a
+    transformação para médias, comparações ou regressão (isso fica a critério do
+    pesquisador, que decide se refaz a análise inteira com os dados transformados)."""
+    residuos = anova.get("residuals")
+    formula = anova.get("formula")
+    if residuos is None or not formula:
+        return None, None
+
+    bloco = ctx.payload.get("block_column") if ctx.design == "DBC" else None
+    if bloco and bloco not in ctx.df.columns:
+        bloco = None
+
+    pressupostos = assumptions.verificar_pressupostos(
+        ctx.df,
+        np.array(residuos, dtype=float),
+        ctx.response,
+        ctx.treatment,
+        bloco=bloco,
+        alpha=float(ctx.payload.get("alpha") or 0.05),
+    )
+
+    if pressupostos["veredito"] != assumptions.VIOLADO:
+        return pressupostos, None
+
+    metodo = transformations.sugerir_metodo(pressupostos["testes"], ctx.df[ctx.response])
+    if metodo is None:
+        return pressupostos, None
+
+    try:
+        df_transformado = transformations.aplicar(ctx.df, ctx.response, metodo)
+        coluna_t = f"{ctx.response}_transformado"
+        formula_t = formula.replace(_q(ctx.response), _q(coluna_t), 1)
+        modelo_t = smf.ols(formula_t, data=df_transformado).fit()
+        residuos_t = modelo_t.resid.to_numpy(float)
+        normalidade_t = assumptions.normalidade(residuos_t)
+        homoced_t = assumptions.homocedasticidade(df_transformado, coluna_t, ctx.treatment)
+        melhorou = normalidade_t["status"] != assumptions.VIOLADO and homoced_t["status"] != assumptions.VIOLADO
+        transformacao = {
+            "metodo": metodo,
+            "descricao": transformations.DESCRICOES.get(metodo, ""),
+            "aplicado": True,
+            "normalidade_apos": normalidade_t,
+            "homocedasticidade_apos": homoced_t,
+            "melhorou": melhorou,
+            "mensagem": (
+                "A transformação resolveu as violações de normalidade e homocedasticidade "
+                "detectadas nos resíduos originais."
+                if melhorou else
+                "A transformação não foi suficiente para resolver todas as violações; "
+                "considere um teste não-paramétrico (Kruskal-Wallis) como alternativa."
+            ),
+        }
+    except Exception as exc:
+        transformacao = {
+            "metodo": metodo,
+            "descricao": transformations.DESCRICOES.get(metodo, ""),
+            "aplicado": False,
+            "mensagem": f"Não foi possível aplicar ou reajustar o modelo com a transformação sugerida: {exc}",
+        }
+
+    return pressupostos, transformacao
+
+
 def analyze(payload: Dict[str, Any]) -> Dict[str, Any]:
     ctx = _prepare_context(payload)
     anova = _anova(ctx)
@@ -1107,6 +1179,7 @@ def analyze(payload: Dict[str, Any]) -> Dict[str, Any]:
     factor_comparisons = _factor_comparisons(ctx, anova)
     interaction_breakdown = _interaction_breakdown(ctx, anova)
     recommendations = _recommendations(ctx, anova, means, regression)
+    pressupostos, transformacao_sugerida = _pressupostos_e_transformacao(ctx, anova)
     if interaction_breakdown:
         factors = ctx.payload.get("factor_columns") or []
         if len(factors) >= 2:
@@ -1131,6 +1204,8 @@ def analyze(payload: Dict[str, Any]) -> Dict[str, Any]:
         "interaction_breakdown": interaction_breakdown,
         "regression": regression,
         "recommendations": recommendations,
+        "pressupostos": pressupostos,
+        "transformacao_sugerida": transformacao_sugerida,
     }
     return _clean_value(result)
 
