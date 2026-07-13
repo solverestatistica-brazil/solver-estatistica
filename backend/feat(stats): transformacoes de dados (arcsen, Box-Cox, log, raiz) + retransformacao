@@ -1,0 +1,396 @@
+"""
+Transformacoes de dados — Solver Estatistica.
+
+Quando um pressuposto da ANOVA e violado, transformar a variavel resposta costuma
+resolver. Este modulo escolhe A transformacao certa para O problema encontrado, aplica,
+reverifica os pressupostos e — crucialmente — sabe DESFAZER a transformacao na hora de
+reportar as medias.
+
+Transformacoes cobertas:
+  raiz         sqrt(x)                 -> contagens grandes
+  raiz_meio    sqrt(x + 0,5)           -> contagens pequenas ou com zeros (Bartlett, 1936)
+  log          log10(x)                -> efeitos multiplicativos, variancia ~ media^2
+  log_um       log10(x + 1)            -> idem, com zeros presentes
+  arcsen       arcsen(sqrt(x/100))     -> PORCENTAGENS (germinacao, severidade, controle)
+  box_cox      (x^lam - 1) / lam       -> geral, lambda estimado por maxima verossimilhanca
+
+REGRA DE OURO DA RETRANSFORMACAO:
+A media das transformadas NAO e a transformada da media. Desfazer a transformacao de uma
+media transformada devolve a MEDIA GEOMETRICA (no caso do log), nao a aritmetica. Isso e
+correto e e o que se reporta na literatura — mas precisa ser DITO ao usuario, senao ele
+acha que o numero "mudou sozinho". Toda funcao de retransformacao aqui devolve junto o
+rotulo do que ela esta realmente devolvendo.
+
+Regra do projeto (herdada do incidente de 13/07/2026):
+NENHUM estado indeterminado pode ser apresentado como resultado. Se uma transformacao nao
+e aplicavel aos dados (log de valor negativo, arcsen fora de 0-100), a funcao recusa
+explicitamente com status="inaplicavel" — nunca devolve NaN silencioso.
+"""
+
+from __future__ import annotations
+
+import math
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+import pandas as pd
+from scipy import stats
+
+VIOLADO = "violado"
+OK = "ok"
+
+
+# ---------------------------------------------------------------- definicoes
+
+def _erro(nome: str, motivo: str) -> Dict[str, Any]:
+    return {"nome": nome, "aplicavel": False, "motivo": motivo, "valores": None}
+
+
+def _ok(nome: str, rotulo: str, valores: np.ndarray, **extra) -> Dict[str, Any]:
+    d = {
+        "nome": nome,
+        "rotulo": rotulo,
+        "aplicavel": True,
+        "motivo": None,
+        "valores": [float(v) for v in valores],
+    }
+    d.update(extra)
+    return d
+
+
+def raiz(x: np.ndarray) -> Dict[str, Any]:
+    if np.any(x < 0):
+        return _erro("raiz", "Ha valores negativos. A raiz quadrada exige x >= 0.")
+    return _ok("raiz", "raiz(x)", np.sqrt(x))
+
+
+def raiz_meio(x: np.ndarray) -> Dict[str, Any]:
+    if np.any(x < -0.5):
+        return _erro("raiz_meio", "Ha valores abaixo de -0,5. Exige x + 0,5 >= 0.")
+    return _ok("raiz_meio", "raiz(x + 0,5)", np.sqrt(x + 0.5))
+
+
+def log10(x: np.ndarray) -> Dict[str, Any]:
+    if np.any(x <= 0):
+        return _erro(
+            "log",
+            "Ha valores zero ou negativos. Use log(x + 1) — o logaritmo exige x > 0.",
+        )
+    return _ok("log", "log10(x)", np.log10(x))
+
+
+def log_um(x: np.ndarray) -> Dict[str, Any]:
+    if np.any(x <= -1):
+        return _erro("log_um", "Ha valores <= -1. Exige x + 1 > 0.")
+    return _ok("log_um", "log10(x + 1)", np.log10(x + 1.0))
+
+
+def arcsen(x: np.ndarray) -> Dict[str, Any]:
+    """Arco-seno da raiz da proporcao. Espera x em PORCENTAGEM (0 a 100).
+
+    Esta e a transformacao de porcentagem — germinacao, severidade de doenca, eficiencia
+    de controle, vigor. E o dado central de uma empresa de sementes, e e exatamente o caso
+    em que a ANOVA sem transformacao da errado: proporcoes tem variancia dependente da
+    media (maxima perto de 50%, minima perto de 0% e 100%), violando a homocedasticidade
+    por construcao.
+    """
+    if np.any(x < 0) or np.any(x > 100):
+        return _erro(
+            "arcsen",
+            "Ha valores fora do intervalo 0-100. O arco-seno exige porcentagens. "
+            "Se seus dados estao em proporcao (0 a 1), multiplique por 100 antes.",
+        )
+    return _ok("arcsen", "arcsen(raiz(x/100)) em graus",
+               np.degrees(np.arcsin(np.sqrt(x / 100.0))))
+
+
+def box_cox(x: np.ndarray) -> Dict[str, Any]:
+    """Box-Cox com lambda estimado por maxima verossimilhanca.
+
+    A mais geral: busca SIMULTANEAMENTE estabilizar a variancia e aproximar a normalidade.
+    Exige x > 0 estrito.
+
+    lambda ~  1,0 -> nenhuma transformacao necessaria
+    lambda ~  0,5 -> equivale a raiz quadrada
+    lambda ~  0,0 -> equivale ao logaritmo
+    lambda ~ -1,0 -> equivale ao inverso (1/x)
+    """
+    if np.any(x <= 0):
+        return _erro(
+            "box_cox",
+            "Ha valores zero ou negativos. Box-Cox exige x > 0 estrito. "
+            "Desloque os dados (x + c) ou use outra transformacao.",
+        )
+    if np.allclose(x, x[0]):
+        return _erro("box_cox", "Todos os valores sao identicos. Nao ha variancia a estabilizar.")
+
+    valores, lam = stats.boxcox(x)
+    equivalente = None
+    if abs(lam) < 0.1:
+        equivalente = "praticamente um logaritmo (lambda ~ 0)"
+    elif abs(lam - 0.5) < 0.1:
+        equivalente = "praticamente uma raiz quadrada (lambda ~ 0,5)"
+    elif abs(lam - 1.0) < 0.1:
+        equivalente = "lambda ~ 1: os dados provavelmente NAO precisam de transformacao"
+    elif abs(lam + 1.0) < 0.1:
+        equivalente = "praticamente um inverso 1/x (lambda ~ -1)"
+
+    return _ok("box_cox", f"Box-Cox (lambda = {lam:.4f})", valores,
+               lambda_=round(float(lam), 4), equivalente=equivalente)
+
+
+TRANSFORMACOES = {
+    "raiz": raiz,
+    "raiz_meio": raiz_meio,
+    "log": log10,
+    "log_um": log_um,
+    "arcsen": arcsen,
+    "box_cox": box_cox,
+}
+
+
+# ------------------------------------------------------------ retransformacao
+
+def retransformar(nome: str, valor: float, lambda_: Optional[float] = None) -> Dict[str, Any]:
+    """Desfaz a transformacao para reportar a media na escala original.
+
+    ATENCAO CONCEITUAL: retransformar a MEDIA das transformadas nao devolve a media
+    aritmetica original. Devolve outra coisa — geralmente a media geometrica. Isso NAO e
+    um bug: e o comportamento correto e e o que se reporta na literatura (a media
+    retransformada e um estimador da mediana da distribuicao original). Mas o usuario
+    PRECISA ser avisado, senao ele compara com a media bruta e acha que o sistema errou.
+    """
+    try:
+        if nome == "raiz":
+            v, tipo = valor ** 2, "media quadratica retransformada"
+        elif nome == "raiz_meio":
+            v, tipo = valor ** 2 - 0.5, "media quadratica retransformada"
+        elif nome == "log":
+            v, tipo = 10.0 ** valor, "MEDIA GEOMETRICA (nao a aritmetica)"
+        elif nome == "log_um":
+            v, tipo = 10.0 ** valor - 1.0, "MEDIA GEOMETRICA (nao a aritmetica)"
+        elif nome == "arcsen":
+            v = (math.sin(math.radians(valor)) ** 2) * 100.0
+            tipo = "porcentagem retransformada"
+        elif nome == "box_cox":
+            if lambda_ is None:
+                return {"valor": None, "tipo": None,
+                        "aviso": "lambda nao informado — impossivel retransformar."}
+            if abs(lambda_) < 1e-8:
+                v = math.exp(valor)
+            else:
+                base = lambda_ * valor + 1.0
+                if base <= 0:
+                    return {"valor": None, "tipo": None,
+                            "aviso": "Retransformacao Box-Cox indefinida para este valor."}
+                v = base ** (1.0 / lambda_)
+            tipo = "media retransformada (estimador da mediana)"
+        else:
+            return {"valor": float(valor), "tipo": "sem transformacao", "aviso": None}
+
+        if not math.isfinite(v):
+            return {"valor": None, "tipo": None, "aviso": "Retransformacao produziu valor indefinido."}
+
+        return {
+            "valor": round(float(v), 4),
+            "tipo": tipo,
+            "aviso": (
+                "A media retransformada NAO e igual a media aritmetica dos dados originais. "
+                "Ela estima a mediana da distribuicao. Reporte-a como tal — e faca as "
+                "comparacoes estatisticas (teste F, Tukey) SEMPRE na escala transformada."
+            ),
+        }
+    except (ValueError, OverflowError) as exc:
+        return {"valor": None, "tipo": None, "aviso": f"Retransformacao falhou: {exc}"}
+
+
+# ------------------------------------------------------------- recomendacao
+
+def recomendar(pressupostos: Dict[str, Any], x: np.ndarray,
+               contexto: Optional[str] = None) -> List[str]:
+    """Ordena as transformacoes candidatas conforme QUAL pressuposto quebrou.
+
+    `contexto` opcional: "porcentagem" | "contagem" | None.
+
+    --------------------------------------------------------------------------------
+    PRINCIPIO: quando a TEORIA garante a violacao, nao espere o TESTE confirmar.
+    --------------------------------------------------------------------------------
+    Uma porcentagem vem de uma binomial: variancia = p(1-p)/n. Ela e HETEROCEDASTICA POR
+    CONSTRUCAO — maxima perto de 50%, minima perto de 0% e 100%. Nao e uma possibilidade,
+    e uma certeza matematica. O mesmo vale para contagens (Poisson: variancia = media).
+
+    Mas o teste de Levene, com as 4-5 repeticoes de um ensaio real, nao tem poder para
+    ver isso (taxa de deteccao de 4,1% para uma razao de variancias de 15x — ver
+    assumptions.homocedasticidade). Se esperarmos o teste "dar violado" para so entao
+    sugerir o arcsen, nunca vamos sugerir o arcsen.
+
+    Entao: quando o usuario declara que o dado e porcentagem ou contagem, recomendamos a
+    transformacao apropriada INDEPENDENTEMENTE do resultado do teste — e explicamos que a
+    razao e a natureza do dado, nao um p-valor.
+    """
+    testes = pressupostos.get("testes", {})
+    homoc = testes.get("homocedasticidade", {})
+    var_ruim = homoc.get("status") == VIOLADO
+    var_incerta = homoc.get("baixo_poder") is True
+    norm_ruim = testes.get("normalidade", {}).get("status") == VIOLADO
+    adit_ruim = testes.get("aditividade", {}).get("status") == VIOLADO
+
+    # Caminho TEORICO: a natureza do dado decide, nao o p-valor.
+    if contexto == "porcentagem":
+        return ["arcsen", "box_cox", "log_um"]
+    if contexto == "contagem":
+        return ["raiz_meio", "raiz", "log_um", "box_cox"]
+
+    # Caminho EMPIRICO: sem contexto declarado, dependemos dos testes.
+    if not (var_ruim or norm_ruim or adit_ruim or var_incerta):
+        return []
+
+    tem_zero_ou_neg = bool(np.any(x <= 0))
+    parece_contagem = bool(np.all(x >= 0) and np.allclose(x, np.round(x)))
+    parece_pct = bool(np.all((x >= 0) & (x <= 100)) and np.any(x > 1) and not parece_contagem)
+
+    ordem: List[str] = []
+    if parece_pct:
+        ordem.append("arcsen")
+    if parece_contagem:
+        ordem += ["raiz_meio", "raiz"]
+    if adit_ruim or var_ruim or var_incerta:
+        ordem += ["log_um"] if tem_zero_ou_neg else ["log", "log_um"]
+    if not tem_zero_ou_neg:
+        ordem.append("box_cox")
+
+    vistos, saida = set(), []
+    for t in ordem:
+        if t not in vistos:
+            vistos.add(t)
+            saida.append(t)
+    return saida
+
+
+def aplicar_e_reavaliar(
+    df: pd.DataFrame,
+    resposta: str,
+    tratamento: str,
+    bloco: Optional[str],
+    pressupostos_originais: Dict[str, Any],
+    contexto: Optional[str] = None,
+    alpha: float = 0.05,
+) -> Dict[str, Any]:
+    """Testa as transformacoes candidatas e devolve as que RESOLVEM o problema.
+
+    Nao aplica nada sozinho — devolve as opcoes com evidencia, para o usuario escolher.
+    Uma ferramenta que transforma dados silenciosamente e uma ferramenta em que nao se
+    pode confiar.
+    """
+    from assumptions import verificar_pressupostos
+
+    x = pd.to_numeric(df[resposta], errors="coerce").to_numpy(float)
+    candidatas = recomendar(pressupostos_originais, x, contexto)
+
+    if not candidatas:
+        return {
+            "necessaria": False,
+            "recomendada": None,
+            "mensagem": "Nenhum pressuposto foi violado. Transformacao desnecessaria — "
+                        "transformar dados que ja atendem os pressupostos so dificulta a "
+                        "interpretacao, sem ganho estatistico.",
+            "opcoes": [],
+            "aviso_retransformacao": None,
+        }
+
+    resultados: List[Dict[str, Any]] = []
+    for nome in candidatas:
+        t = TRANSFORMACOES[nome](x)
+        if not t["aplicavel"]:
+            resultados.append({
+                "nome": nome, "aplicavel": False, "motivo": t["motivo"],
+                "resolve": False, "pressupostos": None,
+            })
+            continue
+
+        d2 = df.copy()
+        d2[resposta] = t["valores"]
+        res = _residuos(d2, resposta, tratamento, bloco)
+        if res is None:
+            resultados.append({
+                "nome": nome, "aplicavel": True, "rotulo": t["rotulo"],
+                "resolve": False, "pressupostos": None,
+                "motivo": "Nao foi possivel calcular os residuos do modelo transformado.",
+            })
+            continue
+
+        p2 = verificar_pressupostos(d2, res, resposta, tratamento, bloco, alpha)
+
+        # "Resolve" = nenhum pressuposto VIOLADO restante.
+        #
+        # NAO exigimos veredito == "ok". Motivo: o aviso de baixo poder do Levene depende
+        # so do numero de repeticoes — ele NUNCA desaparece por transformar os dados. Se
+        # exigirmos veredito "ok", nenhuma transformacao consegue passar num ensaio com 5
+        # repeticoes, que e o tamanho real da maioria dos experimentos. O criterio seria
+        # impossivel de satisfazer e o modulo inteiro viraria decoracao.
+        #
+        # ATENCAO e INDETERMINADO sao avisos sobre os LIMITES do que podemos afirmar.
+        # VIOLADO e o unico veredito que diz que algo esta de fato errado.
+        violados_depois = [
+            k for k, v in p2["testes"].items() if v["status"] == VIOLADO
+        ]
+        resolve = not violados_depois
+
+        resultados.append({
+            "nome": nome,
+            "aplicavel": True,
+            "rotulo": t["rotulo"],
+            "lambda": t.get("lambda_"),
+            "equivalente": t.get("equivalente"),
+            "resolve": resolve,
+            "veredito": p2["veredito"],
+            "violados_restantes": violados_depois,
+            "p_normalidade": p2["testes"].get("normalidade", {}).get("p_value"),
+            "p_homocedasticidade": p2["testes"].get("homocedasticidade", {}).get("p_value"),
+            "p_aditividade": p2["testes"].get("aditividade", {}).get("p_value"),
+            "razao_variancias": p2["testes"].get("homocedasticidade", {}).get("razao_variancias"),
+        })
+
+    # Entre as que resolvem, prefere a que deixa a menor razao de variancias
+    # (evidencia descritiva, que nao depende do poder do teste).
+    boas = [r for r in resultados if r.get("resolve")]
+    boas.sort(key=lambda r: (r.get("razao_variancias") or float("inf")))
+    return {
+        "necessaria": True,
+        "mensagem": (
+            f"{len(boas)} transformacao(oes) resolvem os pressupostos violados."
+            if boas else
+            "Nenhuma das transformacoes testadas resolveu todos os pressupostos. "
+            "Considere um teste nao-parametrico (Kruskal-Wallis) ou revise se ha erro "
+            "de coleta/digitacao nos dados."
+        ),
+        "recomendada": boas[0]["nome"] if boas else None,
+        "opcoes": resultados,
+        "aviso_retransformacao": (
+            "Faca SEMPRE o teste F e a comparacao de medias na escala TRANSFORMADA. "
+            "Retransforme apenas na hora de apresentar as medias — e avise no laudo que "
+            "elas sao medias retransformadas, nao aritmeticas."
+        ),
+    }
+
+
+def _residuos(df: pd.DataFrame, resposta: str, tratamento: str,
+              bloco: Optional[str]) -> Optional[np.ndarray]:
+    """Residuos do modelo aditivo (DBC se houver bloco, DIC caso contrario)."""
+    try:
+        if bloco and bloco in df.columns:
+            tab = df.pivot_table(index=bloco, columns=tratamento, values=resposta, aggfunc="mean")
+            A = tab.to_numpy(float)
+            if np.isnan(A).any():
+                return None
+            mu = A.mean()
+            E = A - A.mean(axis=1)[:, None] - A.mean(axis=0)[None, :] + mu
+            blocos, trats = list(tab.index), list(tab.columns)
+            return np.array([
+                E[blocos.index(r[bloco]), trats.index(r[tratamento])]
+                for _, r in df.iterrows()
+            ])
+        medias = df.groupby(tratamento)[resposta].transform("mean")
+        return (pd.to_numeric(df[resposta], errors="coerce") - medias).to_numpy(float)
+    except Exception:
+        return None
