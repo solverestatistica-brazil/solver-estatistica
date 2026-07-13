@@ -581,43 +581,78 @@ body:has(#view-app:not(.hidden)){background-size:38px 38px,38px 38px,100% 100%,1
 
 
 /* ================================================================
-   Solver v20260714 - Hero preview polish (remover laranja + refinamento)
+   Solver v20260715 - Preview rebalance + panels transparentes
    ================================================================ */
 
-/* Dose callout: tinha borda e texto laranja (--accent). Trocamos por
-   verde brand-bright para ficar coeso com a paleta. */
-.preview-card .dose-callout {
-  border-color: var(--brand-bright) !important;
-  background: rgba(136, 216, 177, 0.15) !important;
+/* PREVIEW CARD (hero): chart eh o destaque, KPI cards mais compactos */
+.preview-card .stats-row {
+  gap: 8px !important;
 }
-.preview-card .dose-callout b {
-  color: var(--brand-deep) !important;
-}
-
-/* Stats row: melhor consistencia visual entre os 4 cards */
 .preview-card .stats-row > * {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  padding: 10px 12px !important;
+  min-height: 66px;
+  max-height: 80px;
+}
+.preview-card .stats-row > * > label,
+.preview-card .stat-cv > label,
+.preview-card .stats-row > * > span:first-child {
+  font-size: 10.5px !important;
+  margin-bottom: 2px !important;
+}
+.preview-card .stats-row strong,
+.preview-card .cv-headline {
+  font-size: 20px !important;
+  line-height: 1.05 !important;
+  margin: 0 !important;
+}
+.preview-card .stats-row em {
+  font-size: 11px !important;
+  margin-top: 4px !important;
+}
+.preview-card .cv-ring {
+  width: 32px !important;
+  height: 32px !important;
+  flex: 0 0 32px !important;
 }
 
-/* Mini-anova: um leve destaque nas linhas para nao ficar denso */
-.preview-card .mini-anova-row + .mini-anova-row {
-  border-top: 1px solid rgba(51, 157, 105, 0.08);
+/* Chart do preview: mais espaco vertical para virar o elemento principal */
+.preview-card .preview-split {
+  min-height: 210px !important;
+}
+.preview-card .chart-placeholder {
+  min-height: 210px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.preview-card .chart-wrap {
+  flex: 1 1 auto !important;
+  min-height: 165px !important;
+}
+.preview-card .chart-placeholder svg {
+  height: 170px !important;
+  width: 100% !important;
+}
+.preview-card .mini-anova-card {
+  min-height: 210px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.preview-card .mini-anova {
+  flex: 1 1 auto !important;
 }
 
-/* Preview actions (Dados/ANOVA/Pos-teste/PDF): hover sutil */
-.preview-card .preview-action {
-  transition: transform 0.16s ease;
+/* PANELS 'O QUE VOCE RECEBE' e 'PARA QUEM E': mais transparentes,
+   pra deixar o grid verde escuro do canvas aparecer atras */
+.panel#capacidades,
+.panel#publico {
+  background: rgba(11, 35, 30, 0.35) !important;
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
 }
-.preview-card .preview-action:hover {
-  transform: translateY(-2px);
-}
-
-/* Preview card ganha shadow verde sutil no hover */
-.preview-card {
-  transition: box-shadow 0.25s ease;
-}
-.preview-card:hover {
-  box-shadow: 0 18px 42px rgba(51, 157, 105, 0.14);
+.panel#capacidades article,
+.panel#publico article {
+  background: rgba(11, 35, 30, 0.28) !important;
+  border-color: rgba(51, 157, 105, 0.32) !important;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
 }
