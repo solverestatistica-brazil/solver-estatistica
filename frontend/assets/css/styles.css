@@ -763,7 +763,15 @@ body:has(#view-app:not(.hidden)){background-size:38px 38px,38px 38px,100% 100%,1
 }
 
 
-/* Solver v20260718 - Curva de regressao mais fina no preview */
-.preview-card .chart-wrap svg path[fill="none"] {
-  stroke-width: 1.5 !important;
+/* Solver v20260719 - Alinhamento uniforme dos 4 stat cards */
+.preview-card .stats-row > * {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  gap: 6px !important;
+}
+.preview-card .stat-cv .cv-ring-row {
+  align-self: stretch !important;
+  justify-content: center !important;
 }
