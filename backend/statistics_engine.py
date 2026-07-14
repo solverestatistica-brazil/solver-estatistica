@@ -955,25 +955,33 @@ def _poly_optimum(coeffs: List[float], x_min: float, x_max: float, goal: str) ->
     return {"x": chosen[0], "y": chosen[1], "goal": goal}
 
 def _regression_plot_base64(means_df: pd.DataFrame, x_grid: np.ndarray, y_grid: np.ndarray, model: Dict[str, Any]) -> str:
+    # [FIX P0-9] Grafico embutido no PDF no tema escuro do site (fundo #0d1e15,
+    # texto claro, verde vivo) em vez do fundo branco original.
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
+    fig.patch.set_facecolor("#0d1e15")
+    ax.set_facecolor("#0d1e15")
     ax.errorbar(
         means_df["x"], means_df["y"], yerr=means_df["sd"],
-        fmt="o", color="#24492E", ecolor="#3E7E54", elinewidth=1.4,
+        fmt="o", color="#8FC378", ecolor="#3E7E54", elinewidth=1.4,
         capsize=4, markersize=7, label="Observado (média por dose)",
+        markeredgecolor="#F6F9F6", markeredgewidth=0.6,
     )
-    ax.plot(x_grid, y_grid, color="#5FAF77", linewidth=2.2, label=f"Grau {model['degree']} · R²aj {model['adj_r2']:.3f}")
+    ax.plot(x_grid, y_grid, color="#8FC378", linewidth=2.2, label=f"Grau {model['degree']} · R²aj {model['adj_r2']:.3f}")
     optimum = model.get("optimum") or {}
     if optimum.get("x") is not None:
-        ax.axvline(optimum["x"], linestyle="--", linewidth=1, color="#8a6d2f")
-        ax.scatter([optimum["x"]], [optimum["y"]], marker="D", s=60, color="#c99a2e", zorder=5, label="Dose ótima")
-    ax.set_xlabel("Dose / fator numérico")
-    ax.set_ylabel("Resposta")
-    ax.set_title("Regressão ajustada")
-    ax.grid(True, alpha=0.25)
-    ax.legend()
+        ax.axvline(optimum["x"], linestyle="--", linewidth=1, color="#D4B14A")
+        ax.scatter([optimum["x"]], [optimum["y"]], marker="D", s=60, color="#D4B14A", zorder=5, label="Dose ótima")
+    ax.set_xlabel("Dose / fator numérico", color="#a8b8ac", fontsize=10)
+    ax.set_ylabel("Resposta", color="#a8b8ac", fontsize=10)
+    ax.set_title("Regressão ajustada", color="#F6F9F6", fontsize=13, fontweight="bold")
+    ax.tick_params(colors="#a8b8ac")
+    for spine in ax.spines.values():
+        spine.set_color("#8FC37833")
+    ax.grid(True, color="#8FC378", alpha=0.15)
+    ax.legend(facecolor="#122820", edgecolor="#8FC37855", labelcolor="#F6F9F6")
     buffer = io.BytesIO()
     fig.tight_layout()
-    fig.savefig(buffer, format="png")
+    fig.savefig(buffer, format="png", facecolor=fig.get_facecolor())
     plt.close(fig)
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 

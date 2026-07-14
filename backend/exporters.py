@@ -12,6 +12,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+from openpyxl.chart import BarChart, Reference
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from reportlab.lib import colors
@@ -64,25 +65,35 @@ except Exception:
     FONT_HEADING_BLACK = "Helvetica-Bold"
     FONT_SEMIBOLD = "Helvetica-Bold"
 
-# [FIX P0-8] Paleta atualizada para bater com o verde atual do site (index.html e o
-# override de resultados.html usam --brand:#3E7E54/--brand-bright:#8FC378; esta paleta
-# ainda estava no verde antigo #339D69/#88D8B1, de antes da reedicao visual do site).
+# [FIX P0-9] Relatorio inteiro (nao so a capa) agora replica o tema escuro real do
+# site (dark green/preto, texto claro) em vez do tema claro original do MVP - o body
+# do PDF ficava branco enquanto o site inteiro e escuro, uma quebra visual grande.
 BRAND_DARK = colors.HexColor("#06120C")
 BRAND_DEEP = colors.HexColor("#24492E")
 BRAND = colors.HexColor("#3E7E54")
 BRAND_BRIGHT = colors.HexColor("#8FC378")
-TEXT_L1 = colors.HexColor("#16422D")
-TEXT_L2 = colors.HexColor("#3E7E54")
-SURFACE_LINE = colors.HexColor("#E7ECE9")
-SURFACE_SUBTLE = colors.HexColor("#F4F7F5")
-SUCCESS = colors.HexColor("#45956E")
-SUCCESS_TINT = colors.HexColor("#E0ECEA")
-WARNING = colors.HexColor("#C6892E")
-WARNING_TINT = colors.HexColor("#F2E7D2")
+AMBER = colors.HexColor("#D4B14A")
+
+# Superficies escuras (equivalentes a --bg/--surface/--surface-elev-2 do site).
+SURFACE_BG = colors.HexColor("#06120C")
+SURFACE_CARD = colors.HexColor("#0d1e15")
+SURFACE_CARD_ALT = colors.HexColor("#122820")
+BORDER_LINE = colors.Color(143 / 255, 195 / 255, 120 / 255, alpha=0.16)
+BORDER_STRONG = colors.Color(143 / 255, 195 / 255, 120 / 255, alpha=0.32)
+
+# Texto sobre fundo escuro (equivalentes a --text-l1/--text-l2/--text-l3 do site).
+TEXT_L1 = colors.HexColor("#F6F9F6")
+TEXT_L2 = colors.HexColor("#a8b8ac")
+TEXT_L3 = colors.HexColor("#6a7a6f")
+
+SUCCESS = BRAND_BRIGHT
+SUCCESS_TINT = colors.Color(143 / 255, 195 / 255, 120 / 255, alpha=0.16)
+WARNING = AMBER
+WARNING_TINT = colors.Color(212 / 255, 177 / 255, 74 / 255, alpha=0.16)
 NEUTRAL = colors.HexColor("#94A3B8")
-NEUTRAL_TINT = colors.HexColor("#EEF2F0")
+NEUTRAL_TINT = colors.Color(148 / 255, 163 / 255, 184 / 255, alpha=0.14)
 ACCENT = colors.HexColor("#D16D2E")
-ACCENT_TINT = colors.HexColor("#F1E2D4")
+ACCENT_TINT = colors.Color(209 / 255, 109 / 255, 46 / 255, alpha=0.16)
 MUTED_ON_DARK = colors.HexColor("#5C8079")
 
 # Layout: relatorio em A4 retrato (formato padrao de laudo tecnico impresso).
@@ -95,6 +106,7 @@ CARD_GAP_W = 0.4 * cm
 
 # Hex simples (sem objeto Color) para marcacao inline em Paragraph (<font color="...">).
 BRAND_HEX = "#3E7E54"
+BRAND_BRIGHT_HEX = "#8FC378"
 BRAND_DEEP_HEX = "#24492E"
 
 HEX = {
@@ -188,6 +200,12 @@ def _draw_header_footer(canvas_obj, doc) -> None:
     canvas_obj.saveState()
     width, height = PAGE_SIZE
 
+    # [FIX P0-9] Fundo escuro em toda a pagina de conteudo (nao so a faixa do topo),
+    # para bater com o tema escuro real do site em vez de deixar o corpo do relatorio
+    # branco enquanto capa/site sao escuros.
+    canvas_obj.setFillColor(SURFACE_BG)
+    canvas_obj.rect(0, 0, width, height, fill=1, stroke=0)
+
     canvas_obj.setFillColor(BRAND_DARK)
     band_clip = canvas_obj.beginPath()
     band_clip.rect(0, height - 2.2 * cm, width, 2.2 * cm)
@@ -220,7 +238,7 @@ def _draw_header_footer(canvas_obj, doc) -> None:
         datetime.now().strftime("Gerado em %d/%m/%Y às %H:%M"),
     )
 
-    canvas_obj.setStrokeColor(SURFACE_LINE)
+    canvas_obj.setStrokeColor(BORDER_STRONG)
     canvas_obj.setLineWidth(0.6)
     canvas_obj.line(1.3 * cm, 1.15 * cm, width - 1.3 * cm, 1.15 * cm)
     canvas_obj.setFont(FONT_BODY, 7.5)
@@ -326,9 +344,9 @@ def _kpi_card(label: str, value: str, sub: str) -> Table:
         colWidths=[CARD_W],
     )
     card.setStyle(TableStyle([
-        ("BOX", (0, 0), (-1, -1), 0.8, SURFACE_LINE),
+        ("BOX", (0, 0), (-1, -1), 0.8, BORDER_STRONG),
         ("ROUNDEDCORNERS", [8, 8, 8, 8]),
-        ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+        ("BACKGROUND", (0, 0), (-1, -1), SURFACE_CARD),
         ("TOPPADDING", (0, 0), (-1, -1), 11),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 11),
         ("LEFTPADDING", (0, 0), (-1, -1), 13),
@@ -396,10 +414,10 @@ def _styled_table(rows: List[List[Any]], sig_col: Optional[int] = None, col0_wid
         ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
         ("FONTNAME", (0, 0), (-1, 0), FONT_HEADING),
         ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [SURFACE_SUBTLE, colors.white]),
-        ("LINEBELOW", (0, 0), (-1, n_rows - 2), 0.5, SURFACE_LINE),
-        ("LINEBELOW", (0, 0), (-1, 0), 1.6, BRAND),
-        ("BOX", (0, 0), (-1, -1), 0.8, SURFACE_LINE),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [SURFACE_CARD, SURFACE_CARD_ALT]),
+        ("LINEBELOW", (0, 0), (-1, n_rows - 2), 0.5, BORDER_LINE),
+        ("LINEBELOW", (0, 0), (-1, 0), 1.6, BRAND_BRIGHT),
+        ("BOX", (0, 0), (-1, -1), 0.8, BORDER_STRONG),
         ("ROUNDEDCORNERS", [8, 8, 8, 8]),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
         ("TOPPADDING", (0, 0), (-1, -1), 7),
@@ -471,7 +489,7 @@ def _fmt_p(value: Any) -> str:
 
 def _accent_heading(text: str) -> str:
     """Prefixa titulos de secao com um marcador colorido (acabamento do site)."""
-    return f'<font color="{BRAND_HEX}">▪</font>&nbsp;&nbsp;{text}'
+    return f'<font color="{BRAND_BRIGHT_HEX}">▪</font>&nbsp;&nbsp;{text}'
 
 def _anova_narrative(result: Dict[str, Any]) -> Optional[str]:
     """Paragrafo cientifico que interpreta o teste F para as fontes de variacao reais do experimento."""
@@ -605,7 +623,7 @@ def _regression_narrative(result: Dict[str, Any]) -> Optional[str]:
 def _executive_summary_box(messages: List[str], width: float) -> Table:
     """Caixa destacada (callout) para o resumo executivo, com barra de acento a esquerda,
     no lugar de uma lista solta de marcadores - visual mais premium/relatorio de verdade."""
-    head_style = ParagraphStyle("ExecHead", fontName=FONT_HEADING, fontSize=12, textColor=BRAND_DEEP, spaceAfter=9)
+    head_style = ParagraphStyle("ExecHead", fontName=FONT_HEADING, fontSize=12, textColor=BRAND_BRIGHT, spaceAfter=9)
     item_style = ParagraphStyle("ExecItem", fontName=FONT_BODY, fontSize=9.5, leading=14, textColor=TEXT_L1, spaceAfter=3)
     content: List[Any] = [Paragraph(_accent_heading("Resumo executivo"), head_style)]
     for msg in messages:
@@ -667,7 +685,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
 
     styles = getSampleStyleSheet()
     meta_style = ParagraphStyle("SolverMeta", parent=styles["BodyText"], fontName=FONT_BODY, fontSize=9.5, textColor=TEXT_L2, spaceAfter=4)
-    h2 = ParagraphStyle("SolverH2", parent=styles["Heading2"], fontName=FONT_HEADING, fontSize=12.5, textColor=BRAND_DEEP, spaceBefore=4, spaceAfter=7)
+    h2 = ParagraphStyle("SolverH2", parent=styles["Heading2"], fontName=FONT_HEADING, fontSize=12.5, textColor=BRAND_BRIGHT, spaceBefore=4, spaceAfter=7)
     body = ParagraphStyle("SolverBody", parent=styles["BodyText"], fontName=FONT_BODY, fontSize=9.5, leading=14.5, textColor=TEXT_L1)
     bullet = ParagraphStyle("SolverBullet", parent=body, leftIndent=10, spaceAfter=2)
     caption = ParagraphStyle("SolverCaption", parent=body, fontSize=8.5, textColor=TEXT_L2, leading=12.5, spaceBefore=6)
@@ -813,8 +831,22 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     doc.build(story)
     return buffer.getvalue()
 
-def _style_excel_sheet(worksheet, n_cols: int) -> None:
-    """Aplica cabecalho com a cor da marca, zebra e largura automatica as planilhas exportadas."""
+_EXCEL_SIG_STYLE = {
+    "1%": ("E5F3EA", "1E6B3E"),
+    "5%": ("FBF1DC", "8A6D1F"),
+    "ns": ("EEF2F0", "6B7A72"),
+    "sim": ("E5F3EA", "1E6B3E"),
+    "não": ("EEF2F0", "6B7A72"),
+    "true": ("E5F3EA", "1E6B3E"),
+    "false": ("EEF2F0", "6B7A72"),
+}
+
+def _style_excel_sheet(worksheet, n_cols: int, sig_col: Optional[int] = None) -> None:
+    """Aplica cabecalho com a cor da marca, zebra e largura automatica as planilhas exportadas.
+
+    sig_col: quando informado (1-indexado), pinta a coluna de significancia/booleano
+    (1%/5%/ns ou Sim/Não/True/False) com o mesmo codigo de cores do PDF - realce visual
+    de dashboard em vez de texto cru, sem precisar abrir o PDF para ver o que e relevante."""
     header_fill = PatternFill(start_color=HEX["brand_deep"], end_color=HEX["brand_deep"], fill_type="solid")
     header_font = Font(color="FFFFFF", bold=True, size=10)
     body_font = Font(color=HEX["text_l1"], size=10)
@@ -836,6 +868,15 @@ def _style_excel_sheet(worksheet, n_cols: int) -> None:
             cell.border = border
             if row % 2 == 0:
                 cell.fill = zebra_fill
+        if sig_col is not None:
+            sig_cell = worksheet.cell(row=row, column=sig_col)
+            key = str(sig_cell.value).strip().lower()
+            style = _EXCEL_SIG_STYLE.get(key)
+            if style:
+                bg, fg = style
+                sig_cell.fill = PatternFill(start_color=bg, end_color=bg, fill_type="solid")
+                sig_cell.font = Font(color=fg, bold=True, size=10)
+                sig_cell.alignment = Alignment(horizontal="center", vertical="center")
 
     for col in range(1, n_cols + 1):
         letter = get_column_letter(col)
@@ -844,6 +885,128 @@ def _style_excel_sheet(worksheet, n_cols: int) -> None:
 
     worksheet.freeze_panes = "A2"
     worksheet.row_dimensions[1].height = 20
+    worksheet.sheet_view.showGridLines = False
+    worksheet.sheet_properties.tabColor = HEX["brand"]
+
+def _kpi_block(ws, row: int, col: int, span: int, label: str, value: str, sub: str) -> None:
+    """Escreve um card de KPI (label/valor/sub) mesclado, no estilo dos cards do site/PDF."""
+    fill = PatternFill(start_color="0D1E15", end_color="0D1E15", fill_type="solid")
+    border = Border(
+        left=Side(style="thin", color="8FC378"), right=Side(style="thin", color="8FC378"),
+        top=Side(style="thin", color="8FC378"), bottom=Side(style="thin", color="8FC378"),
+    )
+    for r in range(row, row + 3):
+        ws.merge_cells(start_row=r, start_column=col, end_row=r, end_column=col + span - 1)
+        for c in range(col, col + span):
+            ws.cell(row=r, column=c).fill = fill
+            ws.cell(row=r, column=c).border = border
+    label_cell = ws.cell(row=row, column=col, value=label.upper())
+    label_cell.font = Font(color="A8B8AC", bold=True, size=9)
+    label_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    value_cell = ws.cell(row=row + 1, column=col, value=value)
+    value_cell.font = Font(color="F6F9F6", bold=True, size=20)
+    value_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    sub_cell = ws.cell(row=row + 2, column=col, value=sub)
+    sub_cell.font = Font(color="8FC378", bold=True, size=9)
+    sub_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws.row_dimensions[row + 1].height = 26
+
+def _build_dashboard_sheet(workbook, result: Dict[str, Any], means_df: "pd.DataFrame") -> None:
+    """Aba 'Painel', sempre a primeira: banner com a marca, KPIs em cards, resumo executivo
+    e um grafico de barras das medias por tratamento - visao geral antes de mergulhar nas
+    abas de dados brutos, no espirito de um dashboard em vez de uma planilha crua."""
+    ws = workbook.create_sheet("Painel", 0)
+    ws.sheet_view.showGridLines = False
+    ws.sheet_properties.tabColor = HEX["brand"]
+    ws.sheet_view.zoomScale = 100
+
+    n_cols_layout = 12
+    for col in range(1, n_cols_layout + 1):
+        ws.column_dimensions[get_column_letter(col)].width = 9.5
+
+    dark_fill = PatternFill(start_color="06120C", end_color="06120C", fill_type="solid")
+    for row in range(1, 40):
+        for col in range(1, n_cols_layout + 1):
+            ws.cell(row=row, column=col).fill = dark_fill
+
+    ws.merge_cells("B2:L2")
+    title_cell = ws["B2"]
+    title_cell.value = "SOLVER · Relatório Estatístico"
+    title_cell.font = Font(color="F6F9F6", bold=True, size=18)
+    title_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws.row_dimensions[2].height = 30
+
+    meta = result.get("meta", {})
+    design_label = DESIGN_LABELS.get(meta.get("design"), meta.get("design") or "—")
+    type_label = TYPE_LABELS.get(meta.get("analysis_type"), meta.get("analysis_type") or "—")
+    subtitle = design_label if meta.get("analysis_type") in (None, "single") else f"{design_label} · {type_label.capitalize()}"
+    ws.merge_cells("B3:L3")
+    sub_cell = ws["B3"]
+    sub_cell.value = f"{subtitle} · {meta.get('n_rows', '—')} observações · Gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')}"
+    sub_cell.font = Font(color="8FC378", bold=True, size=10.5)
+    sub_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    ws.row_dimensions[3].height = 18
+
+    cv = result.get("anova", {}).get("cv")
+    cv_label = result.get("anova", {}).get("cv_label", "Indisponível")
+    best = (result.get("means") or {}).get("best")
+    best_label = str(best.get("treatment")) if best else "—"
+    best_sub = f"Média {_fmt(best.get('mean'))}" if best else "—"
+
+    _kpi_block(ws, 5, 2, 3, "CV experimental", _fmt_pct(cv) if cv is not None else "—", cv_label)
+    _kpi_block(ws, 5, 6, 3, "Linhas analisadas", str(meta.get("n_rows", "—")), "Observações")
+    _kpi_block(ws, 5, 10, 3, "Melhor tratamento", best_label, best_sub)
+
+    row = 9
+    ws.merge_cells(f"B{row}:L{row}")
+    exec_head = ws.cell(row=row, column=2, value="▪  Resumo executivo")
+    exec_head.font = Font(color="8FC378", bold=True, size=12.5)
+    exec_head.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+    row += 1
+    messages = list(result.get("recommendations", []))
+    for note in result.get("anova", {}).get("model_notes", []) or []:
+        messages.append("Nota técnica: " + note)
+    exec_start_row = row
+    for msg in messages:
+        ws.merge_cells(f"B{row}:L{row}")
+        item_cell = ws.cell(row=row, column=2, value="•  " + msg)
+        item_cell.font = Font(color="F6F9F6", size=10)
+        item_cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True, indent=1)
+        ws.row_dimensions[row].height = 28
+        row += 1
+    for r in range(exec_start_row, row):
+        for c in range(2, n_cols_layout + 1):
+            ws.cell(row=r, column=c).fill = PatternFill(start_color="0D1E15", end_color="0D1E15", fill_type="solid")
+
+    row += 1
+    if means_df is not None and not means_df.empty and "mean" in means_df.columns:
+        chart_head_row = row
+        ws.merge_cells(f"B{chart_head_row}:L{chart_head_row}")
+        chart_head = ws.cell(row=chart_head_row, column=2, value="▪  Médias por tratamento")
+        chart_head.font = Font(color="8FC378", bold=True, size=12.5)
+        chart_head.alignment = Alignment(horizontal="left", vertical="center", indent=1)
+        row += 1
+
+        chart = BarChart()
+        chart.type = "col"
+        chart.style = 10
+        chart.title = None
+        chart.y_axis.title = None
+        chart.x_axis.title = None
+        chart.legend = None
+        chart.height = 8
+        chart.width = 24
+        treat_col = list(means_df.columns).index("treatment") + 1
+        mean_col = list(means_df.columns).index("mean") + 1
+        n_data_rows = len(means_df)
+        values_ref = Reference(workbook["Medias"], min_col=mean_col, min_row=1, max_row=1 + n_data_rows)
+        cats_ref = Reference(workbook["Medias"], min_col=treat_col, min_row=2, max_row=1 + n_data_rows)
+        chart.add_data(values_ref, titles_from_data=True)
+        chart.set_categories(cats_ref)
+        series = chart.series[0]
+        series.graphicalProperties.solidFill = "3E7E54"
+        series.graphicalProperties.line.noFill = True
+        ws.add_chart(chart, f"B{row}")
 
 def build_excel(payload: Dict[str, Any]) -> bytes:
     """Gera planilha Excel com abas de ANOVA, medias e recomendacoes, com a identidade visual Solver."""
@@ -852,7 +1015,8 @@ def build_excel(payload: Dict[str, Any]) -> bytes:
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         anova_df = pd.DataFrame(result.get("anova", {}).get("table", []))
         anova_df.to_excel(writer, index=False, sheet_name="ANOVA")
-        _style_excel_sheet(writer.sheets["ANOVA"], len(anova_df.columns) if not anova_df.empty else 1)
+        anova_sig_col = list(anova_df.columns).index("significance") + 1 if "significance" in anova_df.columns else None
+        _style_excel_sheet(writer.sheets["ANOVA"], len(anova_df.columns) if not anova_df.empty else 1, sig_col=anova_sig_col)
 
         means_df = pd.DataFrame(result.get("means", {}).get("treatment_means", []))
         means_df.to_excel(writer, index=False, sheet_name="Medias")
@@ -862,7 +1026,8 @@ def build_excel(payload: Dict[str, Any]) -> bytes:
         if comparison.get("comparisons"):
             comp_df = pd.DataFrame(comparison.get("comparisons", []))
             comp_df.to_excel(writer, index=False, sheet_name="Comparacoes")
-            _style_excel_sheet(writer.sheets["Comparacoes"], len(comp_df.columns) if not comp_df.empty else 1)
+            comp_sig_col = list(comp_df.columns).index("significant") + 1 if "significant" in comp_df.columns else None
+            _style_excel_sheet(writer.sheets["Comparacoes"], len(comp_df.columns) if not comp_df.empty else 1, sig_col=comp_sig_col)
 
         factor_rows = []
         for fc in result.get("factor_comparisons", []) or []:
@@ -891,13 +1056,16 @@ def build_excel(payload: Dict[str, Any]) -> bytes:
             _style_excel_sheet(writer.sheets["Interacao"], len(interaction_df.columns))
 
         resumo_df = pd.DataFrame({"recomendacao": result.get("recommendations", [])})
-        resumo_df.to_excel(writer, index=False, sheet_name="Resumo")
-        _style_excel_sheet(writer.sheets["Resumo"], 1)
+        resumo_df.to_excel(writer, index=False, sheet_name="Recomendacoes")
+        _style_excel_sheet(writer.sheets["Recomendacoes"], 1)
 
         if result.get("regression"):
             reg_df = pd.DataFrame(result["regression"].get("models", [])).drop(columns=["coefficients"], errors="ignore")
             reg_df.to_excel(writer, index=False, sheet_name="Regressao")
             _style_excel_sheet(writer.sheets["Regressao"], len(reg_df.columns) if not reg_df.empty else 1)
+
+        _build_dashboard_sheet(writer.book, result, means_df)
+        writer.book.active = 0
     return buffer.getvalue()
 
 def build_regression_plot(payload: Dict[str, Any], fmt: str = "png") -> bytes:
@@ -909,20 +1077,28 @@ def build_regression_plot(payload: Dict[str, Any], fmt: str = "png") -> bytes:
     points = pd.DataFrame(reg["points"])
     curve = pd.DataFrame(reg["fitted_curve"])
     selected = reg["selected_model"]
+
+    # [FIX P0-9] Grafico no tema escuro do site (fundo #0d1e15, texto claro,
+    # verde vivo para os dados) em vez do fundo branco original.
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=200)
-    ax.scatter(points["x"], points["y"], label="Observado", color="#3E7E54")
-    ax.plot(curve["x"], curve["y"], label=f"Grau {reg['selected_degree']} · R²aj {selected['adj_r2']:.3f}", color="#24492E")
+    fig.patch.set_facecolor("#0d1e15")
+    ax.set_facecolor("#0d1e15")
+    ax.scatter(points["x"], points["y"], label="Observado", color="#8FC378", edgecolors="#3E7E54", linewidths=0.8, s=45, zorder=3)
+    ax.plot(curve["x"], curve["y"], label=f"Grau {reg['selected_degree']} · R²aj {selected['adj_r2']:.3f}", color="#8FC378", linewidth=2.2)
     opt = selected.get("optimum") or {}
     if opt.get("x") is not None:
-        ax.axvline(opt["x"], linestyle="--", linewidth=1, color="#D16D2E")
-        ax.scatter([opt["x"]], [opt["y"]], marker="o", s=55, label="Ótimo", color="#D16D2E")
-    ax.set_xlabel(reg.get("x_label", "x"))
-    ax.set_ylabel(reg.get("y_label", "Resposta"))
-    ax.set_title("Regressão Solver")
-    ax.grid(True, alpha=0.25)
-    ax.legend()
+        ax.axvline(opt["x"], linestyle="--", linewidth=1, color="#D4B14A")
+        ax.scatter([opt["x"]], [opt["y"]], marker="o", s=70, label="Ótimo", color="#D4B14A", zorder=4)
+    ax.set_xlabel(reg.get("x_label", "x"), color="#a8b8ac", fontsize=10)
+    ax.set_ylabel(reg.get("y_label", "Resposta"), color="#a8b8ac", fontsize=10)
+    ax.set_title("Regressão Solver", color="#F6F9F6", fontsize=13, fontweight="bold")
+    ax.tick_params(colors="#a8b8ac")
+    for spine in ax.spines.values():
+        spine.set_color("#8FC37833")
+    ax.grid(True, color="#8FC378", alpha=0.15)
+    legend = ax.legend(facecolor="#122820", edgecolor="#8FC37855", labelcolor="#F6F9F6")
     output = io.BytesIO()
     fig.tight_layout()
-    fig.savefig(output, format=fmt)
+    fig.savefig(output, format=fmt, facecolor=fig.get_facecolor())
     plt.close(fig)
     return output.getvalue()
