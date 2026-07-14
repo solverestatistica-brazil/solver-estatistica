@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solver Estatística — Ambiente de análise</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#06120C; --bg-elev:#0d1e15; --bg-elev-2:#122820;
+  --border:rgba(143,195,120,.14); --border-strong:rgba(143,195,120,.28);
+  --text:#F6F9F6; --text-dim:#a8b8ac; --text-muted:#6a7a6f;
+  --green-1:#3E7E54; --green-2:#8FC378; --green-3:#24492E;
+  --amber:#D4B14A; --amber-2:#B8933A; --danger:#d95252;
+  --f-display:'Exo 2',system-ui,sans-serif;
+  --f-heading:'Exo 2',system-ui,sans-serif;
+  --f-body:'Open Sans',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:var(--f-body);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.page-shell{max-width:1440px;margin:0 auto;padding:0 32px}
+
+/* NAV */
+.nav{display:flex;justify-content:space-between;align-items:center;padding:22px 0}
+.logo-group{display:flex;align-items:center;gap:12px}
+.logo-group strong{font-family:var(--f-display);font-size:18px;letter-spacing:2px;display:block}
+.logo-group small{font-size:9px;letter-spacing:3px;color:var(--text-dim)}
+.back-link{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim);font-weight:600;transition:color .15s}
+.back-link:hover{color:var(--green-2)}
+.nav-actions{display:flex;gap:10px;align-items:center}
+.btn{padding:11px 22px;border-radius:10px;font-family:var(--f-heading);font-weight:600;font-size:13px;cursor:pointer;border:none;transition:all .2s;display:inline-flex;align-items:center;gap:8px}
+.btn.solid{background:var(--green-1);color:#fff}
+.btn.solid:hover{background:var(--green-2);transform:translateY(-1px)}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--border-strong)}
+.btn.ghost:hover{border-color:var(--green-2);background:rgba(143,195,120,.06)}
+
+/* Section head */
+.workspace-head{padding:24px 0 30px}
+.workspace-head .kicker{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--green-2);margin-bottom:10px;display:block;font-family:var(--f-heading);font-weight:700}
+.workspace-head h1{font-family:var(--f-heading);font-size:clamp(28px,3.4vw,40px);font-weight:700;letter-spacing:-.015em;margin-bottom:8px}
+.workspace-head p{color:var(--text-dim);font-size:15px;max-width:720px}
+
+/* Status bar do backend */
+.status-bar{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;margin-bottom:26px;flex-wrap:wrap}
+.status-bar label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);font-family:var(--f-heading);font-weight:600}
+.status-bar input{flex:1;min-width:280px;padding:9px 14px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--f-body);font-size:13px}
+.status-bar input:focus{outline:none;border-color:var(--green-2)}
+.status-bar .status-pill{padding:6px 14px;background:rgba(217,82,82,.12);color:var(--danger);border-radius:999px;font-size:11.5px;font-weight:700;font-family:var(--f-heading);letter-spacing:.5px}
+.status-bar .status-pill.ok{background:rgba(143,195,120,.15);color:var(--green-2)}
+
+/* Stepper */
+.stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px;position:relative}
+.step-item{position:relative;padding:16px 20px;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all .2s;text-align:left}
+.step-item:hover{border-color:var(--border-strong)}
+.step-item.active{background:linear-gradient(140deg,rgba(62,126,84,.18),var(--bg-elev));border-color:var(--green-2);box-shadow:0 4px 16px rgba(62,126,84,.15)}
+.step-item.done{border-color:rgba(143,195,120,.22)}
+.step-item .num{font-family:var(--f-display);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;font-weight:600}
+.step-item.active .num{color:var(--green-2)}
+.step-item .name{font-family:var(--f-heading);font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
+.step-item .name-sub{font-size:11.5px;color:var(--text-dim);margin-top:2px;font-family:var(--f-body)}
+.step-check{width:16px;height:16px;background:var(--green-2);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#0d1e15;font-size:11px}
+.step-item.done .step-check::before{content:'✓';font-weight:700}
+
+/* TABS */
+.tab-content{display:none}
+.tab-content.active{display:block}
+
+/* ============ TAB RESULTADOS (Power BI style) ============ */
+.dash-toolbar{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:var(--bg-elev);border:1px solid var(--border);border-radius:14px;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.filter-label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-right:6px}
+.filter-pill{padding:8px 14px;background:rgba(143,195,120,.06);border:1px solid var(--border);border-radius:999px;font-size:12.5px;color:var(--text);cursor:pointer;font-weight:600}
+.filter-pill.active{background:var(--green-1);border-color:var(--green-1);color:#fff}
+.filter-pill:hover{border-color:var(--border-strong)}
+.toolbar-actions{display:flex;gap:8px}
+.icon-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:rgba(143,195,120,.06);border:1px solid var(--border);border-radius:9px;color:var(--text-dim);cursor:pointer}
+.icon-btn:hover{color:var(--green-2);border-color:var(--border-strong)}
+
+.dash-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.tile{background:var(--bg-elev);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative;transition:border-color .2s}
+.tile:hover{border-color:var(--border-strong)}
+.tile-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.tile-head h4{font-family:var(--f-heading);font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim);margin:0}
+.tile-actions{display:flex;gap:4px;opacity:0;transition:opacity .15s}
+.tile:hover .tile-actions{opacity:1}
+.tile-actions button{width:24px;height:24px;background:transparent;border:none;color:var(--text-muted);cursor:pointer;border-radius:4px}
+.tile-actions button:hover{background:rgba(255,255,255,.06);color:var(--text)}
+
+.kpi{grid-column:span 3;padding:22px}
+.kpi.excellent{background:linear-gradient(140deg,rgba(62,126,84,.22),var(--bg-elev));border-color:rgba(143,195,120,.35)}
+.kpi.gold{background:linear-gradient(140deg,rgba(212,177,74,.15),var(--bg-elev));border-color:rgba(212,177,74,.3)}
+.kpi-label{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:12px;font-family:var(--f-heading);font-weight:600}
+.kpi-value{font-family:var(--f-display);font-weight:700;font-size:42px;line-height:1;letter-spacing:-.02em;margin-bottom:8px;display:flex;align-items:baseline;gap:6px}
+.kpi-value small{font-size:16px;font-weight:500;color:var(--text-dim)}
+.kpi-caption{display:flex;justify-content:space-between;align-items:end;gap:10px}
+.kpi-status{font-size:11px;padding:3px 10px;border-radius:6px;font-weight:700;letter-spacing:.5px;font-family:var(--f-heading)}
+.kpi-status.good{background:rgba(143,195,120,.18);color:var(--green-2)}
+.kpi-status.warn{background:rgba(212,177,74,.18);color:var(--amber)}
+.spark{width:70px;height:24px}
+
+.tile.chart-main{grid-column:span 7;min-height:380px;position:relative}
+.tile.anova{grid-column:span 5}
+.tile.means{grid-column:span 6}
+.tile.viz{grid-column:span 6}
+.tile.insights{grid-column:span 12;background:linear-gradient(120deg,rgba(62,126,84,.1),var(--bg-elev))}
+
+.data-table{width:100%;border-collapse:collapse;font-size:13px}
+.data-table th{text-align:left;padding:10px 8px;font-size:10.5px;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);border-bottom:1px solid var(--border);font-weight:600;font-family:var(--f-heading)}
+.data-table td{padding:12px 8px;border-bottom:1px solid var(--border)}
+.data-table tr:last-child td{border-bottom:none}
+.data-table td.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--f-display);font-weight:500}
+
+.sig-badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.5px;font-family:var(--f-heading)}
+.sig-badge.high{background:rgba(143,195,120,.18);color:var(--green-2)}
+.sig-badge.med{background:rgba(212,177,74,.18);color:var(--amber)}
+.sig-badge.ns{background:rgba(255,255,255,.05);color:var(--text-muted)}
+
+.means-table .trt-cell{display:flex;align-items:center;gap:10px}
+.trt-dot{width:8px;height:8px;border-radius:50%;background:var(--green-2)}
+.data-bar-wrap{position:relative;min-width:180px}
+.data-bar{height:22px;background:linear-gradient(90deg,var(--green-1),var(--green-2));border-radius:4px;display:flex;align-items:center;padding:0 8px;font-size:12px;font-weight:600;color:#fff;font-variant-numeric:tabular-nums;font-family:var(--f-display)}
+.tukey-letter{display:inline-block;padding:3px 9px;border-radius:6px;font-family:var(--f-heading);font-weight:700;font-size:12px;background:rgba(143,195,120,.12);color:var(--green-2);min-width:22px;text-align:center}
+.tukey-letter.b{background:rgba(212,177,74,.14);color:var(--amber)}
+.tukey-letter.c{background:rgba(217,82,82,.14);color:var(--danger)}
+
+.insights-list{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.insight-item{padding:16px 18px;background:rgba(255,255,255,.02);border-left:3px solid var(--green-2);border-radius:0 10px 10px 0}
+.insight-item .tag{display:inline-block;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:3px 8px;border-radius:4px;background:rgba(143,195,120,.14);color:var(--green-2);margin-bottom:8px;font-weight:700;font-family:var(--f-heading)}
+.insight-item.attention{border-color:var(--amber)}
+.insight-item.attention .tag{background:rgba(212,177,74,.14);color:var(--amber)}
+.insight-item p{font-size:13.5px;line-height:1.5}
+.insight-item p strong{color:var(--green-2)}
+.insight-item.attention p strong{color:var(--amber)}
+
+.chart-legend{display:flex;gap:16px;font-size:12px;color:var(--text-dim);margin-bottom:8px}
+.chart-legend span{display:inline-flex;align-items:center;gap:6px}
+.chart-legend .swatch{width:10px;height:10px;border-radius:2px}
+.chart-canvas-wrap{position:relative;height:280px}
+.dose-callout{position:absolute;top:20px;right:20px;padding:10px 14px;background:rgba(212,177,74,.12);border:1px solid rgba(212,177,74,.3);border-radius:10px;text-align:right}
+.dose-callout small{display:block;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:2px;font-family:var(--f-heading);font-weight:700}
+.dose-callout b{font-family:var(--f-display);font-size:22px;font-weight:700}
+
+/* ============ TAB CONFIGURACAO ============ */
+.form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:26px;background:var(--bg-elev);border:1px solid var(--border);border-radius:16px;margin-bottom:20px}
+.form-grid label{display:flex;flex-direction:column;gap:8px;font-size:12px;letter-spacing:.5px;color:var(--text-dim);font-family:var(--f-heading);font-weight:600;text-transform:uppercase}
+.form-grid select,.form-grid input{padding:11px 14px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:9px;color:var(--text);font-family:var(--f-body);font-size:14px;text-transform:none;letter-spacing:0}
+.form-grid select:focus,.form-grid input:focus{outline:none;border-color:var(--green-2)}
+.rule-card{padding:22px 26px;background:linear-gradient(135deg,rgba(212,177,74,.08),var(--bg-elev));border:1px solid rgba(212,177,74,.2);border-radius:14px}
+.rule-card b{display:block;font-family:var(--f-heading);font-weight:700;color:var(--amber);margin-bottom:10px;font-size:14px;letter-spacing:.3px}
+.rule-card p{color:var(--text-dim);line-height:1.55;font-size:13.5px}
+
+/* ============ TAB DADOS ============ */
+.data-actions{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
+.data-card{padding:22px;background:var(--bg-elev);border:1px solid var(--border);border-radius:14px}
+.data-card h4{font-family:var(--f-heading);font-size:14px;margin-bottom:14px;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);font-weight:600}
+.manual-inputs{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
+.manual-inputs label{display:flex;flex-direction:column;gap:6px;flex:1;font-size:11px;color:var(--text-dim);font-family:var(--f-heading);font-weight:600;text-transform:uppercase}
+.manual-inputs input{padding:9px 12px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px}
+
+/* ============ TAB EXPORTACOES ============ */
+.export-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.export-card{padding:28px 24px;background:var(--bg-elev);border:1px solid var(--border);border-radius:14px;cursor:pointer;text-align:left;transition:all .2s;color:var(--text);font-family:var(--f-body)}
+.export-card:hover{border-color:var(--green-2);transform:translateY(-2px);background:linear-gradient(140deg,rgba(62,126,84,.15),var(--bg-elev))}
+.export-card .icon{width:44px;height:44px;background:rgba(143,195,120,.12);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--green-2);margin-bottom:16px}
+.export-card b{display:block;font-family:var(--f-heading);font-size:16px;margin-bottom:6px}
+.export-card span{display:block;font-size:12.5px;color:var(--text-dim);line-height:1.45}
+
+/* Nav footer between tabs */
+.tab-nav{display:flex;justify-content:space-between;margin-top:26px;padding-top:22px;border-top:1px solid var(--border)}
+
+@media (max-width:900px){
+  .stepper{grid-template-columns:repeat(2,1fr)}
+  .kpi{grid-column:span 6}
+  .tile.chart-main,.tile.anova,.tile.means,.tile.viz{grid-column:span 12}
+  .insights-list{grid-template-columns:1fr}
+  .form-grid,.export-grid{grid-template-columns:1fr 1fr}
+  .data-actions{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="page-shell">
+
+  <nav class="nav">
+    <a href="index.html" class="logo-group">
+      <svg width="42" height="42" viewBox="0 0 40 40" fill="none">
+        <rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="rgba(255,255,255,.03)" stroke="#3E7E54" stroke-width="1.6"/>
+        <polyline points="10,25 16,18 20,21 28,12" stroke="#8FC378" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <polyline points="23,12 28,12 28,17" stroke="#8FC378" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <span><strong>SOLVER</strong><small>INTELLIGENCE FOR FIELD TRIALS</small></span>
+    </a>
+    <div class="nav-actions">
+      <a href="index.html" class="back-link">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Voltar à capa
+      </a>
+      <a class="btn ghost" href="index.html#metodologia">Metodologia</a>
+      <button class="btn solid" id="newAnalysis">↺ Nova análise</button>
+    </div>
+  </nav>
+
+  <div class="workspace-head">
+    <span class="kicker">Ambiente de análise</span>
+    <h1>Dashboard estatístico do ensaio</h1>
+    <p>Fluxo guiado em 4 etapas. Escolha o delineamento, informe os dados, interprete a ANOVA e só então decida o pós-teste ou a regressão.</p>
+  </div>
+
+  <!-- Status backend -->
+  <div class="status-bar">
+    <label for="apiBase">URL do backend Render</label>
+    <input id="apiBase" type="url" placeholder="https://seu-backend.onrender.com" value="https://solver-backend.onrender.com">
+    <button class="btn ghost" id="saveApi">Salvar URL</button>
+    <span class="status-pill ok" id="apiStatus">API online · 42ms</span>
+  </div>
+
+  <!-- Stepper -->
+  <div class="stepper">
+    <button class="step-item done" data-step="1">
+      <div class="num">Passo 1</div>
+      <div class="name">Modelo <span class="step-check"></span></div>
+      <div class="name-sub">DBC · Fatorial 4x4</div>
+    </button>
+    <button class="step-item done" data-step="2">
+      <div class="num">Passo 2</div>
+      <div class="name">Dados <span class="step-check"></span></div>
+      <div class="name-sub">64 observações carregadas</div>
+    </button>
+    <button class="step-item active" data-step="3">
+      <div class="num">Passo 3</div>
+      <div class="name">Resultados</div>
+      <div class="name-sub">ANOVA, médias e regressão</div>
+    </button>
+    <button class="step-item" data-step="4">
+      <div class="num">Passo 4</div>
+      <div class="name">Exportações</div>
+      <div class="name-sub">PDF, Excel, PNG, PDF vetorial</div>
+    </button>
+  </div>
+
+  <!-- ============ TAB 1 · MODELO ============ -->
+  <div class="tab-content" id="tab-1">
+    <div class="form-grid">
+      <label>Delineamento
+        <select><option>DIC · Inteiramente casualizado</option><option selected>DBC · Blocos casualizados</option><option>DQL · Quadrado latino</option></select>
+      </label>
+      <label>Tipo de análise
+        <select><option>Fator único</option><option selected>Fatorial (A x B)</option><option>Parcelas subdivididas</option><option>Regressão direta</option></select>
+      </label>
+      <label>Objetivo
+        <select><option selected>Maior resposta é melhor</option><option>Menor resposta é melhor</option></select>
+      </label>
+      <label>Coluna resposta
+        <input value="valor">
+      </label>
+      <label>Coluna tratamento
+        <input value="tratamento">
+      </label>
+      <label>Coluna bloco
+        <input value="bloco">
+      </label>
+      <label>Fator numérico (dose)
+        <input placeholder="Ex.: dose">
+      </label>
+      <label>Fatores fatorial
+        <input placeholder="Ex.: hibrido,dose">
+      </label>
+      <label>Grau de regressão
+        <select><option selected>Automático</option><option>Linear</option><option>Quadrático</option><option>Cúbico</option></select>
+      </label>
+    </div>
+    <div class="rule-card">
+      <b>Regra do Solver</b>
+      <p>Se a regressão solicitada não for a melhor pros dados, o backend recomenda automaticamente o modelo com maior R2 ajustado. Regressão só é calculada com fator numérico com >=3 níveis distintos e 1 GL residual.</p>
+    </div>
+    <div class="tab-nav">
+      <a href="index.html" class="btn ghost">← Voltar à capa</a>
+      <button class="btn solid" onclick="goToStep(2)">Avancar para dados →</button>
+    </div>
+  </div>
+
+  <!-- ============ TAB 2 · DADOS ============ -->
+  <div class="tab-content" id="tab-2">
+    <div class="data-actions">
+      <div class="data-card">
+        <h4>Preencher manualmente</h4>
+        <div class="manual-inputs">
+          <label>Tratamentos <input type="number" value="4"></label>
+          <label>Blocos/Repeticoes <input type="number" value="4"></label>
+          <button class="btn solid">Gerar tabela</button>
+        </div>
+      </div>
+      <div class="data-card">
+        <h4>Upload de arquivo</h4>
+        <div class="manual-inputs">
+          <label>CSV/XLSX <input type="file" accept=".csv,.xlsx,.xls"></label>
+          <button class="btn ghost">Carregar exemplo</button>
+        </div>
+      </div>
+    </div>
+    <div class="tab-nav">
+      <button class="btn ghost" onclick="goToStep(1)">← Voltar ao modelo</button>
+      <button class="btn solid" onclick="goToStep(3)">Rodar análise →</button>
+    </div>
+  </div>
+
+  <!-- ============ TAB 3 · RESULTADOS (Power BI) ============ -->
+  <div class="tab-content active" id="tab-3">
+
+    <div class="dash-toolbar">
+      <div class="filters">
+        <span class="filter-label">Fator</span>
+        <button class="filter-pill active">Dose (kg/ha)</button>
+        <button class="filter-pill">Hibrido</button>
+        <span class="filter-label" style="margin-left:12px">Bloco</span>
+        <button class="filter-pill active">Todos</button>
+        <button class="filter-pill">I</button>
+        <button class="filter-pill">II</button>
+        <button class="filter-pill">III</button>
+        <button class="filter-pill">IV</button>
+      </div>
+      <div class="toolbar-actions">
+        <button class="icon-btn" title="Atualizar">↻</button>
+        <button class="icon-btn" title="Fullscreen">⛶</button>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+
+      <div class="tile kpi excellent">
+        <div class="kpi-label">CV experimental</div>
+        <div class="kpi-value">8,4<small>%</small></div>
+        <div class="kpi-caption">
+          <span class="kpi-status good">Precisão alta</span>
+          <svg class="spark" viewBox="0 0 70 24"><polyline points="0,18 12,15 24,16 36,10 48,12 60,6 70,8" fill="none" stroke="#8FC378" stroke-width="1.6"/></svg>
+        </div>
+      </div>
+
+      <div class="tile kpi excellent">
+        <div class="kpi-label">F calculado</div>
+        <div class="kpi-value">41,32</div>
+        <div class="kpi-caption">
+          <span class="kpi-status good">p &lt; 0,01</span>
+          <svg class="spark" viewBox="0 0 70 24"><polyline points="0,20 15,17 30,13 45,10 60,6 70,4" fill="none" stroke="#8FC378" stroke-width="1.6"/></svg>
+        </div>
+      </div>
+
+      <div class="tile kpi excellent">
+        <div class="kpi-label">R2 ajustado</div>
+        <div class="kpi-value">0,95</div>
+        <div class="kpi-caption">
+          <span class="kpi-status good">Ótimo ajuste</span>
+          <svg class="spark" viewBox="0 0 70 24"><polyline points="0,20 12,15 24,12 36,10 48,8 60,7 70,6" fill="none" stroke="#8FC378" stroke-width="1.6"/></svg>
+        </div>
+      </div>
+
+      <div class="tile kpi gold">
+        <div class="kpi-label">Melhor tratamento</div>
+        <div class="kpi-value">T4</div>
+        <div class="kpi-caption">
+          <span class="kpi-status warn">124,8 kg/ha</span>
+          <svg class="spark" viewBox="0 0 70 24"><polyline points="0,18 15,14 30,12 45,8 60,6 70,4" fill="none" stroke="#D4B14A" stroke-width="1.6"/></svg>
+        </div>
+      </div>
+
+      <div class="tile chart-main">
+        <div class="tile-head"><h4>Curva ajustada · Dose x Resposta</h4></div>
+        <div class="chart-legend">
+          <span><span class="swatch" style="background:#8FC378"></span>Observados</span>
+          <span><span class="swatch" style="background:#3E7E54"></span>Ajuste quadratico</span>
+          <span><span class="swatch" style="background:rgba(62,126,84,.25)"></span>IC 95%</span>
+        </div>
+        <div class="dose-callout"><small>Dose ótima</small><b>124,8 kg/ha</b></div>
+        <div class="chart-canvas-wrap"><canvas id="regChart"></canvas></div>
+      </div>
+
+      <div class="tile anova">
+        <div class="tile-head"><h4>Quadro de ANOVA · Teste F</h4></div>
+        <table class="data-table">
+          <thead><tr><th>Fonte de variacao</th><th style="text-align:right">GL</th><th style="text-align:right">F</th><th style="text-align:right">Sig.</th></tr></thead>
+          <tbody>
+            <tr><td>Tratamentos (A)</td><td class="num">3</td><td class="num">41,32</td><td style="text-align:right"><span class="sig-badge high">1%</span></td></tr>
+            <tr><td>Blocos</td><td class="num">3</td><td class="num">2,86</td><td style="text-align:right"><span class="sig-badge ns">ns</span></td></tr>
+            <tr><td>Interação A x B</td><td class="num">9</td><td class="num">9,74</td><td style="text-align:right"><span class="sig-badge high">1%</span></td></tr>
+            <tr><td>Regressão linear</td><td class="num">1</td><td class="num">5,42</td><td style="text-align:right"><span class="sig-badge med">5%</span></td></tr>
+            <tr><td>Residuo</td><td class="num">12</td><td class="num">—</td><td style="text-align:right">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tile means">
+        <div class="tile-head"><h4>Medias e agrupamento (Tukey 5%)</h4></div>
+        <table class="data-table means-table">
+          <thead><tr><th>Tratamento</th><th style="width:60%">Media</th><th style="text-align:center">Grupo</th></tr></thead>
+          <tbody>
+            <tr><td><div class="trt-cell"><span class="trt-dot"></span>T4 · 160 kg/ha</div></td><td><div class="data-bar-wrap"><div class="data-bar" style="width:100%">124,8</div></div></td><td style="text-align:center"><span class="tukey-letter">a</span></td></tr>
+            <tr><td><div class="trt-cell"><span class="trt-dot" style="background:#D4B14A"></span>T3 · 120 kg/ha</div></td><td><div class="data-bar-wrap"><div class="data-bar" style="width:88%">109,6</div></div></td><td style="text-align:center"><span class="tukey-letter b">b</span></td></tr>
+            <tr><td><div class="trt-cell"><span class="trt-dot" style="background:#D4B14A"></span>T2 · 80 kg/ha</div></td><td><div class="data-bar-wrap"><div class="data-bar" style="width:72%;background:linear-gradient(90deg,#3E7E54,#8FC378)">89,4</div></div></td><td style="text-align:center"><span class="tukey-letter b">b</span></td></tr>
+            <tr><td><div class="trt-cell"><span class="trt-dot" style="background:#d95252"></span>T1 · 40 kg/ha</div></td><td><div class="data-bar-wrap"><div class="data-bar" style="width:52%;background:linear-gradient(90deg,#24492E,#5c9564)">64,7</div></div></td><td style="text-align:center"><span class="tukey-letter c">c</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="tile viz">
+        <div class="tile-head"><h4>Resposta media por tratamento · IC 95%</h4></div>
+        <div class="chart-canvas-wrap"><canvas id="barsChart"></canvas></div>
+      </div>
+
+      <div class="tile insights">
+        <div class="tile-head"><h4>Insights automáticos · Interpretação do Solver</h4></div>
+        <div class="insights-list">
+          <div class="insight-item"><span class="tag">Precisão</span><p>Ensaio com <strong>CV de 8,4%</strong>, classificado como precisão alta segundo Pimentel Gomes. Resultados confiáveis pra tomada de decisão.</p></div>
+          <div class="insight-item"><span class="tag">Efeito significativo</span><p>Efeito de tratamentos foi <strong>altamente significativo (p &lt; 0,01)</strong>. Pós-teste de Tukey aplicado abaixo separa 3 grupos distintos.</p></div>
+          <div class="insight-item attention"><span class="tag">Dose ótima</span><p>Curva quadrática ajustada indica <strong>124,8 kg/ha</strong> como ponto de máxima resposta. Doses acima não produzem ganho estatístico.</p></div>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="tab-nav">
+      <button class="btn ghost" onclick="goToStep(2)">← Voltar aos dados</button>
+      <button class="btn solid" onclick="goToStep(4)">Ver exportações →</button>
+    </div>
+  </div>
+
+  <!-- ============ TAB 4 · EXPORTACOES ============ -->
+  <div class="tab-content" id="tab-4">
+    <div class="export-grid">
+      <button class="export-card">
+        <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M14 3v5h5M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V8l-6-5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <b>PDF técnico</b><span>Relatório completo pra diretoria ou laudo</span>
+      </button>
+      <button class="export-card">
+        <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M3 10h18M9 4v16M15 4v16" stroke="currentColor" stroke-width="1.8"/></svg></div>
+        <b>Excel</b><span>ANOVA, médias e resumo completos</span>
+      </button>
+      <button class="export-card">
+        <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="9" r="2" stroke="currentColor" stroke-width="1.8"/><path d="M21 15l-5-5-11 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+        <b>PNG regressão</b><span>Gráfico em alta resolução</span>
+      </button>
+      <button class="export-card">
+        <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 18C7 14 10 10 12 8s5-4 8-4M4 18v3M20 4h-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <b>PDF vetorial</b><span>Gráfico editável pra publicação</span>
+      </button>
+    </div>
+    <p style="margin-top:20px;color:var(--text-muted);font-size:13px">As exportações são geradas pelo backend Render. Verifique se a URL está configurada no topo da página.</p>
+    <div class="tab-nav">
+      <button class="btn ghost" onclick="goToStep(3)">← Voltar aos resultados</button>
+      <a href="index.html" class="btn solid">Concluir e voltar à capa</a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Stepper
+function goToStep(n){
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+n).classList.add('active');
+  document.querySelectorAll('.step-item').forEach((s,i)=>{
+    s.classList.remove('active','done');
+    if(i+1===n)s.classList.add('active');
+    else if(i+1<n)s.classList.add('done');
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+document.querySelectorAll('.step-item').forEach(s=>{
+  s.addEventListener('click',()=>goToStep(+s.dataset.step));
+});
+
+// Chart de regressão
+const doseCurve=Array.from({length:41},(_,i)=>i*5);
+const respCurve=doseCurve.map(x=>45+0.98*x-0.0039*x*x);
+new Chart(document.getElementById('regChart').getContext('2d'),{
+  type:'line',
+  data:{labels:doseCurve,datasets:[
+    {label:'IC sup',data:respCurve.map(y=>y+7),borderColor:'transparent',backgroundColor:'rgba(62,126,84,0.2)',fill:'+1',pointRadius:0,tension:0.35},
+    {label:'IC inf',data:respCurve.map(y=>y-7),borderColor:'transparent',fill:false,pointRadius:0,tension:0.35},
+    {label:'Ajuste',data:respCurve,borderColor:'#3E7E54',borderWidth:3,pointRadius:0,tension:0.35,fill:false},
+    {label:'Observados',data:[{x:0,y:45},{x:40,y:68},{x:80,y:92},{x:120,y:118},{x:160,y:125},{x:200,y:121}],borderColor:'#8FC378',backgroundColor:'#8FC378',pointRadius:6,pointHoverRadius:8,showLine:false,type:'scatter'},
+    {label:'Dose ótima',data:[{x:124.8,y:106.6}],borderColor:'#D4B14A',backgroundColor:'#D4B14A',pointRadius:8,pointStyle:'rectRot',showLine:false,type:'scatter'}
+  ]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#0d1e15',titleColor:'#F6F9F6',bodyColor:'#a8b8ac',borderColor:'rgba(143,195,120,0.3)',borderWidth:1,padding:10,cornerRadius:8}},scales:{x:{type:'linear',title:{display:true,text:'Dose (kg/ha)',color:'#a8b8ac'},grid:{color:'rgba(143,195,120,0.06)'},ticks:{color:'#a8b8ac',font:{size:11}}},y:{title:{display:true,text:'Resposta (sc/ha)',color:'#a8b8ac'},grid:{color:'rgba(143,195,120,0.06)'},ticks:{color:'#a8b8ac',font:{size:11}}}}}
+});
+
+// Chart de barras
+new Chart(document.getElementById('barsChart').getContext('2d'),{
+  type:'bar',
+  data:{labels:['T1 · 40kg','T2 · 80kg','T3 · 120kg','T4 · 160kg'],datasets:[{label:'Media',data:[64.7,89.4,109.6,124.8],backgroundColor:['rgba(62,126,84,0.35)','rgba(62,126,84,0.55)','rgba(143,195,120,0.7)','rgba(212,177,74,0.85)'],borderColor:['#3E7E54','#3E7E54','#8FC378','#D4B14A'],borderWidth:2,borderRadius:6}]},
+  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#0d1e15',titleColor:'#F6F9F6',bodyColor:'#a8b8ac',borderColor:'rgba(143,195,120,0.3)',borderWidth:1,padding:10,cornerRadius:8,callbacks:{label:c=>`${c.parsed.y} sc/ha ±5,2`}}},scales:{x:{grid:{display:false},ticks:{color:'#a8b8ac',font:{size:11}}},y:{grid:{color:'rgba(143,195,120,0.06)'},ticks:{color:'#a8b8ac',font:{size:11}}}}}
+});
+</script>
+</body>
+</html>
