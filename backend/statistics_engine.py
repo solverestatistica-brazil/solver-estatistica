@@ -811,17 +811,15 @@ def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
     if numeric_col and numeric_col in df.columns:
         x = pd.to_numeric(df[numeric_col], errors="coerce")
         x_label = numeric_col
-    elif ctx.analysis_type == "regression" and ctx.treatment in df.columns:
-        # [FIX P0-2] Esta extracao de numero do ROTULO do tratamento so faz sentido
-        # quando o usuario escolheu explicitamente o design "Regressao" — af, ele
-        # ja declarou que o eixo e quantitativo. Para single/factorial (DBC/DIC com
-        # tratamentos categoricos como T1..T4) isso inventava um eixo numerico a
-        # partir do INDICE do rotulo (T1->1, T2->2...) e publicava "dose otima em
-        # x=3,44" para um fator que nao e dose nenhuma. Verificado em producao com
-        # o exemplo oficial do site.
-        x = _parse_numeric_from_text(df[ctx.treatment])
-        x_label = ctx.treatment
     else:
+        # [FIX P0-6] A regressao so faz sentido com um eixo quantitativo DECLARADO
+        # via numeric_factor_column. O fallback anterior extraia numero do ROTULO
+        # do tratamento (T1->1, T2->2...) sempre que analysis_type=="regression",
+        # mesmo sem nenhuma coluna de dose informada. Isso permitia que um payload
+        # com analysis_type incorreto (ex.: vazado de um post-teste na tela de
+        # comparacao de medias) publicasse uma "dose otima" para tratamentos
+        # categoricos (T1..T4) que nao sao doses. Sem numeric_factor_column
+        # valido, a regressao nao roda.
         return None
 
     reg_df = pd.DataFrame({"x": x, "y": df[response]}).dropna()

@@ -363,6 +363,23 @@ def test_valores_criticos_de_f_nao_estao_invertidos():
     assert trat["f_1"] > trat["f_5"]
 
 
+def test_comparacao_de_medias_preserva_analysis_type():
+    """Pedir Tukey num DBC nao pode virar uma regressao."""
+    res = _dbc(DBC_EXEMPLO, comparison_test="tukey")
+    assert res["meta"]["analysis_type"] == "single"
+    assert len(res["anova"]["table"]) > 0, "quadro de ANOVA veio vazio"
+    assert res["means"]["comparison"] is not None, "Tukey nao foi calculado"
+
+
+def test_bug_2_regressao_sem_numeric_factor_column_nao_roda():
+    """[FIX P0-6] Sem numeric_factor_column, a regressao nao pode inventar um eixo
+    a partir do ROTULO do tratamento (T1->1, T2->2...). T1..T4 nao sao doses.
+    Reproduz o payload vazado do post-teste em producao: analysis_type="regression"
+    sem numeric_factor_column, sobre tratamentos categoricos."""
+    res = _dbc(DBC_EXEMPLO, analysis_type="regression", numeric_factor_column=None)
+    assert res["regression"] is None, "Regressao nao deveria rodar sem coluna numerica declarada"
+
+
 def test_smoke_dbc_com_dados_realistas():
     """Sanidade: DBC com CV realista (5-15%%) roda e devolve estatistica valida."""
     random.seed(42)

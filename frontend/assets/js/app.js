@@ -1317,7 +1317,11 @@
     const base = cleanApiBase(apiInput.value);
     if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
     const payload = payloadFromUi();
-    payload.analysis_type = 'regression';
+    // [FIX P0-6] Nao sobrescrever analysis_type aqui: isso derrubava a ANOVA e as
+    // medias da analise original (o backend zera o quadro de ANOVA quando
+    // analysis_type=="regression"). O post-teste "Regressao" deve so ADICIONAR o
+    // ajuste de dose sobre a analise ja feita (single/factorial/split_plot),
+    // preservando o tipo original.
     payload.numeric_factor_column = colOverride || null;
     const degree = $('regressionDegreePost').value;
     payload.regression_degree = degree ? Number(degree) : null;
