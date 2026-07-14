@@ -64,13 +64,15 @@ except Exception:
     FONT_HEADING_BLACK = "Helvetica-Bold"
     FONT_SEMIBOLD = "Helvetica-Bold"
 
-# Paleta identica a assets/css/styles.css (identidade visual Solver, v3 harmonizada).
+# [FIX P0-8] Paleta atualizada para bater com o verde atual do site (index.html e o
+# override de resultados.html usam --brand:#3E7E54/--brand-bright:#8FC378; esta paleta
+# ainda estava no verde antigo #339D69/#88D8B1, de antes da reedicao visual do site).
 BRAND_DARK = colors.HexColor("#06120C")
-BRAND_DEEP = colors.HexColor("#194B32")
-BRAND = colors.HexColor("#339D69")
-BRAND_BRIGHT = colors.HexColor("#88D8B1")
+BRAND_DEEP = colors.HexColor("#24492E")
+BRAND = colors.HexColor("#3E7E54")
+BRAND_BRIGHT = colors.HexColor("#8FC378")
 TEXT_L1 = colors.HexColor("#16422D")
-TEXT_L2 = colors.HexColor("#339D69")
+TEXT_L2 = colors.HexColor("#3E7E54")
 SURFACE_LINE = colors.HexColor("#E7ECE9")
 SURFACE_SUBTLE = colors.HexColor("#F4F7F5")
 SUCCESS = colors.HexColor("#45956E")
@@ -92,12 +94,12 @@ CARD_W = 5.85 * cm
 CARD_GAP_W = 0.4 * cm
 
 # Hex simples (sem objeto Color) para marcacao inline em Paragraph (<font color="...">).
-BRAND_HEX = "#339D69"
-BRAND_DEEP_HEX = "#194B32"
+BRAND_HEX = "#3E7E54"
+BRAND_DEEP_HEX = "#24492E"
 
 HEX = {
-    "brand_deep": "194B32",
-    "brand": "339D69",
+    "brand_deep": "24492E",
+    "brand": "3E7E54",
     "surface_line": "E7ECE9",
     "surface_subtle": "F4F7F5",
     "success": "45956E",
@@ -107,7 +109,7 @@ HEX = {
     "neutral": "94A3B8",
     "neutral_tint": "EEF2F0",
     "text_l1": "16422D",
-    "text_l2": "339D69",
+    "text_l2": "3E7E54",
 }
 
 DESIGN_LABELS = {
@@ -908,8 +910,8 @@ def build_regression_plot(payload: Dict[str, Any], fmt: str = "png") -> bytes:
     curve = pd.DataFrame(reg["fitted_curve"])
     selected = reg["selected_model"]
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=200)
-    ax.scatter(points["x"], points["y"], label="Observado", color="#339D69")
-    ax.plot(curve["x"], curve["y"], label=f"Grau {reg['selected_degree']} · R²aj {selected['adj_r2']:.3f}", color="#194B32")
+    ax.scatter(points["x"], points["y"], label="Observado", color="#3E7E54")
+    ax.plot(curve["x"], curve["y"], label=f"Grau {reg['selected_degree']} · R²aj {selected['adj_r2']:.3f}", color="#24492E")
     opt = selected.get("optimum") or {}
     if opt.get("x") is not None:
         ax.axvline(opt["x"], linestyle="--", linewidth=1, color="#D16D2E")

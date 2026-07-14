@@ -28,7 +28,7 @@
 <div class="page-shell">
 <nav class="nav">
 <a class="logo-group" href="index.html" id="logoHome" aria-label="Solver Estatística">
-<svg width="50" height="50" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<svg width="42" height="42" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
 <rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="rgba(255,255,255,0.03)" style="stroke:var(--brand)" stroke-width="1.6"/>
 <polyline points="10,25 16,18 20,21 28,12" style="stroke:var(--brand-bright)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
 <polyline points="23,12 28,12 28,17" style="stroke:var(--brand-bright)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
@@ -198,42 +198,6 @@
 </article>
 </div>
 </section>
-
-<dialog id="formatosModal" class="formatos-modal">
-<div class="section-head left formatos-modal-head">
-<div>
-<span>Formato de dados</span>
-<h2>Colunas mínimas por delineamento</h2>
-</div>
-<button class="modal-close" type="button" id="closeFormatosModal" aria-label="Fechar instruções">&times;</button>
-</div>
-<div class="format-grid">
-<article><b>DIC</b><code>tratamento, valor</code><p>Use quando não houver blocos, linhas ou colunas.</p></article>
-<article><b>DBC</b><code>bloco, tratamento, valor</code><p>Um registro por combinação bloco × tratamento.</p></article>
-<article><b>DQL</b><code>linha, coluna, tratamento, valor</code><p>Tratamentos, linhas e colunas devem ter o mesmo número de níveis.</p></article>
-<article><b>Regressão</b><code>dose, valor</code><p>Informe o fator numérico para cálculo de dose ótima.</p></article>
-</div>
-</dialog>
-
-<dialog id="metodologiaModal" class="formatos-modal">
-<div class="section-head left formatos-modal-head">
-<div>
-<span>Metodologia</span>
-<h2>Referências científicas</h2>
-</div>
-<button class="modal-close" type="button" id="closeMetodologiaModal" aria-label="Fechar metodologia">&times;</button>
-</div>
-<div class="metodologia-body">
-<p>Os cálculos de ANOVA (teste F), os delineamentos (DIC/DBC/DQL/fatorial/parcelas subdivididas) e os testes de comparação de médias seguem a formulação clássica descrita em:</p>
-<ul>
-<li><b>Pimentel Gomes, F.</b> <i>Curso de Estatística Experimental</i>. 15. ed. FEALQ/ESALQ, 2022.</li>
-<li><b>Banzatto, D. A.; Kronka, S. N.</b> <i>Experimentação Agrícola</i>. 4. ed. FUNEP, 2006.</li>
-<li><b>Steel, R. G. D.; Torrie, J. H.; Dickey, D. A.</b> <i>Principles and Procedures of Statistics</i>. 3. ed. McGraw-Hill, 1997.</li>
-<li>Artigos originais dos pós-testes: <b>Tukey (1949)</b>, <b>Duncan (1955)</b>, <b>Dunnett (1955)</b>, <b>Newman (1939)/Keuls (1952)</b> e <b>Scheffé (1953)</b>.</li>
-</ul>
-<p class="small-note">Lista completa com DOIs em <a href="https://github.com/solverestatistica-brazil/solver-estatistica/blob/main/docs/ARQUITETURA.md" target="_blank" rel="noopener noreferrer">docs/ARQUITETURA.md</a>.</p>
-</div>
-</dialog>
 </main>
 </div>
 
@@ -510,6 +474,43 @@
 </section>
 </main>
 </div>
+
+<dialog id="formatosModal" class="formatos-modal">
+<div class="section-head left formatos-modal-head">
+<div>
+<span>Formato de dados</span>
+<h2>Colunas mínimas por delineamento</h2>
+</div>
+<button class="modal-close" type="button" id="closeFormatosModal" aria-label="Fechar instruções">&times;</button>
+</div>
+<div class="format-grid">
+<article><b>DIC</b><code>tratamento, valor</code><p>Use quando não houver blocos, linhas ou colunas.</p></article>
+<article><b>DBC</b><code>bloco, tratamento, valor</code><p>Um registro por combinação bloco × tratamento.</p></article>
+<article><b>DQL</b><code>linha, coluna, tratamento, valor</code><p>Tratamentos, linhas e colunas devem ter o mesmo número de níveis.</p></article>
+<article><b>Regressão</b><code>dose, valor</code><p>Informe o fator numérico para cálculo de dose ótima.</p></article>
+</div>
+</dialog>
+
+<dialog id="metodologiaModal" class="formatos-modal">
+<div class="section-head left formatos-modal-head">
+<div>
+<span>Metodologia</span>
+<h2>Referências científicas</h2>
+</div>
+<button class="modal-close" type="button" id="closeMetodologiaModal" aria-label="Fechar metodologia">&times;</button>
+</div>
+<div class="metodologia-body">
+<p>Os cálculos de ANOVA (teste F), os delineamentos (DIC/DBC/DQL/fatorial/parcelas subdivididas) e os testes de comparação de médias seguem a formulação clássica descrita em:</p>
+<ul>
+<li><b>Pimentel Gomes, F.</b> <i>Curso de Estatística Experimental</i>. 15. ed. FEALQ/ESALQ, 2022.</li>
+<li><b>Banzatto, D. A.; Kronka, S. N.</b> <i>Experimentação Agrícola</i>. 4. ed. FUNEP, 2006.</li>
+<li><b>Steel, R. G. D.; Torrie, J. H.; Dickey, D. A.</b> <i>Principles and Procedures of Statistics</i>. 3. ed. McGraw-Hill, 1997.</li>
+<li>Artigos originais dos pós-testes: <b>Tukey (1949)</b>, <b>Duncan (1955)</b>, <b>Dunnett (1955)</b>, <b>Newman (1939)/Keuls (1952)</b> e <b>Scheffé (1953)</b>.</li>
+</ul>
+<p class="small-note">Lista completa com DOIs em <a href="https://github.com/solverestatistica-brazil/solver-estatistica/blob/main/docs/ARQUITETURA.md" target="_blank" rel="noopener noreferrer">docs/ARQUITETURA.md</a>.</p>
+</div>
+</dialog>
+
 <footer class="site-footer">
 <div class="site-footer-inner">
 <span class="footer-credit">Desenvolvido por <b>Fernando Paes Lorena</b></span>

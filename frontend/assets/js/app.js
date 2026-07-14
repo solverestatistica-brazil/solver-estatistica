@@ -32,12 +32,11 @@
     $('heroOpenApp').addEventListener('click', showApp);
     $('navOpenApp').addEventListener('click', showApp);
     $('navBackToSite').addEventListener('click', showLanding);
-    $('logoHome').addEventListener('click', (event) => {
-      if (!$('view-app').classList.contains('hidden')) {
-        event.preventDefault();
-        showLanding();
-      }
-    });
+    // [FIX P0-7] resultados.html e index.html sao paginas separadas agora; o
+    // logo tem href="index.html" e deve navegar normalmente. Antes, este handler
+    // dava preventDefault() e chamava showLanding() (que so alterna a secao
+    // "view-landing" escondida DENTRO desta mesma pagina), entao o clique nunca
+    // saia do resultados.html e parecia nao fazer nada.
   }
 
   function bindModal(modalId, openBtnIds, closeBtnId) {
