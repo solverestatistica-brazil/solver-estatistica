@@ -1,498 +1,578 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Solver Estatistica Experimental: ANOVA, comparacao de medias e regressao para ensaios de campo." />
+  <!-- [FIX 3.6] Favicon inline (SVG, zero request extra) -->
+  <link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="%23081C13" stroke="%233E7E54" stroke-width="1.6"/><polyline points="10,25 16,18 20,21 28,12" stroke="%238FC378" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><polyline points="23,12 28,12 28,17" stroke="%238FC378" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>' />
+  <meta name="theme-color" content="#06120C" />
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Solver Estatistica Experimental" />
+  <meta property="og:title" content="Solver Estatistica Experimental" />
+  <meta property="og:description" content="ANOVA para DIC, DBC e DQL, comparacao de medias, regressao e exportacao PDF/Excel em portugues, direto no navegador." />
+  <meta property="og:url" content="https://www.solver-estatistica.com.br/" />
+  <meta property="og:locale" content="pt_BR" />
+  <!-- Twitter/X card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Solver Estatistica Experimental" />
+  <meta name="twitter:description" content="ANOVA, comparacao de medias e regressao para ensaios de campo." />
 <title>Solver Estatística — Ambiente de análise</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<style>
-:root{
-  --bg:#06120C; --bg-elev:#0d1e15; --bg-elev-2:#122820;
-  --border:rgba(143,195,120,.14); --border-strong:rgba(143,195,120,.28);
-  --text:#F6F9F6; --text-dim:#a8b8ac; --text-muted:#6a7a6f;
-  --green-1:#3E7E54; --green-2:#8FC378; --green-3:#24492E;
-  --amber:#D4B14A; --amber-2:#B8933A; --danger:#d95252;
-  --f-display:'Exo 2',system-ui,sans-serif;
-  --f-heading:'Exo 2',system-ui,sans-serif;
-  --f-body:'Open Sans',system-ui,sans-serif;
-}
-*{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:var(--f-body);min-height:100vh;overflow-x:hidden;-webkit-font-smoothing:antialiased}
-a{color:inherit;text-decoration:none}
-.page-shell{max-width:1440px;margin:0 auto;padding:0 32px}
-
-/* NAV */
-.nav{display:flex;justify-content:space-between;align-items:center;padding:22px 0}
-.logo-group{display:flex;align-items:center;gap:12px}
-.logo-group strong{font-family:var(--f-display);font-size:18px;letter-spacing:2px;display:block}
-.logo-group small{font-size:9px;letter-spacing:3px;color:var(--text-dim)}
-.back-link{display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--text-dim);font-weight:600;transition:color .15s}
-.back-link:hover{color:var(--green-2)}
-.nav-actions{display:flex;gap:10px;align-items:center}
-.btn{padding:11px 22px;border-radius:10px;font-family:var(--f-heading);font-weight:600;font-size:13px;cursor:pointer;border:none;transition:all .2s;display:inline-flex;align-items:center;gap:8px}
-.btn.solid{background:var(--green-1);color:#fff}
-.btn.solid:hover{background:var(--green-2);transform:translateY(-1px)}
-.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--border-strong)}
-.btn.ghost:hover{border-color:var(--green-2);background:rgba(143,195,120,.06)}
-
-/* Section head */
-.workspace-head{padding:24px 0 30px}
-.workspace-head .kicker{font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--green-2);margin-bottom:10px;display:block;font-family:var(--f-heading);font-weight:700}
-.workspace-head h1{font-family:var(--f-heading);font-size:clamp(28px,3.4vw,40px);font-weight:700;letter-spacing:-.015em;margin-bottom:8px}
-.workspace-head p{color:var(--text-dim);font-size:15px;max-width:720px}
-
-/* Status bar do backend */
-.status-bar{display:flex;align-items:center;gap:12px;padding:14px 20px;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;margin-bottom:26px;flex-wrap:wrap}
-.status-bar label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-dim);font-family:var(--f-heading);font-weight:600}
-.status-bar input{flex:1;min-width:280px;padding:9px 14px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--f-body);font-size:13px}
-.status-bar input:focus{outline:none;border-color:var(--green-2)}
-.status-bar .status-pill{padding:6px 14px;background:rgba(217,82,82,.12);color:var(--danger);border-radius:999px;font-size:11.5px;font-weight:700;font-family:var(--f-heading);letter-spacing:.5px}
-.status-bar .status-pill.ok{background:rgba(143,195,120,.15);color:var(--green-2)}
-
-/* Stepper */
-.stepper{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px;position:relative}
-.step-item{position:relative;padding:16px 20px;background:var(--bg-elev);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all .2s;text-align:left}
-.step-item:hover{border-color:var(--border-strong)}
-.step-item.active{background:linear-gradient(140deg,rgba(62,126,84,.18),var(--bg-elev));border-color:var(--green-2);box-shadow:0 4px 16px rgba(62,126,84,.15)}
-.step-item.done{border-color:rgba(143,195,120,.22)}
-.step-item .num{font-family:var(--f-display);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px;font-weight:600}
-.step-item.active .num{color:var(--green-2)}
-.step-item .name{font-family:var(--f-heading);font-size:15px;font-weight:700;display:flex;align-items:center;gap:8px}
-.step-item .name-sub{font-size:11.5px;color:var(--text-dim);margin-top:2px;font-family:var(--f-body)}
-.step-check{width:16px;height:16px;background:var(--green-2);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;color:#0d1e15;font-size:11px}
-.step-item.done .step-check::before{content:'✓';font-weight:700}
-
-/* TABS */
-.tab-content{display:none}
-.tab-content.active{display:block}
-
-/* ============ TAB RESULTADOS (Power BI style) ============ */
-.dash-toolbar{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;background:var(--bg-elev);border:1px solid var(--border);border-radius:14px;margin-bottom:20px;flex-wrap:wrap;gap:12px}
-.filters{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.filter-label{font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-right:6px}
-.filter-pill{padding:8px 14px;background:rgba(143,195,120,.06);border:1px solid var(--border);border-radius:999px;font-size:12.5px;color:var(--text);cursor:pointer;font-weight:600}
-.filter-pill.active{background:var(--green-1);border-color:var(--green-1);color:#fff}
-.filter-pill:hover{border-color:var(--border-strong)}
-.toolbar-actions{display:flex;gap:8px}
-.icon-btn{width:34px;height:34px;display:flex;align-items:center;justify-content:center;background:rgba(143,195,120,.06);border:1px solid var(--border);border-radius:9px;color:var(--text-dim);cursor:pointer}
-.icon-btn:hover{color:var(--green-2);border-color:var(--border-strong)}
-
-.dash-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
-.tile{background:var(--bg-elev);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative;transition:border-color .2s}
-.tile:hover{border-color:var(--border-strong)}
-.tile-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
-.tile-head h4{font-family:var(--f-heading);font-size:13px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--text-dim);margin:0}
-.tile-actions{display:flex;gap:4px;opacity:0;transition:opacity .15s}
-.tile:hover .tile-actions{opacity:1}
-.tile-actions button{width:24px;height:24px;background:transparent;border:none;color:var(--text-muted);cursor:pointer;border-radius:4px}
-.tile-actions button:hover{background:rgba(255,255,255,.06);color:var(--text)}
-
-.kpi{grid-column:span 3;padding:22px}
-.kpi.excellent{background:linear-gradient(140deg,rgba(62,126,84,.22),var(--bg-elev));border-color:rgba(143,195,120,.35)}
-.kpi.gold{background:linear-gradient(140deg,rgba(212,177,74,.15),var(--bg-elev));border-color:rgba(212,177,74,.3)}
-.kpi-label{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--text-dim);margin-bottom:12px;font-family:var(--f-heading);font-weight:600}
-.kpi-value{font-family:var(--f-display);font-weight:700;font-size:42px;line-height:1;letter-spacing:-.02em;margin-bottom:8px;display:flex;align-items:baseline;gap:6px}
-.kpi-value small{font-size:16px;font-weight:500;color:var(--text-dim)}
-.kpi-caption{display:flex;justify-content:space-between;align-items:end;gap:10px}
-.kpi-status{font-size:11px;padding:3px 10px;border-radius:6px;font-weight:700;letter-spacing:.5px;font-family:var(--f-heading)}
-.kpi-status.good{background:rgba(143,195,120,.18);color:var(--green-2)}
-.kpi-status.warn{background:rgba(212,177,74,.18);color:var(--amber)}
-.spark{width:70px;height:24px}
-
-.tile.chart-main{grid-column:span 7;min-height:380px;position:relative}
-.tile.anova{grid-column:span 5}
-.tile.means{grid-column:span 6}
-.tile.viz{grid-column:span 6}
-.tile.insights{grid-column:span 12;background:linear-gradient(120deg,rgba(62,126,84,.1),var(--bg-elev))}
-
-.data-table{width:100%;border-collapse:collapse;font-size:13px}
-.data-table th{text-align:left;padding:10px 8px;font-size:10.5px;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);border-bottom:1px solid var(--border);font-weight:600;font-family:var(--f-heading)}
-.data-table td{padding:12px 8px;border-bottom:1px solid var(--border)}
-.data-table tr:last-child td{border-bottom:none}
-.data-table td.num{text-align:right;font-variant-numeric:tabular-nums;font-family:var(--f-display);font-weight:500}
-
-.sig-badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:10.5px;font-weight:700;letter-spacing:.5px;font-family:var(--f-heading)}
-.sig-badge.high{background:rgba(143,195,120,.18);color:var(--green-2)}
-.sig-badge.med{background:rgba(212,177,74,.18);color:var(--amber)}
-.sig-badge.ns{background:rgba(255,255,255,.05);color:var(--text-muted)}
-
-.means-table .trt-cell{display:flex;align-items:center;gap:10px}
-.trt-dot{width:8px;height:8px;border-radius:50%;background:var(--green-2)}
-.data-bar-wrap{position:relative;min-width:180px}
-.data-bar{height:22px;background:linear-gradient(90deg,var(--green-1),var(--green-2));border-radius:4px;display:flex;align-items:center;padding:0 8px;font-size:12px;font-weight:600;color:#fff;font-variant-numeric:tabular-nums;font-family:var(--f-display)}
-.tukey-letter{display:inline-block;padding:3px 9px;border-radius:6px;font-family:var(--f-heading);font-weight:700;font-size:12px;background:rgba(143,195,120,.12);color:var(--green-2);min-width:22px;text-align:center}
-.tukey-letter.b{background:rgba(212,177,74,.14);color:var(--amber)}
-.tukey-letter.c{background:rgba(217,82,82,.14);color:var(--danger)}
-
-.insights-list{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-.insight-item{padding:16px 18px;background:rgba(255,255,255,.02);border-left:3px solid var(--green-2);border-radius:0 10px 10px 0}
-.insight-item .tag{display:inline-block;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;padding:3px 8px;border-radius:4px;background:rgba(143,195,120,.14);color:var(--green-2);margin-bottom:8px;font-weight:700;font-family:var(--f-heading)}
-.insight-item.attention{border-color:var(--amber)}
-.insight-item.attention .tag{background:rgba(212,177,74,.14);color:var(--amber)}
-.insight-item p{font-size:13.5px;line-height:1.5}
-.insight-item p strong{color:var(--green-2)}
-.insight-item.attention p strong{color:var(--amber)}
-
-.chart-legend{display:flex;gap:16px;font-size:12px;color:var(--text-dim);margin-bottom:8px}
-.chart-legend span{display:inline-flex;align-items:center;gap:6px}
-.chart-legend .swatch{width:10px;height:10px;border-radius:2px}
-.chart-canvas-wrap{position:relative;height:280px}
-.dose-callout{position:absolute;top:20px;right:20px;padding:10px 14px;background:rgba(212,177,74,.12);border:1px solid rgba(212,177,74,.3);border-radius:10px;text-align:right}
-.dose-callout small{display:block;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--amber);margin-bottom:2px;font-family:var(--f-heading);font-weight:700}
-.dose-callout b{font-family:var(--f-display);font-size:22px;font-weight:700}
-
-/* ============ TAB CONFIGURACAO ============ */
-.form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding:26px;background:var(--bg-elev);border:1px solid var(--border);border-radius:16px;margin-bottom:20px}
-.form-grid label{display:flex;flex-direction:column;gap:8px;font-size:12px;letter-spacing:.5px;color:var(--text-dim);font-family:var(--f-heading);font-weight:600;text-transform:uppercase}
-.form-grid select,.form-grid input{padding:11px 14px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:9px;color:var(--text);font-family:var(--f-body);font-size:14px;text-transform:none;letter-spacing:0}
-.form-grid select:focus,.form-grid input:focus{outline:none;border-color:var(--green-2)}
-.rule-card{padding:22px 26px;background:linear-gradient(135deg,rgba(212,177,74,.08),var(--bg-elev));border:1px solid rgba(212,177,74,.2);border-radius:14px}
-.rule-card b{display:block;font-family:var(--f-heading);font-weight:700;color:var(--amber);margin-bottom:10px;font-size:14px;letter-spacing:.3px}
-.rule-card p{color:var(--text-dim);line-height:1.55;font-size:13.5px}
-
-/* ============ TAB DADOS ============ */
-.data-actions{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px}
-.data-card{padding:22px;background:var(--bg-elev);border:1px solid var(--border);border-radius:14px}
-.data-card h4{font-family:var(--f-heading);font-size:14px;margin-bottom:14px;text-transform:uppercase;letter-spacing:1px;color:var(--text-dim);font-weight:600}
-.manual-inputs{display:flex;gap:10px;align-items:end;flex-wrap:wrap}
-.manual-inputs label{display:flex;flex-direction:column;gap:6px;flex:1;font-size:11px;color:var(--text-dim);font-family:var(--f-heading);font-weight:600;text-transform:uppercase}
-.manual-inputs input{padding:9px 12px;background:rgba(0,0,0,.25);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:14px}
-
-/* ============ TAB EXPORTACOES ============ */
-.export-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.export-card{padding:28px 24px;background:var(--bg-elev);border:1px solid var(--border);border-radius:14px;cursor:pointer;text-align:left;transition:all .2s;color:var(--text);font-family:var(--f-body)}
-.export-card:hover{border-color:var(--green-2);transform:translateY(-2px);background:linear-gradient(140deg,rgba(62,126,84,.15),var(--bg-elev))}
-.export-card .icon{width:44px;height:44px;background:rgba(143,195,120,.12);border-radius:10px;display:flex;align-items:center;justify-content:center;color:var(--green-2);margin-bottom:16px}
-.export-card b{display:block;font-family:var(--f-heading);font-size:16px;margin-bottom:6px}
-.export-card span{display:block;font-size:12.5px;color:var(--text-dim);line-height:1.45}
-
-/* Nav footer between tabs */
-.tab-nav{display:flex;justify-content:space-between;margin-top:26px;padding-top:22px;border-top:1px solid var(--border)}
-
-@media (max-width:900px){
-  .stepper{grid-template-columns:repeat(2,1fr)}
-  .kpi{grid-column:span 6}
-  .tile.chart-main,.tile.anova,.tile.means,.tile.viz{grid-column:span 12}
-  .insights-list{grid-template-columns:1fr}
-  .form-grid,.export-grid{grid-template-columns:1fr 1fr}
-  .data-actions{grid-template-columns:1fr}
-}
-</style>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700&family=Montserrat:wght@500;600;700&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="assets/css/styles.css?v=20260720" />
 </head>
 <body>
-
 <div class="page-shell">
+<nav class="nav">
+<a class="logo-group" href="index.html" id="logoHome" aria-label="Solver Estatística">
+<svg width="50" height="50" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="rgba(255,255,255,0.03)" style="stroke:var(--brand)" stroke-width="1.6"/>
+<polyline points="10,25 16,18 20,21 28,12" style="stroke:var(--brand-bright)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<polyline points="23,12 28,12 28,17" style="stroke:var(--brand-bright)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>
+<span>
+<strong>SOLVER</strong>
+<small>INTELLIGENCE FOR FIELD TRIALS</small>
+</span>
+</a>
+<div class="nav-actions hidden" id="navActionsLanding">
+<button class="btn ghost" type="button" id="openFormatosModalNav">Formato dos dados</button>
+<button class="btn solid" id="navOpenApp" type="button">Iniciar análise</button>
+</div>
+<div class="nav-actions" id="navActionsApp">
+<button class="btn ghost" id="newAnalysisBtn" type="button">↺ Nova análise</button>
+<a class="btn ghost" href="index.html" id="navBackToSite">← Voltar à capa</a>
+</div>
+</nav>
 
-  <nav class="nav">
-    <a href="index.html" class="logo-group">
-      <svg width="42" height="42" viewBox="0 0 40 40" fill="none">
-        <rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="rgba(255,255,255,.03)" stroke="#3E7E54" stroke-width="1.6"/>
-        <polyline points="10,25 16,18 20,21 28,12" stroke="#8FC378" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        <polyline points="23,12 28,12 28,17" stroke="#8FC378" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-      </svg>
-      <span><strong>SOLVER</strong><small>INTELLIGENCE FOR FIELD TRIALS</small></span>
-    </a>
-    <div class="nav-actions">
-      <a href="index.html" class="back-link">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Voltar à capa
-      </a>
-      <a class="btn ghost" href="index.html#metodologia">Metodologia</a>
-      <button class="btn solid" id="newAnalysis">↺ Nova análise</button>
-    </div>
-  </nav>
+<div id="view-landing" class="hidden">
+<header class="hero" id="top">
+<section class="hero-copy">
+<span class="badge"><i></i>Estatística experimental de precisão</span>
+<h1>Transforme ensaios de campo em <em>decisões estatísticas seguras</em>.</h1>
+<p>Faça ANOVA para DIC, DBC e DQL, compare médias, avalie regressões e gere relatórios técnicos em PDF ou Excel com visual profissional.</p>
+<div class="cta-row">
+<button class="btn big solid" id="heroOpenApp" type="button">Criar análise</button>
+<button class="btn big ghost" type="button" id="openFormatosModalHero">Ver formato dos dados</button>
+</div>
+<div class="feature-grid">
+<article><b>ANOVA</b><span>Teste F interpretado</span></article>
+<article><b>Tukey + testes</b><span>Duncan, Dunnett, SNK, Scheffé</span></article>
+<article><b>Regressão</b><span>Linear, quadrática e cúbica</span></article>
+<article><b>Exportação</b><span>PDF, Excel, PNG e PDF vetorial</span></article>
+</div>
+</section>
 
-  <div class="workspace-head">
-    <span class="kicker">Ambiente de análise</span>
-    <h1>Dashboard estatístico do ensaio</h1>
-    <p>Fluxo guiado em 4 etapas. Escolha o delineamento, informe os dados, interprete a ANOVA e só então decida o pós-teste ou a regressão.</p>
-  </div>
+<section class="preview-card" aria-label="Prévia do relatório">
+<div class="window-head"><span><i></i><i></i><i></i></span><b>PREVIEW DO RELATÓRIO</b></div>
+<div class="stats-row">
+<div class="stat-cv"><label>CV experimental</label><div class="cv-ring-row"><svg class="cv-ring" viewBox="0 0 52 52" width="36" height="36" aria-hidden="true"><circle cx="26" cy="26" r="21" fill="none" style="stroke:var(--surface-line)" stroke-width="6"/><circle cx="26" cy="26" r="21" fill="none" style="stroke:var(--brand)" stroke-width="6" stroke-linecap="round" stroke-dasharray="131.9" stroke-dashoffset="21" transform="rotate(-90 26 26)"/></svg><div class="cv-ring-text"><strong class="cv-headline">Ótimo</strong><span id="previewCv">8,40%</span></div></div><em>Precisão alta</em></div>
+<div><label>Teste F</label><strong id="previewF">41,32</strong><em>p &lt; 0,01</em></div>
+<div><label>Comparação de médias</label><strong>Tukey 5%</strong><em>4 grupos</em></div>
+<div><label>R² regressão</label><strong id="previewR2">0,95</strong><em>Ótimo ajuste</em></div>
+</div>
+<div class="preview-split">
+<div class="chart-placeholder">
+<div class="chart-title"><span>Curva ajustada e dose ótima</span></div>
+<div class="chart-wrap">
+<div class="dose-callout" style="left:27.9%"><b id="previewDose">124,8 kg/ha</b></div>
+<svg width="100%" height="112" viewBox="0 0 340 90" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M8,70 C38,56 60,28 95,20 L95,78 L8,78 Z" style="fill:var(--brand)" opacity="0.14"/>
+<path d="M95,20 C112,18 120,44 148,40 C168,38 178,26 205,24 C250,22 290,46 330,58 L330,78 L95,78 Z" style="fill:var(--brand-bright)" opacity="0.1"/>
+<path d="M8,70 C38,56 60,28 95,20" fill="none" style="stroke:var(--brand)" stroke-width="2.2" stroke-linecap="round"/>
+<path d="M95,20 C112,18 120,44 148,40 C168,38 178,26 205,24 C250,22 290,46 330,58" fill="none" style="stroke:var(--brand-bright)" stroke-width="2.2" stroke-linecap="round"/>
+<line x1="95" y1="20" x2="95" y2="76" style="stroke:var(--surface-line)" stroke-width="1.2" stroke-dasharray="3,3"/>
+<circle cx="37.5" cy="51.6" r="2.3" style="fill:var(--surface)" stroke="var(--brand)" stroke-width="1.5"/>
+<circle cx="68.2" cy="30.7" r="2.3" style="fill:var(--surface)" stroke="var(--brand)" stroke-width="1.5"/>
+<circle cx="119.7" cy="32.5" r="2.3" style="fill:var(--surface)" stroke="var(--brand-bright)" stroke-width="1.5"/>
+<circle cx="173.9" cy="32" r="2.3" style="fill:var(--surface)" stroke="var(--brand-bright)" stroke-width="1.5"/>
+<circle cx="205" cy="24" r="2.3" style="fill:var(--surface)" stroke="var(--brand-bright)" stroke-width="1.5"/>
+<circle cx="234" cy="26.1" r="2.3" style="fill:var(--surface)" stroke="var(--brand-bright)" stroke-width="1.5"/>
+<circle cx="269.4" cy="35.8" r="2.3" style="fill:var(--surface)" stroke="var(--brand-bright)" stroke-width="1.5"/>
+<circle cx="306" cy="49.7" r="2.3" style="fill:var(--surface)" stroke="var(--brand-bright)" stroke-width="1.5"/>
+<circle cx="95" cy="20" r="7.5" style="fill:var(--brand)" opacity="0.16"/>
+<circle cx="95" cy="20" r="4.5" style="fill:var(--brand-bright)" stroke="var(--surface)" stroke-width="2"/>
+<text x="8" y="85" font-size="8" style="fill:var(--text-l2);font-family:'Open Sans',sans-serif">Dose</text>
+<text x="330" y="85" text-anchor="end" font-size="8" style="fill:var(--text-l2);font-family:'Open Sans',sans-serif">Resposta</text>
+</svg>
+</div>
+</div>
+<div class="mini-anova-card">
+<div class="chart-title"><span>Resumo ANOVA</span></div>
+<div class="mini-anova">
+<div class="mini-anova-head"><span>FV</span><span>F</span><span>Sig.</span></div>
+<div class="mini-anova-row"><span>Parcela</span><b>24,86</b><mark>1%</mark></div>
+<div class="mini-anova-row"><span>Subparcela</span><b>41,32</b><mark>1%</mark></div>
+<div class="mini-anova-row"><span>Parcela × Sub</span><b>9,74</b><mark>1%</mark></div>
+</div>
+</div>
+</div>
+<div class="preview-actions">
+<div class="preview-action">
+<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg></div>
+<b>Dados</b><span>CSV ou matriz</span>
+</div>
+<div class="preview-action">
+<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M3 20h18"/></svg></div>
+<b>ANOVA</b><span>Teste F</span>
+</div>
+<div class="preview-action">
+<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="12" height="12" rx="2"/><path d="M9 9h11v11H9z"/></svg></div>
+<b>Pós-teste</b><span>Médias ou curva</span>
+</div>
+<div class="preview-action">
+<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><path d="M9 13h6M9 16.5h6"/></svg></div>
+<b>PDF</b><span>Laudo final</span>
+</div>
+</div>
+</section>
+</header>
 
-  <!-- Status backend -->
-  <div class="status-bar">
-    <label for="apiBase">URL do backend Render</label>
-    <input id="apiBase" type="url" placeholder="https://seu-backend.onrender.com" value="https://solver-backend.onrender.com">
-    <button class="btn ghost" id="saveApi">Salvar URL</button>
-    <span class="status-pill ok" id="apiStatus">API online · 42ms</span>
-  </div>
+<main>
+<section class="panel" id="capacidades">
+<div class="section-head">
+<span>O que você recebe</span>
+<h2>Tudo que o experimento precisa, num só lugar</h2>
+</div>
+<div class="capability-grid">
+<article class="capability-card">
+<div class="icon-circle">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>
+</div>
+<h3>KPIs estatísticos</h3>
+<p>CV, F calculado, significância e R² aparecem em cards de leitura imediata.</p>
+</article>
+<article class="capability-card">
+<div class="icon-circle">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16"/><path d="M6 15l4-5 4 2 5-7"/></svg>
+</div>
+<h3>Gráfico de regressão</h3>
+<p>Visual com curva ajustada, pontos observados e destaque para a dose ótima.</p>
+</article>
+<article class="capability-card">
+<div class="icon-circle">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/></svg>
+</div>
+<h3>Resumo da ANOVA</h3>
+<p>Tabela compacta com badges de significância para orientar o pós-teste.</p>
+</article>
+<article class="capability-card">
+<div class="icon-circle">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="12" cy="13" r="2"/><circle cx="5" cy="20" r="2"/><circle cx="19" cy="20" r="2"/><path d="M6.6 7.4L10.6 11.8M17.4 7.4L13.4 11.8M10.6 14.4L6.6 18.6M13.4 14.4L17.4 18.6"/></svg>
+</div>
+<h3>Fluxo guiado</h3>
+<p>Você segue a sequência: modelo, dados, ANOVA, comparação/regressão e exportação.</p>
+</article>
+</div>
+</section>
 
-  <!-- Stepper -->
-  <div class="stepper">
-    <button class="step-item done" data-step="1">
-      <div class="num">Passo 1</div>
-      <div class="name">Modelo <span class="step-check"></span></div>
-      <div class="name-sub">DBC · Fatorial 4x4</div>
-    </button>
-    <button class="step-item done" data-step="2">
-      <div class="num">Passo 2</div>
-      <div class="name">Dados <span class="step-check"></span></div>
-      <div class="name-sub">64 observações carregadas</div>
-    </button>
-    <button class="step-item active" data-step="3">
-      <div class="num">Passo 3</div>
-      <div class="name">Resultados</div>
-      <div class="name-sub">ANOVA, médias e regressão</div>
-    </button>
-    <button class="step-item" data-step="4">
-      <div class="num">Passo 4</div>
-      <div class="name">Exportações</div>
-      <div class="name-sub">PDF, Excel, PNG, PDF vetorial</div>
-    </button>
-  </div>
+<section class="panel" id="publico">
+<div class="section-head">
+<span>Para quem é</span>
+<h2>Feito para quem decide com base em dados de campo</h2>
+</div>
+<div class="audience-grid">
+<article class="audience-card">
+<div class="icon-circle">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V10"/><path d="M12 10c0-4 3-6 7-6 0 4-3 7-7 6z"/><path d="M12 13c0-3-3-5-7-5 0 3 3 6 7 5z"/></svg>
+</div>
+<h3>Agronegócio</h3>
+<p>Decisões de campo com comparação de tratamentos e relatórios claros para o produtor.</p>
+</article>
+<article class="audience-card">
+<div class="icon-circle">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 4-9 4-9-4 9-4z"/><path d="M6 10v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/><path d="M21 8v6"/></svg>
+</div>
+<h3>Acadêmico</h3>
+<p>Validação de exercícios, TCCs, aulas práticas e interpretação passo a passo da ANOVA.</p>
+</article>
+<article class="audience-card">
+<div class="icon-circle">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"/><path d="M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/><path d="M7.5 15h9"/></svg>
+</div>
+<h3>P&D e pesquisa</h3>
+<p>Padronização de análises e apresentação profissional dos resultados de ensaios.</p>
+</article>
+</div>
+</section>
 
-  <!-- ============ TAB 1 · MODELO ============ -->
-  <div class="tab-content" id="tab-1">
-    <div class="form-grid">
-      <label>Delineamento
-        <select><option>DIC · Inteiramente casualizado</option><option selected>DBC · Blocos casualizados</option><option>DQL · Quadrado latino</option></select>
-      </label>
-      <label>Tipo de análise
-        <select><option>Fator único</option><option selected>Fatorial (A x B)</option><option>Parcelas subdivididas</option><option>Regressão direta</option></select>
-      </label>
-      <label>Objetivo
-        <select><option selected>Maior resposta é melhor</option><option>Menor resposta é melhor</option></select>
-      </label>
-      <label>Coluna resposta
-        <input value="valor">
-      </label>
-      <label>Coluna tratamento
-        <input value="tratamento">
-      </label>
-      <label>Coluna bloco
-        <input value="bloco">
-      </label>
-      <label>Fator numérico (dose)
-        <input placeholder="Ex.: dose">
-      </label>
-      <label>Fatores fatorial
-        <input placeholder="Ex.: hibrido,dose">
-      </label>
-      <label>Grau de regressão
-        <select><option selected>Automático</option><option>Linear</option><option>Quadrático</option><option>Cúbico</option></select>
-      </label>
-    </div>
-    <div class="rule-card">
-      <b>Regra do Solver</b>
-      <p>Se a regressão solicitada não for a melhor pros dados, o backend recomenda automaticamente o modelo com maior R2 ajustado. Regressão só é calculada com fator numérico com >=3 níveis distintos e 1 GL residual.</p>
-    </div>
-    <div class="tab-nav">
-      <a href="index.html" class="btn ghost">← Voltar à capa</a>
-      <button class="btn solid" onclick="goToStep(2)">Avancar para dados →</button>
-    </div>
-  </div>
+<dialog id="formatosModal" class="formatos-modal">
+<div class="section-head left formatos-modal-head">
+<div>
+<span>Formato de dados</span>
+<h2>Colunas mínimas por delineamento</h2>
+</div>
+<button class="modal-close" type="button" id="closeFormatosModal" aria-label="Fechar instruções">&times;</button>
+</div>
+<div class="format-grid">
+<article><b>DIC</b><code>tratamento, valor</code><p>Use quando não houver blocos, linhas ou colunas.</p></article>
+<article><b>DBC</b><code>bloco, tratamento, valor</code><p>Um registro por combinação bloco × tratamento.</p></article>
+<article><b>DQL</b><code>linha, coluna, tratamento, valor</code><p>Tratamentos, linhas e colunas devem ter o mesmo número de níveis.</p></article>
+<article><b>Regressão</b><code>dose, valor</code><p>Informe o fator numérico para cálculo de dose ótima.</p></article>
+</div>
+</dialog>
 
-  <!-- ============ TAB 2 · DADOS ============ -->
-  <div class="tab-content" id="tab-2">
-    <div class="data-actions">
-      <div class="data-card">
-        <h4>Preencher manualmente</h4>
-        <div class="manual-inputs">
-          <label>Tratamentos <input type="number" value="4"></label>
-          <label>Blocos/Repeticoes <input type="number" value="4"></label>
-          <button class="btn solid">Gerar tabela</button>
-        </div>
-      </div>
-      <div class="data-card">
-        <h4>Upload de arquivo</h4>
-        <div class="manual-inputs">
-          <label>CSV/XLSX <input type="file" accept=".csv,.xlsx,.xls"></label>
-          <button class="btn ghost">Carregar exemplo</button>
-        </div>
-      </div>
-    </div>
-    <div class="tab-nav">
-      <button class="btn ghost" onclick="goToStep(1)">← Voltar ao modelo</button>
-      <button class="btn solid" onclick="goToStep(3)">Rodar análise →</button>
-    </div>
-  </div>
-
-  <!-- ============ TAB 3 · RESULTADOS (Power BI) ============ -->
-  <div class="tab-content active" id="tab-3">
-
-    <div class="dash-toolbar">
-      <div class="filters">
-        <span class="filter-label">Fator</span>
-        <button class="filter-pill active">Dose (kg/ha)</button>
-        <button class="filter-pill">Hibrido</button>
-        <span class="filter-label" style="margin-left:12px">Bloco</span>
-        <button class="filter-pill active">Todos</button>
-        <button class="filter-pill">I</button>
-        <button class="filter-pill">II</button>
-        <button class="filter-pill">III</button>
-        <button class="filter-pill">IV</button>
-      </div>
-      <div class="toolbar-actions">
-        <button class="icon-btn" title="Atualizar">↻</button>
-        <button class="icon-btn" title="Fullscreen">⛶</button>
-      </div>
-    </div>
-
-    <div class="dash-grid">
-
-      <div class="tile kpi excellent">
-        <div class="kpi-label">CV experimental</div>
-        <div class="kpi-value">8,4<small>%</small></div>
-        <div class="kpi-caption">
-          <span class="kpi-status good">Precisão alta</span>
-          <svg class="spark" viewBox="0 0 70 24"><polyline points="0,18 12,15 24,16 36,10 48,12 60,6 70,8" fill="none" stroke="#8FC378" stroke-width="1.6"/></svg>
-        </div>
-      </div>
-
-      <div class="tile kpi excellent">
-        <div class="kpi-label">F calculado</div>
-        <div class="kpi-value">41,32</div>
-        <div class="kpi-caption">
-          <span class="kpi-status good">p &lt; 0,01</span>
-          <svg class="spark" viewBox="0 0 70 24"><polyline points="0,20 15,17 30,13 45,10 60,6 70,4" fill="none" stroke="#8FC378" stroke-width="1.6"/></svg>
-        </div>
-      </div>
-
-      <div class="tile kpi excellent">
-        <div class="kpi-label">R2 ajustado</div>
-        <div class="kpi-value">0,95</div>
-        <div class="kpi-caption">
-          <span class="kpi-status good">Ótimo ajuste</span>
-          <svg class="spark" viewBox="0 0 70 24"><polyline points="0,20 12,15 24,12 36,10 48,8 60,7 70,6" fill="none" stroke="#8FC378" stroke-width="1.6"/></svg>
-        </div>
-      </div>
-
-      <div class="tile kpi gold">
-        <div class="kpi-label">Melhor tratamento</div>
-        <div class="kpi-value">T4</div>
-        <div class="kpi-caption">
-          <span class="kpi-status warn">124,8 kg/ha</span>
-          <svg class="spark" viewBox="0 0 70 24"><polyline points="0,18 15,14 30,12 45,8 60,6 70,4" fill="none" stroke="#D4B14A" stroke-width="1.6"/></svg>
-        </div>
-      </div>
-
-      <div class="tile chart-main">
-        <div class="tile-head"><h4>Curva ajustada · Dose x Resposta</h4></div>
-        <div class="chart-legend">
-          <span><span class="swatch" style="background:#8FC378"></span>Observados</span>
-          <span><span class="swatch" style="background:#3E7E54"></span>Ajuste quadratico</span>
-          <span><span class="swatch" style="background:rgba(62,126,84,.25)"></span>IC 95%</span>
-        </div>
-        <div class="dose-callout"><small>Dose ótima</small><b>124,8 kg/ha</b></div>
-        <div class="chart-canvas-wrap"><canvas id="regChart"></canvas></div>
-      </div>
-
-      <div class="tile anova">
-        <div class="tile-head"><h4>Quadro de ANOVA · Teste F</h4></div>
-        <table class="data-table">
-          <thead><tr><th>Fonte de variacao</th><th style="text-align:right">GL</th><th style="text-align:right">F</th><th style="text-align:right">Sig.</th></tr></thead>
-          <tbody>
-            <tr><td>Tratamentos (A)</td><td class="num">3</td><td class="num">41,32</td><td style="text-align:right"><span class="sig-badge high">1%</span></td></tr>
-            <tr><td>Blocos</td><td class="num">3</td><td class="num">2,86</td><td style="text-align:right"><span class="sig-badge ns">ns</span></td></tr>
-            <tr><td>Interação A x B</td><td class="num">9</td><td class="num">9,74</td><td style="text-align:right"><span class="sig-badge high">1%</span></td></tr>
-            <tr><td>Regressão linear</td><td class="num">1</td><td class="num">5,42</td><td style="text-align:right"><span class="sig-badge med">5%</span></td></tr>
-            <tr><td>Residuo</td><td class="num">12</td><td class="num">—</td><td style="text-align:right">—</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="tile means">
-        <div class="tile-head"><h4>Medias e agrupamento (Tukey 5%)</h4></div>
-        <table class="data-table means-table">
-          <thead><tr><th>Tratamento</th><th style="width:60%">Media</th><th style="text-align:center">Grupo</th></tr></thead>
-          <tbody>
-            <tr><td><div class="trt-cell"><span class="trt-dot"></span>T4 · 160 kg/ha</div></td><td><div class="data-bar-wrap"><div class="data-bar" style="width:100%">124,8</div></div></td><td style="text-align:center"><span class="tukey-letter">a</span></td></tr>
-            <tr><td><div class="trt-cell"><span class="trt-dot" style="background:#D4B14A"></span>T3 · 120 kg/ha</div></td><td><div class="data-bar-wrap"><div class="data-bar" style="width:88%">109,6</div></div></td><td style="text-align:center"><span class="tukey-letter b">b</span></td></tr>
-            <tr><td><div class="trt-cell"><span class="trt-dot" style="background:#D4B14A"></span>T2 · 80 kg/ha</div></td><td><div class="data-bar-wrap"><div class="data-bar" style="width:72%;background:linear-gradient(90deg,#3E7E54,#8FC378)">89,4</div></div></td><td style="text-align:center"><span class="tukey-letter b">b</span></td></tr>
-            <tr><td><div class="trt-cell"><span class="trt-dot" style="background:#d95252"></span>T1 · 40 kg/ha</div></td><td><div class="data-bar-wrap"><div class="data-bar" style="width:52%;background:linear-gradient(90deg,#24492E,#5c9564)">64,7</div></div></td><td style="text-align:center"><span class="tukey-letter c">c</span></td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div class="tile viz">
-        <div class="tile-head"><h4>Resposta media por tratamento · IC 95%</h4></div>
-        <div class="chart-canvas-wrap"><canvas id="barsChart"></canvas></div>
-      </div>
-
-      <div class="tile insights">
-        <div class="tile-head"><h4>Insights automáticos · Interpretação do Solver</h4></div>
-        <div class="insights-list">
-          <div class="insight-item"><span class="tag">Precisão</span><p>Ensaio com <strong>CV de 8,4%</strong>, classificado como precisão alta segundo Pimentel Gomes. Resultados confiáveis pra tomada de decisão.</p></div>
-          <div class="insight-item"><span class="tag">Efeito significativo</span><p>Efeito de tratamentos foi <strong>altamente significativo (p &lt; 0,01)</strong>. Pós-teste de Tukey aplicado abaixo separa 3 grupos distintos.</p></div>
-          <div class="insight-item attention"><span class="tag">Dose ótima</span><p>Curva quadrática ajustada indica <strong>124,8 kg/ha</strong> como ponto de máxima resposta. Doses acima não produzem ganho estatístico.</p></div>
-        </div>
-      </div>
-
-    </div>
-
-    <div class="tab-nav">
-      <button class="btn ghost" onclick="goToStep(2)">← Voltar aos dados</button>
-      <button class="btn solid" onclick="goToStep(4)">Ver exportações →</button>
-    </div>
-  </div>
-
-  <!-- ============ TAB 4 · EXPORTACOES ============ -->
-  <div class="tab-content" id="tab-4">
-    <div class="export-grid">
-      <button class="export-card">
-        <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M14 3v5h5M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V8l-6-5z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <b>PDF técnico</b><span>Relatório completo pra diretoria ou laudo</span>
-      </button>
-      <button class="export-card">
-        <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="4" width="18" height="16" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M3 10h18M9 4v16M15 4v16" stroke="currentColor" stroke-width="1.8"/></svg></div>
-        <b>Excel</b><span>ANOVA, médias e resumo completos</span>
-      </button>
-      <button class="export-card">
-        <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="9" r="2" stroke="currentColor" stroke-width="1.8"/><path d="M21 15l-5-5-11 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
-        <b>PNG regressão</b><span>Gráfico em alta resolução</span>
-      </button>
-      <button class="export-card">
-        <div class="icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 18C7 14 10 10 12 8s5-4 8-4M4 18v3M20 4h-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
-        <b>PDF vetorial</b><span>Gráfico editável pra publicação</span>
-      </button>
-    </div>
-    <p style="margin-top:20px;color:var(--text-muted);font-size:13px">As exportações são geradas pelo backend Render. Verifique se a URL está configurada no topo da página.</p>
-    <div class="tab-nav">
-      <button class="btn ghost" onclick="goToStep(3)">← Voltar aos resultados</button>
-      <a href="index.html" class="btn solid">Concluir e voltar à capa</a>
-    </div>
-  </div>
-
+<dialog id="metodologiaModal" class="formatos-modal">
+<div class="section-head left formatos-modal-head">
+<div>
+<span>Metodologia</span>
+<h2>Referências científicas</h2>
+</div>
+<button class="modal-close" type="button" id="closeMetodologiaModal" aria-label="Fechar metodologia">&times;</button>
+</div>
+<div class="metodologia-body">
+<p>Os cálculos de ANOVA (teste F), os delineamentos (DIC/DBC/DQL/fatorial/parcelas subdivididas) e os testes de comparação de médias seguem a formulação clássica descrita em:</p>
+<ul>
+<li><b>Pimentel Gomes, F.</b> <i>Curso de Estatística Experimental</i>. 15. ed. FEALQ/ESALQ, 2022.</li>
+<li><b>Banzatto, D. A.; Kronka, S. N.</b> <i>Experimentação Agrícola</i>. 4. ed. FUNEP, 2006.</li>
+<li><b>Steel, R. G. D.; Torrie, J. H.; Dickey, D. A.</b> <i>Principles and Procedures of Statistics</i>. 3. ed. McGraw-Hill, 1997.</li>
+<li>Artigos originais dos pós-testes: <b>Tukey (1949)</b>, <b>Duncan (1955)</b>, <b>Dunnett (1955)</b>, <b>Newman (1939)/Keuls (1952)</b> e <b>Scheffé (1953)</b>.</li>
+</ul>
+<p class="small-note">Lista completa com DOIs em <a href="https://github.com/solverestatistica-brazil/solver-estatistica/blob/main/docs/ARQUITETURA.md" target="_blank" rel="noopener noreferrer">docs/ARQUITETURA.md</a>.</p>
+</div>
+</dialog>
+</main>
 </div>
 
+<div id="view-app">
+<main>
+<section class="panel app-panel" id="analisar">
+<div class="section-head">
+<span>Dashboard estatístico</span>
+<h2>Monte a análise em 4 passos</h2>
+<p>Escolha o modelo, informe os dados, interprete a ANOVA e só então decida o pós-teste ou a regressão.</p>
+</div>
+
+<div class="status-bar">
+<div class="api-indicator">
+<span class="api-dot" id="apiDot"></span>
+<span id="apiStatus" class="status-pill">Verificando API…</span>
+</div>
+<details class="advanced-toggle api-settings">
+<summary>Configurações do backend</summary>
+<div class="api-settings-body">
+<label for="apiBase">URL do backend Render</label>
+<input id="apiBase" type="url" placeholder="https://seu-backend.onrender.com" />
+<button class="btn ghost" id="saveApi">Salvar URL</button>
+</div>
+</details>
+</div>
+
+<nav class="stepper" aria-label="Etapas da análise">
+<button class="step-pill active" data-step="modelo" type="button"><i>1</i>Modelo</button>
+<button class="step-pill" data-step="dados" type="button"><i>2</i>Dados</button>
+<button class="step-pill" data-step="resultados" type="button"><i>3</i>Resultados</button>
+<button class="step-pill" data-step="exports" type="button"><i>4</i>Exportações</button>
+</nav>
+
+<div class="workspace-flat">
+<section class="step active" id="step-modelo">
+<div class="section-head left" style="margin-bottom:18px">
+<span>Passo 1</span>
+<h2 style="font-size:20px;margin:6px 0 4px">Qual é o tipo do seu experimento?</h2>
+<p>Escolha o delineamento. Os campos de coleta de dados vão se ajustar sozinhos na próxima etapa.</p>
+</div>
+
+<div class="type-grid" id="typeGrid">
+<button class="type-card" data-type="DIC" type="button">
+<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16"/></svg></div>
+<b>DIC</b>
+<span>Inteiramente casualizado · fator único, sem blocos</span>
+</button>
+<button class="type-card" data-type="DBC" type="button">
+<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18"/></svg></div>
+<b>DBC</b>
+<span>Blocos casualizados · fator único, com blocos</span>
+</button>
+<button class="type-card" data-type="DQL" type="button">
+<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></div>
+<b>DQL</b>
+<span>Quadrado latino · controla linha e coluna</span>
+</button>
+<button class="type-card" data-type="factorial" type="button">
+<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/></svg></div>
+<b>Fatorial</b>
+<span>Dois fatores combinados (A × B)</span>
+</button>
+<button class="type-card" data-type="split_plot" type="button">
+<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg></div>
+<b>Parcelas subdivididas</b>
+<span>Fator na parcela e fator na subparcela</span>
+</button>
+<button class="type-card" data-type="regression" type="button">
+<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16"/><path d="M6 15l4-5 4 2 5-7"/></svg></div>
+<b>Regressão / dose</b>
+<span>Fator numérico contínuo (dose, concentração...)</span>
+</button>
+</div>
+
+<div class="sub-options-row" id="baseDesignWrap" style="display:none">
+<label>Delineamento base
+<select id="baseDesign">
+<option value="DBC">DBC · com blocos</option>
+<option value="DIC">DIC · sem blocos</option>
+</select>
+</label>
+<p class="small-note" style="margin:8px 0 0">A matriz manual só é gerada automaticamente para bases DIC/DBC. Para DQL combinado com fatorial, use o upload de arquivo.</p>
+</div>
+
+<div class="sub-options-row">
+<label>Objetivo
+<select id="goal">
+<option value="max">Maior resposta é melhor</option>
+<option value="min">Menor resposta é melhor</option>
+</select>
+</label>
+</div>
+
+<details class="advanced-toggle">
+<summary>Opções avançadas (nomes de colunas e grau de regressão)</summary>
+<div class="form-grid" style="margin-top:14px">
+<label data-field="responseColumn">Coluna resposta
+<input id="responseColumn" value="valor" />
+</label>
+<label data-field="treatmentColumn">Coluna tratamento
+<input id="treatmentColumn" value="tratamento" />
+</label>
+<label data-field="blockColumn">Coluna bloco
+<input id="blockColumn" value="bloco" />
+</label>
+<label data-field="rowColumn">Coluna linha · DQL
+<input id="rowColumn" value="linha" />
+</label>
+<label data-field="columnColumn">Coluna coluna · DQL
+<input id="columnColumn" value="coluna" />
+</label>
+<label data-field="factorColumns">Fatores (nomes separados por vírgula)
+<input id="factorColumns" placeholder="Ex.: fator_a,fator_b" />
+</label>
+<label data-field="numericFactorColumn">Fator numérico / dose
+<input id="numericFactorColumn" placeholder="Ex.: dose" />
+</label>
+<label data-field="regressionDegree">Grau de regressão solicitado
+<select id="regressionDegree">
+<option value="1">Linear (grau 1)</option>
+<option value="2" selected>Quadrático (grau 2) — padrão para curva dose-resposta</option>
+<option value="3">Cúbico (grau 3)</option>
+</select>
+</label>
+</div>
+</details>
+
+<div class="hidden" id="legacyModelFields">
+<select id="design"><option value="DIC">DIC</option><option value="DBC">DBC</option><option value="DQL">DQL</option></select>
+<select id="analysisType"><option value="single">single</option><option value="factorial">factorial</option><option value="split_plot">split_plot</option><option value="regression">regression</option></select>
+</div>
+
+<div class="hint-card">
+<b>Regra do Solver</b>
+<p>Se uma regressão solicitada não for a melhor para os dados, o backend recomenda automaticamente o modelo com maior R² ajustado. O teste de comparação de médias você escolhe depois, já vendo a ANOVA. A regressão só é calculada quando há um fator numérico (dose) com pelo menos 3 níveis distintos e 1 grau de liberdade residual — isso evita curvas superajustadas/instáveis fora dos pontos observados.</p>
+</div>
+<div class="step-nav">
+<span></span>
+<button class="btn solid big" id="toDadosNext" type="button">Avançar para os dados →</button>
+</div>
+</section>
+
+<section class="step" id="step-dados">
+<div class="choice-grid">
+<button class="choice-card" id="chooseUpload" type="button">
+<div class="icon-circle small">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+</div>
+<b>Enviar arquivo</b>
+<span>CSV (;) já preenchido</span>
+</button>
+<button class="choice-card" id="chooseManual" type="button">
+<div class="icon-circle small">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M8 10v10"/></svg>
+</div>
+<b>Preencher manualmente</b>
+<span>Gerar matriz vazia para digitar</span>
+</button>
+</div>
+<p class="small-note center">Só quer testar? <button class="link-btn" id="loadExample" type="button">Carregar um exemplo pronto</button>.</p>
+
+<div class="data-subpanel hidden" id="dataUploadPanel">
+<label for="fileInput">Upload CSV (separado por ponto e vírgula)</label>
+<input id="fileInput" type="file" accept=".csv" />
+<p class="small-note">Apenas arquivos .csv com colunas separadas por ponto e vírgula (;), no padrão do Excel em português.</p>
+<div id="columnMapping" class="hidden" style="margin-top:14px"></div>
+</div>
+<div class="data-subpanel hidden" id="dataManualPanel">
+<div class="manual-builder-dynamic" id="manualFieldsDynamic"></div>
+</div>
+
+<div class="table-tools" id="dataTableTools" style="display:none">
+<button class="btn ghost" id="addRow">Adicionar linha</button>
+<button class="btn ghost danger" id="clearRows">Limpar</button>
+</div>
+<div class="table-wrap" id="dataTableWrap" style="display:none">
+<table id="dataTable" class="data-table" aria-label="Tabela de dados editável"></table>
+</div>
+<p class="small-note" id="rowCount">Nenhuma linha carregada.</p>
+<p class="inline-error hidden" id="dataErrorMsg"></p>
+<button class="btn ghost hidden" id="restartAnalysis" type="button">↺ Iniciar nova análise</button>
+
+<div class="step-nav">
+<button class="btn ghost" data-back="modelo" type="button">← Voltar ao modelo</button>
+<button class="btn solid big" id="runAnalysis" type="button">Iniciar análise →</button>
+</div>
+</section>
+
+<section class="step" id="step-resultados">
+<div id="emptyResults" class="empty-state">
+<b>Sem resultado ainda</b>
+<p>Volte à etapa "Dados", gere ou carregue os valores e clique em "Iniciar análise".</p>
+</div>
+<div id="results" class="results hidden">
+<div class="result-cards">
+<article title="Critério (Pimentel Gomes): CV ≤10% Ótimo · ≤20% Bom · ≤30% Moderado · >30% Alto"><span>CV experimental</span><strong id="resCv">—</strong><em id="resCvLabel">—</em></article>
+<article><span>Linhas analisadas</span><strong id="resRows">—</strong><em>Observações</em></article>
+<article><span>Melhor tratamento</span><strong id="resBest">—</strong><em id="resBestMean">—</em></article>
+</div>
+
+<section class="result-box full">
+<h3>Quadro de ANOVA · Teste F</h3>
+<div class="table-wrap"><table id="anovaTable" class="result-table"></table></div>
+</section>
+
+<div id="doseAdvisory" class="advisory hidden">
+<b>Isso parece ser uma dose numérica</b>
+<p id="doseAdvisoryText">A coluna avaliada tem valores numéricos crescentes. Considere rodar como Regressão direta para estimar a dose ótima em vez de comparar médias.</p>
+<button class="btn ghost" id="switchToRegression" type="button">Mudar para Regressão direta</button>
+</div>
+
+<section class="result-box full" id="regressionBox">
+<h3>Regressão</h3>
+<div id="regressionSummary" class="regression-summary"></div>
+<canvas id="regressionChart" height="120"></canvas>
+</section>
+
+<section class="result-box full" id="comparisonPanel">
+<h3>Comparação de médias</h3>
+<p class="small-note">Escolha o teste. Em análises com mais de um fator, só é possível comparar fatores que deram significativos no teste F.</p>
+<div class="comparison-controls">
+<label>Teste de comparação
+<select id="comparisonTestPost">
+<option value="tukey">Tukey</option>
+<option value="duncan">Duncan</option>
+<option value="dunnett">Dunnett</option>
+<option value="snk">SNK</option>
+<option value="scheffe">Scheffé</option>
+<option value="regression">Regressão</option>
+</select>
+</label>
+<label id="regressionDegreePostWrap" class="hidden">Grau da regressão
+<select id="regressionDegreePost">
+<option value="">Automático</option>
+<option value="1">Linear</option>
+<option value="2">Quadrático</option>
+<option value="3">Cúbico</option>
+</select>
+</label>
+<div id="comparisonButtons" class="comparison-buttons"></div>
+</div>
+<div id="meansResultBox" class="hidden">
+<h4 id="meansFactorLabel">Médias e grupos</h4>
+<div class="table-wrap"><table id="meansTable" class="result-table"></table></div>
+</div>
+</section>
+
+<section class="result-box full">
+<h3>Recomendações</h3>
+<ul id="recommendations" class="recommendations"></ul>
+</section>
+</div>
+<div class="step-nav">
+<button class="btn ghost" data-back="dados" type="button">← Voltar aos dados</button>
+<button class="btn solid big" id="toExportsNext" type="button">Ver exportações →</button>
+</div>
+</section>
+
+<section class="step" id="step-exports">
+<div class="export-grid">
+<button class="export-card" id="downloadPdf" type="button"><b>PDF técnico</b><span>Relatório para diretoria/laudo</span></button>
+<button class="export-card" id="downloadExcel" type="button"><b>Excel</b><span>ANOVA, médias e resumo</span></button>
+<button class="export-card" id="downloadPng" type="button"><b>PNG regressão</b><span>Imagem em alta qualidade</span></button>
+<button class="export-card" id="downloadPlotPdf" type="button"><b>PDF vetorial</b><span>Gráfico de regressão editável</span></button>
+</div>
+<p class="small-note">As exportações são geradas pelo backend. Configure a URL do Render antes de baixar.</p>
+<div class="step-nav">
+<button class="btn ghost" data-back="resultados" type="button">← Voltar aos resultados</button>
+<span></span>
+</div>
+</section>
+</div>
+</section>
+</main>
+</div>
+<footer class="site-footer">
+<div class="site-footer-inner">
+<span class="footer-credit">Desenvolvido por <b>Fernando Paes Lorena</b></span>
+<div class="footer-links">
+<button class="footer-link" type="button" id="openMetodologiaModal">
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
+<span>Metodologia</span>
+</button>
+<a class="footer-link" href="https://github.com/solverestatistica-brazil/solver-estatistica" target="_blank" rel="noopener noreferrer" aria-label="Ver repositorio no GitHub">
+<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.09 3.29 9.4 7.86 10.93.57.1.78-.25.78-.55 0-.27-.01-1-.02-1.96-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.56-.29-5.26-1.28-5.26-5.7 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11.05 11.05 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.58.24 2.75.12 3.04.74.8 1.18 1.83 1.18 3.09 0 4.43-2.71 5.4-5.29 5.69.42.36.78 1.08.78 2.17 0 1.57-.01 2.83-.01 3.22 0 .3.2.66.79.55A11.5 11.5 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5Z"/></svg>
+<span>GitHub</span>
+</a>
+<a class="footer-link footer-link-report" href="https://github.com/solverestatistica-brazil/solver-estatistica/issues/new" target="_blank" rel="noopener noreferrer">
+<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
+<span>Reportar problema</span>
+</a>
+</div>
+</div>
+</footer>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script src="assets/js/config.js?v=20260720"></script>
+<script src="assets/js/app.js?v=20260720"></script>
 <script>
-// Stepper
-function goToStep(n){
-  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
-  document.getElementById('tab-'+n).classList.add('active');
-  document.querySelectorAll('.step-item').forEach((s,i)=>{
-    s.classList.remove('active','done');
-    if(i+1===n)s.classList.add('active');
-    else if(i+1<n)s.classList.add('done');
+// [FIX chart-init-resize] v20260713b - smart polling until canvas has real dimensions
+(function(){
+  function tick(){
+    const c = document.getElementById('regressionChart');
+    if (!c){ setTimeout(tick, 400); return; }
+    if (c.width < 100){
+      window.dispatchEvent(new Event('resize'));
+      setTimeout(tick, 180);
+    } else {
+      setTimeout(tick, 1500); // still keep an eye on it
+    }
+  }
+  if (document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', tick);
+  } else {
+    tick();
+  }
+})();
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const landing = document.getElementById('view-landing');
+  const app = document.getElementById('view-app');
+  const observer = new MutationObserver(() => {
+    if (landing && !landing.classList.contains('hidden')) landing.classList.add('hidden');
+    if (app && app.classList.contains('hidden')) app.classList.remove('hidden');
   });
-  window.scrollTo({top:0,behavior:'smooth'});
-}
-document.querySelectorAll('.step-item').forEach(s=>{
-  s.addEventListener('click',()=>goToStep(+s.dataset.step));
-});
-
-// Chart de regressão
-const doseCurve=Array.from({length:41},(_,i)=>i*5);
-const respCurve=doseCurve.map(x=>45+0.98*x-0.0039*x*x);
-new Chart(document.getElementById('regChart').getContext('2d'),{
-  type:'line',
-  data:{labels:doseCurve,datasets:[
-    {label:'IC sup',data:respCurve.map(y=>y+7),borderColor:'transparent',backgroundColor:'rgba(62,126,84,0.2)',fill:'+1',pointRadius:0,tension:0.35},
-    {label:'IC inf',data:respCurve.map(y=>y-7),borderColor:'transparent',fill:false,pointRadius:0,tension:0.35},
-    {label:'Ajuste',data:respCurve,borderColor:'#3E7E54',borderWidth:3,pointRadius:0,tension:0.35,fill:false},
-    {label:'Observados',data:[{x:0,y:45},{x:40,y:68},{x:80,y:92},{x:120,y:118},{x:160,y:125},{x:200,y:121}],borderColor:'#8FC378',backgroundColor:'#8FC378',pointRadius:6,pointHoverRadius:8,showLine:false,type:'scatter'},
-    {label:'Dose ótima',data:[{x:124.8,y:106.6}],borderColor:'#D4B14A',backgroundColor:'#D4B14A',pointRadius:8,pointStyle:'rectRot',showLine:false,type:'scatter'}
-  ]},
-  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#0d1e15',titleColor:'#F6F9F6',bodyColor:'#a8b8ac',borderColor:'rgba(143,195,120,0.3)',borderWidth:1,padding:10,cornerRadius:8}},scales:{x:{type:'linear',title:{display:true,text:'Dose (kg/ha)',color:'#a8b8ac'},grid:{color:'rgba(143,195,120,0.06)'},ticks:{color:'#a8b8ac',font:{size:11}}},y:{title:{display:true,text:'Resposta (sc/ha)',color:'#a8b8ac'},grid:{color:'rgba(143,195,120,0.06)'},ticks:{color:'#a8b8ac',font:{size:11}}}}}
-});
-
-// Chart de barras
-new Chart(document.getElementById('barsChart').getContext('2d'),{
-  type:'bar',
-  data:{labels:['T1 · 40kg','T2 · 80kg','T3 · 120kg','T4 · 160kg'],datasets:[{label:'Media',data:[64.7,89.4,109.6,124.8],backgroundColor:['rgba(62,126,84,0.35)','rgba(62,126,84,0.55)','rgba(143,195,120,0.7)','rgba(212,177,74,0.85)'],borderColor:['#3E7E54','#3E7E54','#8FC378','#D4B14A'],borderWidth:2,borderRadius:6}]},
-  options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#0d1e15',titleColor:'#F6F9F6',bodyColor:'#a8b8ac',borderColor:'rgba(143,195,120,0.3)',borderWidth:1,padding:10,cornerRadius:8,callbacks:{label:c=>`${c.parsed.y} sc/ha ±5,2`}}},scales:{x:{grid:{display:false},ticks:{color:'#a8b8ac',font:{size:11}}},y:{grid:{color:'rgba(143,195,120,0.06)'},ticks:{color:'#a8b8ac',font:{size:11}}}}}
+  if (landing) observer.observe(landing, {attributes: true, attributeFilter: ['class']});
+  if (app) observer.observe(app, {attributes: true, attributeFilter: ['class']});
+  const navLand = document.getElementById('navActionsLanding');
+  const navApp = document.getElementById('navActionsApp');
+  const navObserver = new MutationObserver(() => {
+    if (navLand && !navLand.classList.contains('hidden')) navLand.classList.add('hidden');
+    if (navApp && navApp.classList.contains('hidden')) navApp.classList.remove('hidden');
+  });
+  if (navLand) navObserver.observe(navLand, {attributes: true, attributeFilter: ['class']});
+  if (navApp) navObserver.observe(navApp, {attributes: true, attributeFilter: ['class']});
 });
 </script>
 </body>
