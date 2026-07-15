@@ -361,6 +361,10 @@ select{
 }
 .data-table input:focus{border-color:var(--brand);background:var(--canvas-elevated);outline:none}
 .small-note{font-size:12px;color:var(--text-d3);margin:8px 0 0}
+.small-note.warning-note{
+  color:#FCA5A5;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.35);
+  border-radius:8px;padding:8px 10px;font-weight:600;
+}
 
 /* significância badges dentro das result-table */
 .result-table td:last-child{font-family:var(--font-mono);font-size:11px;font-weight:600}

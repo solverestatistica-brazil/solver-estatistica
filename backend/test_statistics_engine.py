@@ -443,6 +443,19 @@ def test_dunnett_sem_testemunha_informada_avisa_no_texto():
     assert "não informada" in nota or "nao informada" in nota.lower()
 
 
+def test_dunnett_nao_usa_letras_compactas():
+    """[AUDITORIA P1-02] Dunnett so testa tratamento vs. testemunha, nunca tratamento vs.
+    tratamento. Um compact letter display (CLD) sugeriria relacoes nunca testadas (ex.: dois
+    tratamentos com letras diferentes por acaso de ordenacao). A coluna 'Grupo' agora usa
+    marcadores nao-transitivos: 'testemunha' para o controle, 'sig'/'ns' para os demais."""
+    res = _dbc(DBC_EXEMPLO, comparison_test="dunnett", control_group="T1")
+    comp = res["means"]["comparison"]
+    assert comp["control"] == "T1"
+    assert comp["letters"]["T1"] == "testemunha"
+    for t in ("T2", "T3", "T4"):
+        assert comp["letters"][t] in {"sig", "ns"}
+
+
 def test_scott_knott_agrupa_sem_sobreposicao_de_letras():
     """Scott-Knott nunca da mais de uma letra por tratamento (ao contrario do CLD de Tukey),
     porque particiona em grupos disjuntos."""
@@ -454,6 +467,23 @@ def test_scott_knott_agrupa_sem_sobreposicao_de_letras():
     # T3 tem media bem destacada dos demais (72.8 vs ~58-60) -> deve ficar isolado no grupo 'a'
     assert comp["letters"]["T3"] == "a"
     assert len({comp["letters"][t] for t in ("T1", "T2", "T4")}) == 1
+
+
+def test_scott_knott_formula_canonica_caso_da_auditoria():
+    """[AUDITORIA P0-01, 15/07/2026 pos-commit 0df4f3d] A formula anterior usava B0 (SQ so do
+    melhor split) tambem no denominador de sigma0^2, e qui-quadrado com df=k em vez de
+    k/(pi-2). No caso reproduzivel da auditoria (T1=0,8510003; T2=1,9416329; T3=5,6462449;
+    MSE=0,4982669; 16 GL; r=4), isso fazia o Solver devolver {T1,T2},{T3} em vez do resultado
+    canonico {T1},{T2},{T3} (conferido contra a formula do artigo original, Scott & Knott
+    1974). Este e' O TESTE MAIS IMPORTANTE do Scott-Knott: garante que a formula usa a
+    dispersao TOTAL das medias do subconjunto (nao so do melhor split) no denominador."""
+    from statistics_engine import _scott_knott_groups
+    means = {"T1": 0.8510003, "T2": 1.9416329, "T3": 5.6462449}
+    ns = {"T1": 4, "T2": 4, "T3": 4}
+    groups = _scott_knott_groups(["T1", "T2", "T3"], means, ns, mse=0.4982669, df_error=16, alpha=0.05)
+    assert groups == [["T1"], ["T2"], ["T3"]], (
+        f"esperado 3 grupos singleton (formula canonica), obtido: {groups}"
+    )
 
 
 def test_alpha_mode_fixed_ignora_significancia_do_f():

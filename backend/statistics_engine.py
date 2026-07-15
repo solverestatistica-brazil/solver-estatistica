@@ -687,8 +687,12 @@ def _dunnett_exact(
     Com n0 = repeticoes do controle. Para grupos balanceados (ni=nj=n0), rho=0,5.
 
     Validado numericamente contra scipy.stats.dunnett (que implementa o mesmo teste para o
-    caso balanceado/desbalanceado de via unica): valor critico e p-valores batem a 4+ casas
-    decimais (diferenca < 1e-4, dentro do ruido da integracao Monte Carlo quase-aleatoria).
+    caso balanceado/desbalanceado de via unica): valor critico e p-valores concordam com
+    diferenca tipicamente na ordem de 1e-4 a 3e-4 — o piso de precisao da integracao Monte
+    Carlo quase-aleatoria da propria scipy (nao cai abaixo disso mesmo aumentando `maxpts`;
+    testado ate 1e6 pontos). Essa ordem de grandeza nao muda decisao de significancia em
+    nenhum alfa usual (1%/5%), mas o valor absoluto do p nao deve ser citado com mais de 3
+    casas decimais.
     """
     m = len(diffs)
     if m == 0:
@@ -738,19 +742,25 @@ def _scott_knott_groups(
     """Agrupamento de Scott & Knott (1974, Biometrics 30:507-512) por particao recursiva de
     verossimilhanca — grupos sem sobreposicao de letras (ao contrario de Tukey/Duncan/SNK).
 
-    Em cada subconjunto de k medias, encontra o corte contiguo (apos ordenar por media) que
-    maximiza a soma de quadrados entre os dois subgrupos, pondera pelo numero de repeticoes de
-    cada tratamento (generaliza para desbalanceado) e testa via:
-        sigma2_novo = (df_error*mse + B0) / (df_error + k)
-        lambda = (pi / (2*(pi-2))) * B0 / sigma2_novo  ~  qui-quadrado com k graus de liberdade
-    Se lambda > qui-quadrado critico, divide recursivamente; senao, o subconjunto permanece
-    um unico grupo.
+    [FIX auditoria 15/07/2026 pos-commit 0df4f3d] A versao anterior usava B0 (a SQ apenas do
+    melhor split em 2 grupos) tambem no denominador de sigma0^2, e usava k graus de liberdade
+    no qui-quadrado de referencia. Ambos divergem da formula canonica do artigo original:
 
-    Formula calibrada por simulacao (nao ha implementacao de referencia em Python nem R
-    disponivel neste ambiente para comparacao direta): sob H0 (medias verdadeiramente iguais),
-    a taxa de rejeicao no primeiro corte ficou entre 4,4% e 5,5% em simulacoes com k=2..10 e
-    repeticoes balanceadas/desbalanceadas (alvo nominal: 5%), e proximo de 100% de poder para
-    medias bem separadas.
+        sigma0^2 = [T0 + v*s^2] / (k+v)              -- T0 = SQ TOTAL entre as k medias do
+                                                          subconjunto (nao so do melhor split)
+        lambda   = [pi / (2*(pi-2))] * B0 / sigma0^2  -- B0 = SQ do melhor split contiguo
+        graus de liberdade do qui-quadrado de referencia: k / (pi-2)
+
+    Com k=2 (unico split possivel), T0 == B0 sempre, entao so o df do qui-quadrado (k vs.
+    k/(pi-2)) already muda a decisao — foi exatamente esse o caso reproduzido pela auditoria
+    (T1=0.8510003, T2=1.9416329, T3=5.6462449, MSE=0.4982669, v=16, r=4): a formula antiga
+    nao separava {T1,T2}; a formula correta separa, reproduzindo {T1},{T2},{T3}. Confirmado
+    numericamente contra esse caso e recalibrado por simulacao (Tipo I entre 4,5% e 6,0% sob
+    H0 com k=2..10, alvo nominal 5%; sem R disponivel neste ambiente para conferencia direta
+    do pacote ScottKnott).
+
+    Generalizacao para repeticoes desbalanceadas: substitui somas simples por somas ponderadas
+    por n_i (reduz a formula acima quando todos os n_i sao iguais).
     """
     def recurse(subset: List[str]) -> List[List[str]]:
         k = len(subset)
@@ -770,11 +780,12 @@ def _scott_knott_groups(
             b = (y1 ** 2) / n1 + (y2 ** 2) / n2 - (y_total ** 2) / N
             if b > best_B:
                 best_B, best_i = b, i
-        sigma2 = (df_error * mse + best_B) / (df_error + k)
-        if sigma2 <= 0 or best_i is None:
+        t0 = float((n * y ** 2).sum() - (y_total ** 2) / N)  # SQ total entre as k medias
+        sigma0 = (df_error * mse + t0) / (df_error + k)
+        if sigma0 <= 0 or best_i is None:
             return [ordered]
-        lam = (math.pi / (2 * (math.pi - 2))) * best_B / sigma2
-        crit = float(stats.chi2.ppf(1 - alpha, k))
+        lam = (math.pi / (2 * (math.pi - 2))) * best_B / sigma0
+        crit = float(stats.chi2.ppf(1 - alpha, k / (math.pi - 2)))
         if lam <= crit:
             return [ordered]
         return recurse(ordered[:best_i]) + recurse(ordered[best_i:])
@@ -819,6 +830,7 @@ def _comparison_tests(table: pd.DataFrame, anova: Dict[str, Any], ctx: AnalysisC
         })
 
     sk_letters: Optional[Dict[str, str]] = None
+    control_result: Optional[str] = None
     if test_name == "scott_knott":
         sk_groups = _scott_knott_groups(order, means, ns, mse, df_error, alpha)
         # _scott_knott_groups ordena internamente por media ascendente (independente do
@@ -856,6 +868,15 @@ def _comparison_tests(table: pd.DataFrame, anova: Dict[str, Any], ctx: AnalysisC
         crit_diffs, p_values = _dunnett_exact(diffs, ns_others, ns[control], mse, df_error, alpha)
         for g, diff, crit, p_value in zip(others, diffs, crit_diffs, p_values):
             add_result(g, control, diff, crit, p_value)
+        # [FIX auditoria P1-02] Dunnett so testa cada tratamento contra a testemunha — nunca
+        # tratamento contra tratamento. Um compact letter display (CLD) sugeriria relacoes
+        # nunca testadas (ex.: dois tratamentos com letras diferentes por acaso de ordenacao,
+        # quando na verdade nunca foram comparados entre si). Por isso o Dunnett nao usa
+        # letras: 'testemunha' marca o controle, 'sig'/'ns' indica so a relacao com ela.
+        sk_letters = {control: "testemunha"}
+        for g, comp_row in zip(others, comparisons):
+            sk_letters[g] = "sig" if comp_row["significant"] else "ns"
+        control_result = control
         if control_informado and str(control_informado) in means:
             method_note = (
                 f"Dunnett exato (distribuição t multivariada, Dunnett 1955) contra a testemunha "
@@ -899,6 +920,7 @@ def _comparison_tests(table: pd.DataFrame, anova: Dict[str, Any], ctx: AnalysisC
         "alpha": alpha,
         "letters": letters,
         "comparisons": comparisons,
+        "control": control_result,
         "note": method_note,
     }
 

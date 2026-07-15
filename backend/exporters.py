@@ -336,6 +336,22 @@ def _means_caption(result: Dict[str, Any]) -> Optional[str]:
     test_name = comparison.get("test", "TUKEY")
     alpha = comparison.get("alpha", 0.05)
     alpha_pct = f"{alpha * 100:.0f}%".replace(".", ",")
+    # [FIX auditoria P1-04] Dunnett so compara cada tratamento contra a testemunha — nunca
+    # tratamento contra tratamento. A legenda de "mesma letra" e' invalida aqui (sugeriria
+    # relacoes nunca testadas) e a coluna Grupo nem usa mais letras para este teste.
+    if test_name == "DUNNETT":
+        control = comparison.get("control") or "—"
+        legenda = (
+            f"Coluna <b>Grupo</b>: 'testemunha' identifica o controle ({control}); 'sig' indica "
+            f"diferença estatisticamente significativa contra a testemunha pelo teste de "
+            f"<b>Dunnett</b> exato, ao nível de {alpha_pct}; 'ns' indica ausência de diferença "
+            f"significativa. O Dunnett <b>não</b> compara tratamentos entre si, apenas cada um "
+            f"contra a testemunha."
+        )
+        note = comparison.get("note") or ""
+        if "não informada" in note or "nao informada" in note.lower():
+            legenda += f" <b>Atenção:</b> {note}"
+        return legenda
     return (
         f"Tratamentos seguidos pela mesma letra na coluna <b>Grupo</b> não diferem estatisticamente "
         f"entre si pelo teste de <b>{test_name.title()}</b>, ao nível de {alpha_pct} de significância."

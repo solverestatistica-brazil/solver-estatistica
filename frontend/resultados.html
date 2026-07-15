@@ -138,7 +138,7 @@
               </label>
               <label>Grau de regressão solicitado
                 <select id="regressionDegree">
-                  <option value="">Automático (melhor R² ajustado)</option>
+                  <option value="">Automático (parcimônia)</option>
                   <option value="1">Linear (grau 1)</option>
                   <option value="2">Quadrático (grau 2)</option>
                   <option value="3">Cúbico (grau 3)</option>
@@ -147,7 +147,7 @@
             </div>
             <div class="hint-card">
               <b>Regra do Solver</b>
-              <p>Se uma regressão solicitada não for a melhor para os dados, o backend recomenda automaticamente o modelo com maior R² ajustado. A regressão só é calculada quando há um fator numérico com pelo menos 3 níveis distintos.</p>
+              <p>Sem um grau escolhido manualmente, o backend seleciona automaticamente o maior grau cujo termo de maior ordem é estatisticamente significativo (parcimônia) — não simplesmente o maior R² ajustado, que poderia indicar superajuste. A regressão só é calculada quando há um fator numérico com pelo menos 3 níveis distintos.</p>
             </div>
           </div>
 
@@ -157,6 +157,8 @@
               <div class="manual-builder">
                 <label>Tratamentos <input id="nTreatments" type="number" min="2" value="4"></label>
                 <label>Blocos / Repetições <input id="nBlocks" type="number" min="1" value="4"></label>
+                <label id="factorALevelsWrap">Níveis do fator A <input id="factorALevels" type="number" min="2" value="2"></label>
+                <label id="factorBLevelsWrap">Níveis do fator B <input id="factorBLevels" type="number" min="2" value="2"></label>
                 <button class="btn solid" id="generateTable">Gerar tabela manual</button>
               </div>
               <div class="upload-box">
@@ -196,12 +198,27 @@
                 <section class="result-box">
                   <h3>Médias e grupos</h3>
                   <div class="table-wrap compact"><table id="meansTable" class="result-table"></table></div>
+                  <p class="small-note" id="comparisonNote"></p>
                 </section>
               </div>
               <section class="result-box" id="regressionBox">
                 <h3>Regressão</h3>
                 <div id="regressionSummary" class="regression-summary"></div>
                 <canvas id="regressionChart" height="120"></canvas>
+              </section>
+              <section class="result-box hidden" id="factorComparisonsBox">
+                <h3>Comparações por fator</h3>
+                <div id="factorComparisonsList"></div>
+              </section>
+              <section class="result-box hidden" id="interactionBox">
+                <h3>Desdobramento da interação</h3>
+                <div id="interactionList"></div>
+              </section>
+              <section class="result-box hidden" id="assumptionsBox">
+                <h3>Pressupostos da ANOVA</h3>
+                <p id="assumptionsSummary" class="small-note"></p>
+                <div class="table-wrap compact"><table id="assumptionsTable" class="result-table"></table></div>
+                <p id="transformationNote" class="small-note"></p>
               </section>
               <section class="result-box">
                 <h3>Recomendações</h3>

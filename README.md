@@ -58,6 +58,16 @@ python -m http.server 5500
 
 Abra `http://127.0.0.1:5500` e informe `http://127.0.0.1:8000` no campo "URL do backend Render".
 
+### Testes
+
+```bash
+cd backend
+pip install -r requirements-dev.txt
+pytest -v
+```
+
+O workflow `.github/workflows/backend-tests.yml` roda essa suíte automaticamente em push/PR que tocam `backend/`.
+
 ## Deploy rápido
 
 Leia o passo a passo completo em [`TUTORIAL_GITHUB_RENDER.md`](TUTORIAL_GITHUB_RENDER.md).

@@ -1,8 +1,8 @@
 """
 Testes da API FastAPI (main.py) — Solver Estatistica.
 
-Como rodar (dentro de backend/, com httpx instalado):
-    pip install pytest httpx
+Como rodar (dentro de backend/):
+    pip install -r requirements-dev.txt
     pytest -v test_main.py
 """
 

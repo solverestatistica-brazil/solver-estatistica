@@ -53,17 +53,27 @@
     $('downloadPng').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png'));
     $('downloadPlotPdf').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf'));
     ['design', 'analysisType'].forEach((id) => $(id)?.addEventListener('change', generateManualTable));
+    $('analysisType').addEventListener('change', updateFactorLevelsVisibility);
     $('comparisonTest').addEventListener('change', updateControlGroupVisibility);
     $('alphaMode').addEventListener('change', updateAlphaValueState);
     $('treatmentColumn').addEventListener('change', updateControlGroupOptions);
     updateControlGroupVisibility();
     updateAlphaValueState();
+    updateFactorLevelsVisibility();
   }
 
   function updateControlGroupVisibility() {
     const wrap = $('controlGroupWrap');
     if (!wrap) return;
     wrap.style.display = $('comparisonTest').value === 'dunnett' ? '' : 'none';
+  }
+
+  function updateFactorLevelsVisibility() {
+    const isFactorial = ['factorial', 'split_plot'].includes($('analysisType').value);
+    ['factorALevelsWrap', 'factorBLevelsWrap'].forEach((id) => {
+      const wrap = $(id);
+      if (wrap) wrap.style.display = isFactorial ? '' : 'none';
+    });
   }
 
   function updateAlphaValueState() {
@@ -152,7 +162,11 @@
     if (design === 'DQL') headers.push(row, col);
     if (analysisType === 'factorial' || analysisType === 'split_plot') headers.push(...factors.filter(Boolean));
     if (analysisType === 'regression' && numeric) headers.push(numeric);
-    if (analysisType !== 'regression') headers.push(treatment);
+    // Fatorial/split-plot: nao inclui a coluna de tratamento — o backend a sintetiza a
+    // partir dos fatores. Incluir uma coluna 'tratamento' vazia aqui faria a validacao de
+    // "coluna com valor ausente" disparar, mesmo com os dois fatores corretamente
+    // preenchidos (a sintese so roda quando a coluna esta AUSENTE, nao vazia).
+    if (analysisType !== 'regression' && analysisType !== 'factorial' && analysisType !== 'split_plot') headers.push(treatment);
     if (!headers.includes(response)) headers.push(response);
 
     const rows = [];
@@ -175,15 +189,32 @@
           rows.push(obj);
         }
       }
+    } else if (analysisType === 'factorial' || analysisType === 'split_plot') {
+      // [FIX auditoria P1-05] A versao anterior amarrava o fator A e o fator B ao MESMO
+      // indice de tratamento (ex.: sempre F1x50, F2x100, F3x150, F4x200) — nunca gerava o
+      // produto cartesiano completo entre os niveis dos dois fatores, entao um fatorial
+      // 4x4 nunca tinha as 16 combinacoes que o delineamento exige. Agora cada fator tem seu
+      // proprio numero de niveis e o gerador cria TODAS as combinacoes, em cada bloco.
+      const aLevels = Math.max(2, Number($('factorALevels').value || 2));
+      const bLevels = Math.max(2, Number($('factorBLevels').value || 2));
+      const [factorA, factorB] = factors;
+      for (let b = 1; b <= nBlocks; b++) {
+        for (let a = 1; a <= aLevels; a++) {
+          for (let bLvl = 1; bLvl <= bLevels; bLvl++) {
+            const obj = Object.fromEntries(headers.map((h) => [h, '']));
+            if (headers.includes(block)) obj[block] = `B${b}`;
+            if (factorA && headers.includes(factorA)) obj[factorA] = `A${a}`;
+            if (factorB && headers.includes(factorB)) obj[factorB] = `S${bLvl}`;
+            rows.push(obj);
+          }
+        }
+      }
     } else {
       for (let b = 1; b <= nBlocks; b++) {
         for (let t = 1; t <= nTreatments; t++) {
           const obj = Object.fromEntries(headers.map((h) => [h, '']));
           if (headers.includes(block)) obj[block] = `B${b}`;
           if (headers.includes(treatment)) obj[treatment] = `T${t}`;
-          factors.forEach((f, idx) => {
-            if (headers.includes(f)) obj[f] = idx === 0 ? `F${t}` : `${t * 50}`;
-          });
           rows.push(obj);
         }
       }
@@ -321,8 +352,12 @@
 
     renderSimpleTable('anovaTable', ['source', 'df', 'sum_sq', 'mean_sq', 'f_calc', 'f_5', 'f_1', 'p_value', 'significance'], result?.anova?.table || [], 'significance');
     renderSimpleTable('meansTable', ['treatment', 'mean', 'n', 'sd', 'group'], result?.means?.treatment_means || []);
+    renderComparisonNote(result?.means?.comparison);
     renderRecommendations(result?.recommendations || []);
     renderRegression(result?.regression);
+    renderFactorComparisons(result?.factor_comparisons);
+    renderInteractionBreakdown(result?.interaction_breakdown);
+    renderAssumptions(result?.pressupostos, result?.transformacao_sugerida);
 
     // atualiza previews (mesmo se hidden)
     const firstF = (result?.anova?.table || []).find((r) => r.f_calc != null);
@@ -342,6 +377,10 @@
   function renderSimpleTable(id, columns, rows, sigColumn) {
     const table = $(id);
     table.innerHTML = '';
+    buildTableInto(table, columns, rows, sigColumn);
+  }
+
+  function buildTableInto(table, columns, rows, sigColumn) {
     const thead = document.createElement('thead');
     const trh = document.createElement('tr');
     columns.forEach((c) => {
@@ -376,6 +415,92 @@
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
+  }
+
+  function statusBadgeText(status) {
+    const map = { ok: 'OK', violado: 'VIOLADO', atencao: 'ATENÇÃO', indeterminado: 'INDETERMINADO' };
+    return map[status] || status || '—';
+  }
+
+  function renderFactorComparisons(list) {
+    const box = $('factorComparisonsBox');
+    const container = $('factorComparisonsList');
+    container.innerHTML = '';
+    if (!list || !list.length) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    list.forEach((fc) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'table-wrap compact';
+      wrap.style.marginBottom = '14px';
+      const title = document.createElement('p');
+      title.className = 'small-note';
+      title.innerHTML = `<b>${fc.factor}</b> — teste: ${fc.test} (α=${format(fc.alpha)}, erro ${fc.error_used === 'a' ? '(a)' : '(b)'})`;
+      const table = document.createElement('table');
+      table.className = 'result-table';
+      buildTableInto(table, ['treatment', 'mean', 'n', 'group'], fc.levels || []);
+      wrap.appendChild(title);
+      wrap.appendChild(table);
+      container.appendChild(wrap);
+    });
+  }
+
+  function renderInteractionBreakdown(list) {
+    const box = $('interactionBox');
+    const container = $('interactionList');
+    container.innerHTML = '';
+    if (!list || !list.length) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    list.forEach((block) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'table-wrap compact';
+      wrap.style.marginBottom = '14px';
+      const title = document.createElement('p');
+      title.className = 'small-note';
+      title.innerHTML = `<b>${block.factor} = ${block.level}</b> — níveis de ${block.sub_factor} (${block.test}, α=${format(block.alpha)})`;
+      const table = document.createElement('table');
+      table.className = 'result-table';
+      buildTableInto(table, ['treatment', 'mean', 'n', 'group'], block.levels || []);
+      wrap.appendChild(title);
+      wrap.appendChild(table);
+      container.appendChild(wrap);
+    });
+  }
+
+  function renderAssumptions(pressupostos, transformacao) {
+    const box = $('assumptionsBox');
+    if (!pressupostos) { box.classList.add('hidden'); return; }
+    box.classList.remove('hidden');
+    $('assumptionsSummary').textContent = `Veredito: ${statusBadgeText(pressupostos.veredito)} — ${pressupostos.resumo || ''}`;
+    const rows = Object.entries(pressupostos.testes || {}).map(([chave, t]) => ({
+      pressuposto: chave, teste: t.teste, status: statusBadgeText(t.status),
+      statistic: t.statistic, p_value: t.p_value, mensagem: t.mensagem,
+    }));
+    renderSimpleTable('assumptionsTable', ['pressuposto', 'teste', 'status', 'statistic', 'p_value', 'mensagem'], rows);
+    const note = $('transformationNote');
+    if (transformacao) {
+      note.textContent = `Transformação sugerida (${transformacao.metodo}): ${transformacao.descricao} ${transformacao.mensagem || ''}`;
+    } else {
+      note.textContent = '';
+    }
+  }
+
+  function renderComparisonNote(comparison) {
+    const el = $('comparisonNote');
+    if (!el) return;
+    if (!comparison || !comparison.note) {
+      el.textContent = '';
+      el.classList.remove('warning-note');
+      return;
+    }
+    let text = comparison.note;
+    if (comparison.test === 'DUNNETT' && comparison.control) {
+      text += ` Testemunha usada: ${comparison.control}.`;
+    }
+    el.textContent = text;
+    // Aviso de testemunha nao informada precisa se destacar, nao passar despercebido
+    // como uma nota metodologica comum (era invisivel antes desta correcao).
+    const isWarning = /testemunha não informada|testemunha nao informada/i.test(comparison.note);
+    el.classList.toggle('warning-note', isWarning);
   }
 
   function renderRecommendations(messages) {
@@ -553,7 +678,8 @@
   function labelFor(key) {
     const map = {
       source: 'FV', df: 'GL', sum_sq: 'SQ', mean_sq: 'QM', f_calc: 'F calc', f_5: 'F 5%', f_1: 'F 1%', p_value: 'p', significance: 'Sig.',
-      treatment: 'Tratamento', mean: 'Média', n: 'n', sd: 'DP', group: 'Grupo'
+      treatment: 'Tratamento', mean: 'Média', n: 'n', sd: 'DP', group: 'Grupo',
+      pressuposto: 'Pressuposto', teste: 'Teste', status: 'Status', statistic: 'Estatística', mensagem: 'Mensagem'
     };
     return map[key] || key;
   }
