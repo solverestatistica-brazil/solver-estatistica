@@ -1,8 +1,12 @@
-"""Exportadores de resultados do Solver em PDF, Excel, PNG e PDF vetorial."""
+"""Exportadores Solver — PDF (estilo dashboard escuro), Excel e gráficos.
+
+v2: PDF em fundo preto (#0A0A0A) com verde emerald (#22C55E) como cor de
+marca, no mesmo idioma visual do site (bento cards, tipografia limpa).
+Excel mantém cabeçalho escuro + corpo claro para facilitar impressão.
+"""
 
 from __future__ import annotations
 
-import base64
 import io
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -12,116 +16,62 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
-from openpyxl.chart import BarChart, Reference
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.platypus import (
-    BaseDocTemplate,
-    CondPageBreak,
-    Frame,
-    Image,
-    KeepTogether,
-    NextPageTemplate,
-    PageBreak,
-    PageTemplate,
-    Paragraph,
-    Spacer,
-    Table,
-    TableStyle,
+    BaseDocTemplate, Frame, KeepTogether, PageTemplate, Paragraph, Spacer, Table, TableStyle,
 )
 
 from statistics_engine import analyze
 
-import os
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
+# ============================================================================
+# Paleta v2 — idêntica ao site (dark / emerald)
+# ============================================================================
+CANVAS = colors.HexColor("#0A0A0A")           # fundo da página
+CANVAS_ELEVATED = colors.HexColor("#121212")   # fundo dos cards
+CANVAS_ELEVATED_2 = colors.HexColor("#171717")  # cabeçalho de tabela
+BORDER = colors.HexColor("#262626")            # borda dos cards / linhas
+BORDER_BRAND = colors.HexColor("#166534")      # borda destacada verde
 
-# Tipografia: replica a identidade do site (Exo 2 nos titulos, Open Sans no corpo).
-# Sem acesso a rede neste ambiente de build para baixar as fontes exatas do Google
-# Fonts, entao embutimos Lato (familia humanista, metricamente proxima de Open Sans)
-# direto no repo em backend/fonts/. Se as fontes originais (Exo2-*.ttf/OpenSans-*.ttf)
-# ficarem disponiveis depois, basta trocar os arquivos em backend/fonts/ - o resto do
-# codigo referencia apenas os nomes logicos FONT_* abaixo.
-_FONTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fonts")
-try:
-    pdfmetrics.registerFont(TTFont("Lato", os.path.join(_FONTS_DIR, "Lato-Regular.ttf")))
-    pdfmetrics.registerFont(TTFont("Lato-Bold", os.path.join(_FONTS_DIR, "Lato-Bold.ttf")))
-    pdfmetrics.registerFont(TTFont("Lato-Black", os.path.join(_FONTS_DIR, "Lato-Black.ttf")))
-    pdfmetrics.registerFont(TTFont("Lato-Semibold", os.path.join(_FONTS_DIR, "Lato-Semibold.ttf")))
-    pdfmetrics.registerFontFamily("Lato", normal="Lato", bold="Lato-Bold", italic="Lato", boldItalic="Lato-Bold")
-    FONT_BODY = "Lato"
-    FONT_BODY_BOLD = "Lato-Bold"
-    FONT_HEADING = "Lato-Bold"
-    FONT_HEADING_BLACK = "Lato-Black"
-    FONT_SEMIBOLD = "Lato-Semibold"
-except Exception:
-    FONT_BODY = "Helvetica"
-    FONT_BODY_BOLD = "Helvetica-Bold"
-    FONT_HEADING = "Helvetica-Bold"
-    FONT_HEADING_BLACK = "Helvetica-Bold"
-    FONT_SEMIBOLD = "Helvetica-Bold"
+TEXT_D1 = colors.HexColor("#F5F5F5")           # texto principal
+TEXT_D2 = colors.HexColor("#A3A3A3")           # texto secundário
+TEXT_D3 = colors.HexColor("#666666")           # texto terciário
 
-# [FIX P0-9] Relatorio inteiro (nao so a capa) agora replica o tema escuro real do
-# site (dark green/preto, texto claro) em vez do tema claro original do MVP - o body
-# do PDF ficava branco enquanto o site inteiro e escuro, uma quebra visual grande.
-BRAND_DARK = colors.HexColor("#06120C")
-BRAND_DEEP = colors.HexColor("#24492E")
-BRAND = colors.HexColor("#3E7E54")
-BRAND_BRIGHT = colors.HexColor("#8FC378")
-AMBER = colors.HexColor("#D4B14A")
+BRAND = colors.HexColor("#22C55E")             # verde primário
+BRAND_HI = colors.HexColor("#4ADE80")          # verde highlight
+BRAND_DEEP = colors.HexColor("#166534")        # verde escuro
+BRAND_DIM = colors.HexColor("#0E2818")         # verde muito escuro (fundo de badge)
 
-# Superficies escuras (equivalentes a --bg/--surface/--surface-elev-2 do site).
-SURFACE_BG = colors.HexColor("#06120C")
-SURFACE_CARD = colors.HexColor("#0d1e15")
-SURFACE_CARD_ALT = colors.HexColor("#122820")
-BORDER_LINE = colors.Color(143 / 255, 195 / 255, 120 / 255, alpha=0.16)
-BORDER_STRONG = colors.Color(143 / 255, 195 / 255, 120 / 255, alpha=0.32)
+SUCCESS = BRAND
+SUCCESS_DIM = colors.HexColor("#0E2818")
+WARNING = colors.HexColor("#F5A85B")
+WARNING_DIM = colors.HexColor("#2A1B0A")
+ERROR = colors.HexColor("#EF4444")
+ERROR_DIM = colors.HexColor("#2A0F0F")
+NEUTRAL = colors.HexColor("#737373")
+NEUTRAL_DIM = colors.HexColor("#1F1F1F")
 
-# Texto sobre fundo escuro (equivalentes a --text-l1/--text-l2/--text-l3 do site).
-TEXT_L1 = colors.HexColor("#F6F9F6")
-TEXT_L2 = colors.HexColor("#a8b8ac")
-TEXT_L3 = colors.HexColor("#6a7a6f")
-
-SUCCESS = BRAND_BRIGHT
-SUCCESS_TINT = colors.Color(143 / 255, 195 / 255, 120 / 255, alpha=0.16)
-WARNING = AMBER
-WARNING_TINT = colors.Color(212 / 255, 177 / 255, 74 / 255, alpha=0.16)
-NEUTRAL = colors.HexColor("#94A3B8")
-NEUTRAL_TINT = colors.Color(148 / 255, 163 / 255, 184 / 255, alpha=0.14)
-ACCENT = colors.HexColor("#D16D2E")
-ACCENT_TINT = colors.Color(209 / 255, 109 / 255, 46 / 255, alpha=0.16)
-MUTED_ON_DARK = colors.HexColor("#5C8079")
-
-# Layout: relatorio em A4 retrato (formato padrao de laudo tecnico impresso).
-PAGE_SIZE = A4
-PAGE_W, PAGE_H = PAGE_SIZE
-MARGIN = 1.3 * cm
-CONTENT_W = PAGE_W - 2 * MARGIN
-CARD_W = 5.85 * cm
-CARD_GAP_W = 0.4 * cm
-
-# Hex simples (sem objeto Color) para marcacao inline em Paragraph (<font color="...">).
-BRAND_HEX = "#3E7E54"
-BRAND_BRIGHT_HEX = "#8FC378"
-BRAND_DEEP_HEX = "#24492E"
-
+# Excel — cabeçalho escuro, corpo claro para impressão.
 HEX = {
-    "brand_deep": "24492E",
-    "brand": "3E7E54",
-    "surface_line": "E7ECE9",
-    "surface_subtle": "F4F7F5",
-    "success": "45956E",
-    "success_tint": "E0ECEA",
-    "warning": "C6892E",
-    "warning_tint": "F2E7D2",
-    "neutral": "94A3B8",
-    "neutral_tint": "EEF2F0",
-    "text_l1": "16422D",
-    "text_l2": "3E7E54",
+    "brand_deep": "166534",
+    "brand": "22C55E",
+    "canvas": "0A0A0A",
+    "surface": "FFFFFF",
+    "surface_line": "E5E7EB",
+    "surface_subtle": "F4F6F5",
+    "success": "16A34A",
+    "success_tint": "DCFCE7",
+    "warning": "D97706",
+    "warning_tint": "FEF3C7",
+    "neutral": "737373",
+    "neutral_tint": "F5F5F5",
+    "text_l1": "0F1F14",
+    "text_l2": "525252",
+    "white": "FFFFFF",
 }
 
 DESIGN_LABELS = {
@@ -136,224 +86,140 @@ TYPE_LABELS = {
     "regression": "regressão direta",
 }
 
+
 def _fmt(value: Any) -> str:
     if value is None:
         return "—"
     if isinstance(value, float):
-        decimals = 2 if abs(value) >= 1000 else 4
-        return f"{value:.{decimals}f}".replace(".", ",")
+        return f"{value:.4f}".replace(".", ",")
     return str(value)
+
 
 def _fmt_pct(value: Any) -> str:
     if value is None:
         return "—"
     return f"{value:.2f}%".replace(".", ",")
 
-def _draw_logo_mark(
-    canvas_obj,
-    x: float,
-    y: float,
-    size: float,
-    mark_color=BRAND,
-    trend_color=BRAND_BRIGHT,
-    line_scale: float = 1.6,
-) -> None:
-    """Desenha apenas o icone do logo (moldura + linha de tendencia com seta na ponta),
-    replicando o SVG do site. Parametrizado em x/y/size para ser reutilizado tanto no
-    cabecalho pequeno de cada pagina quanto em tamanho grande na capa."""
+
+def _draw_header_footer(canvas_obj, doc) -> None:
+    """Desenha fundo preto + faixa de marca no topo + rodapé em toda página."""
+    canvas_obj.saveState()
+    width, height = landscape(A4)
+
+    # ---------- fundo preto full-bleed ----------
+    canvas_obj.setFillColor(CANVAS)
+    canvas_obj.rect(0, 0, width, height, fill=1, stroke=0)
+
+    # ---------- header ----------
+    header_h = 2.4 * cm
+    canvas_obj.setFillColor(CANVAS_ELEVATED)
+    canvas_obj.rect(0, height - header_h, width, header_h, fill=1, stroke=0)
+
+    # linha inferior sutil no header
+    canvas_obj.setStrokeColor(BORDER)
+    canvas_obj.setLineWidth(0.5)
+    canvas_obj.line(0, height - header_h, width, height - header_h)
+
+    # logo — mesma geometria do site
+    logo_x, logo_y = 1.3 * cm, height - 1.85 * cm
+    logo_size = 1.1 * cm
     view = 40.0
-    scale = size / view
+    scale = logo_size / view
 
-    def _sp(px: float, py: float) -> Tuple[float, float]:
-        return x + px * scale, y + size - py * scale
+    def _sp(x: float, y: float) -> Tuple[float, float]:
+        return logo_x + x * scale, logo_y + logo_size - y * scale
 
-    canvas_obj.setStrokeColor(mark_color)
-    canvas_obj.setLineWidth(line_scale * scale)
-    canvas_obj.roundRect(x, y, size, size, 10 * scale, fill=0, stroke=1)
+    # moldura do logo
+    canvas_obj.setStrokeColor(BRAND)
+    canvas_obj.setLineWidth(1.6 * scale)
+    canvas_obj.setFillColor(CANVAS)
+    canvas_obj.roundRect(logo_x, logo_y, logo_size, logo_size, 10 * scale, fill=1, stroke=1)
 
-    canvas_obj.setStrokeColor(trend_color)
-    canvas_obj.setLineWidth(2.2 * scale)
+    # trend line + seta
+    canvas_obj.setStrokeColor(BRAND_HI)
+    canvas_obj.setLineWidth(2.4 * scale)
     canvas_obj.setLineCap(1)
     canvas_obj.setLineJoin(1)
 
     trend = canvas_obj.beginPath()
-    trend_points = [(10, 25), (16, 18), (20, 21), (28, 12)]
-    tx0, ty0 = _sp(*trend_points[0])
-    trend.moveTo(tx0, ty0)
-    for px, py in trend_points[1:]:
+    for i, (px, py) in enumerate([(10, 25), (16, 18), (20, 21), (28, 12)]):
         cx, cy = _sp(px, py)
-        trend.lineTo(cx, cy)
+        (trend.moveTo if i == 0 else trend.lineTo)(cx, cy)
     canvas_obj.drawPath(trend, stroke=1, fill=0)
 
-    arrowhead = canvas_obj.beginPath()
-    arrow_points = [(23, 12), (28, 12), (28, 17)]
-    ax0, ay0 = _sp(*arrow_points[0])
-    arrowhead.moveTo(ax0, ay0)
-    for px, py in arrow_points[1:]:
+    arrow = canvas_obj.beginPath()
+    for i, (px, py) in enumerate([(23, 12), (28, 12), (28, 17)]):
         cx, cy = _sp(px, py)
-        arrowhead.lineTo(cx, cy)
-    canvas_obj.drawPath(arrowhead, stroke=1, fill=0)
+        (arrow.moveTo if i == 0 else arrow.lineTo)(cx, cy)
+    canvas_obj.drawPath(arrow, stroke=1, fill=0)
 
-def _draw_header_footer(canvas_obj, doc) -> None:
-    """Desenha a faixa de marca no topo e o rodape em toda pagina de conteudo do PDF
-    (nao roda na capa, que tem seu proprio desenho de pagina inteira)."""
-    canvas_obj.saveState()
-    width, height = PAGE_SIZE
+    # wordmark
+    canvas_obj.setFillColor(TEXT_D1)
+    canvas_obj.setFont("Helvetica-Bold", 15)
+    canvas_obj.drawString(logo_x + 1.4 * cm, height - 1.25 * cm, "SOLVER")
+    canvas_obj.setFont("Helvetica", 6.8)
+    canvas_obj.setFillColor(TEXT_D3)
+    canvas_obj.drawString(logo_x + 1.4 * cm, height - 1.62 * cm, "INTELLIGENCE FOR FIELD TRIALS")
 
-    # [FIX P0-9] Fundo escuro em toda a pagina de conteudo (nao so a faixa do topo),
-    # para bater com o tema escuro real do site em vez de deixar o corpo do relatorio
-    # branco enquanto capa/site sao escuros.
-    canvas_obj.setFillColor(SURFACE_BG)
-    canvas_obj.rect(0, 0, width, height, fill=1, stroke=0)
-
-    canvas_obj.setFillColor(BRAND_DARK)
-    band_clip = canvas_obj.beginPath()
-    band_clip.rect(0, height - 2.2 * cm, width, 2.2 * cm)
-    canvas_obj.clipPath(band_clip, stroke=0, fill=0)
-    canvas_obj.linearGradient(
-        0, height - 2.2 * cm, width, height,
-        [BRAND_DARK, BRAND_DEEP],
-        [0, 1],
-    )
-
-    logo_x, logo_y = 1.3 * cm, height - 1.75 * cm
-    logo_size = 1.05 * cm
-    _draw_logo_mark(canvas_obj, logo_x, logo_y, logo_size)
-
-    canvas_obj.setFillColor(colors.white)
-    canvas_obj.setFont(FONT_HEADING, 15)
-    canvas_obj.drawString(logo_x + 1.35 * cm, height - 1.2 * cm, "SOLVER")
-    canvas_obj.setFont(FONT_BODY, 6.8)
-    canvas_obj.setFillColor(BRAND_BRIGHT)
-    canvas_obj.drawString(logo_x + 1.35 * cm, height - 1.62 * cm, "INTELLIGENCE FOR FIELD TRIALS")
-
-    canvas_obj.setFont(FONT_HEADING, 12.5)
-    canvas_obj.setFillColor(colors.white)
-    canvas_obj.drawRightString(width - 1.3 * cm, height - 1.2 * cm, "Relatório estatístico")
-    canvas_obj.setFont(FONT_BODY, 7.5)
-    canvas_obj.setFillColor(BRAND_BRIGHT)
+    # título direito
+    canvas_obj.setFont("Helvetica-Bold", 12.5)
+    canvas_obj.setFillColor(TEXT_D1)
+    canvas_obj.drawRightString(width - 1.3 * cm, height - 1.25 * cm, "Relatório estatístico")
+    canvas_obj.setFont("Helvetica", 7.5)
+    canvas_obj.setFillColor(BRAND)
     canvas_obj.drawRightString(
         width - 1.3 * cm,
         height - 1.62 * cm,
         datetime.now().strftime("Gerado em %d/%m/%Y às %H:%M"),
     )
 
-    canvas_obj.setStrokeColor(BORDER_STRONG)
-    canvas_obj.setLineWidth(0.6)
+    # ---------- footer ----------
+    canvas_obj.setStrokeColor(BORDER)
+    canvas_obj.setLineWidth(0.5)
     canvas_obj.line(1.3 * cm, 1.15 * cm, width - 1.3 * cm, 1.15 * cm)
-    canvas_obj.setFont(FONT_BODY, 7.5)
-    canvas_obj.setFillColor(TEXT_L2)
+    canvas_obj.setFont("Helvetica", 7.5)
+    canvas_obj.setFillColor(TEXT_D3)
     canvas_obj.drawString(
         1.3 * cm,
         0.75 * cm,
-        "Solver Estatística Experimental · resultados de MVP devem ser validados antes de uso como laudo técnico oficial.",
+        "Solver Estatística Experimental · valide as rotinas antes de usar como laudo oficial.",
     )
-    canvas_obj.setFillColor(TEXT_L2)
-    canvas_obj.drawRightString(width - 1.3 * cm, 0.75 * cm, f"Página {doc.page - 1}")
+    canvas_obj.drawRightString(width - 1.3 * cm, 0.75 * cm, f"Página {doc.page}")
     canvas_obj.restoreState()
 
-def _draw_cover_page(canvas_obj, doc) -> None:
-    """Capa do relatorio: fundo cheio na cor de marca, logo grande, titulo em
-    destaque e uma faixa com os 3 indicadores-chave (eco dos cards do dashboard)."""
-    canvas_obj.saveState()
-    width, height = PAGE_SIZE
-    meta = getattr(doc, "_solver_meta", {}) or {}
-
-    cover_clip = canvas_obj.beginPath()
-    cover_clip.rect(0, 0, width, height)
-    canvas_obj.clipPath(cover_clip, stroke=0, fill=0)
-    canvas_obj.linearGradient(
-        0, height, 0, 0,
-        [colors.HexColor("#0F332B"), BRAND_DARK],
-        [0, 1],
-    )
-
-    canvas_obj.setStrokeColor(BRAND_DEEP)
-    canvas_obj.setLineWidth(1.1)
-    canvas_obj.circle(width / 2, height - 10.6 * cm, 7.4 * cm, fill=0, stroke=1)
-
-    logo_size = 2.55 * cm
-    logo_x = width / 2 - logo_size / 2
-    logo_y = height - 9.35 * cm
-    _draw_logo_mark(canvas_obj, logo_x, logo_y, logo_size, line_scale=1.5)
-
-    canvas_obj.setFillColor(colors.white)
-    canvas_obj.setFont(FONT_HEADING_BLACK, 22)
-    canvas_obj.drawCentredString(width / 2, height - 10.85 * cm, "SOLVER")
-    canvas_obj.setFont(FONT_BODY, 9.5)
-    canvas_obj.setFillColor(BRAND_BRIGHT)
-    canvas_obj.drawCentredString(width / 2, height - 11.45 * cm, "I N T E L L I G E N C E   F O R   F I E L D   T R I A L S")
-
-    canvas_obj.setFillColor(colors.white)
-    canvas_obj.setFont(FONT_HEADING_BLACK, 30)
-    canvas_obj.drawCentredString(width / 2, height - 15.6 * cm, "Relatório Estatístico")
-
-    canvas_obj.setStrokeColor(BRAND)
-    canvas_obj.setLineWidth(2.2)
-    canvas_obj.line(width / 2 - 2.2 * cm, height - 16.35 * cm, width / 2 + 2.2 * cm, height - 16.35 * cm)
-
-    design_label = DESIGN_LABELS.get(meta.get("design"), meta.get("design") or "—")
-    type_label = TYPE_LABELS.get(meta.get("analysis_type"), meta.get("analysis_type") or "—")
-    if meta.get("analysis_type") in (None, "single"):
-        subtitle = design_label
-    else:
-        subtitle = f"{design_label} · {type_label.capitalize()}"
-    canvas_obj.setFont(FONT_SEMIBOLD, 13.5)
-    canvas_obj.setFillColor(BRAND_BRIGHT)
-    canvas_obj.drawCentredString(width / 2, height - 17.35 * cm, subtitle)
-
-    stats = getattr(doc, "_solver_cover_stats", []) or []
-    if stats:
-        strip_y = height - 21.7 * cm
-        strip_w = width - 2 * 2.4 * cm
-        n = len(stats)
-        col_w = strip_w / n
-        canvas_obj.setStrokeColor(BRAND_DEEP)
-        canvas_obj.setLineWidth(0.8)
-        canvas_obj.roundRect(2.4 * cm, strip_y, strip_w, 2.55 * cm, 9, fill=0, stroke=1)
-        for i, (label, value) in enumerate(stats):
-            cx = 2.4 * cm + col_w * i + col_w / 2
-            if i > 0:
-                canvas_obj.setStrokeColor(BRAND_DEEP)
-                canvas_obj.setLineWidth(0.6)
-                canvas_obj.line(2.4 * cm + col_w * i, strip_y + 0.35 * cm, 2.4 * cm + col_w * i, strip_y + 2.2 * cm)
-            canvas_obj.setFont(FONT_HEADING_BLACK, 15.5)
-            canvas_obj.setFillColor(colors.white)
-            canvas_obj.drawCentredString(cx, strip_y + 1.5 * cm, value)
-            canvas_obj.setFont(FONT_HEADING, 7.3)
-            canvas_obj.setFillColor(BRAND_BRIGHT)
-            canvas_obj.drawCentredString(cx, strip_y + 0.75 * cm, label.upper())
-
-    canvas_obj.setStrokeColor(BRAND_DEEP)
-    canvas_obj.setLineWidth(0.6)
-    canvas_obj.line(2.4 * cm, 2.35 * cm, width - 2.4 * cm, 2.35 * cm)
-    canvas_obj.setFont(FONT_BODY, 8.5)
-    canvas_obj.setFillColor(BRAND_BRIGHT)
-    canvas_obj.drawCentredString(width / 2, 1.85 * cm, "Documento gerado automaticamente pela plataforma Solver Estatística Experimental")
-    canvas_obj.setFont(FONT_BODY, 7.5)
-    canvas_obj.setFillColor(MUTED_ON_DARK)
-    canvas_obj.drawCentredString(width / 2, 1.4 * cm, datetime.now().strftime("Gerado em %d/%m/%Y às %H:%M"))
-    canvas_obj.restoreState()
 
 def _kpi_card(label: str, value: str, sub: str) -> Table:
-    label_style = ParagraphStyle("KpiLabel", fontName=FONT_HEADING, fontSize=7.5, textColor=TEXT_L2, leading=9)
-    value_style = ParagraphStyle("KpiValue", fontName=FONT_HEADING_BLACK, fontSize=18, textColor=TEXT_L1, leading=21, spaceBefore=3)
-    sub_style = ParagraphStyle("KpiSub", fontName=FONT_HEADING, fontSize=8, textColor=SUCCESS, spaceBefore=2)
+    """Card de KPI escuro no estilo do dashboard bento."""
+    label_style = ParagraphStyle(
+        "KpiLabel", fontName="Helvetica-Bold", fontSize=7.5,
+        textColor=TEXT_D3, leading=9,
+    )
+    value_style = ParagraphStyle(
+        "KpiValue", fontName="Helvetica-Bold", fontSize=22,
+        textColor=TEXT_D1, leading=24, spaceBefore=6,
+    )
+    sub_style = ParagraphStyle(
+        "KpiSub", fontName="Helvetica-Bold", fontSize=8,
+        textColor=BRAND, spaceBefore=3,
+    )
     card = Table(
-        [[Paragraph(label.upper(), label_style)], [Paragraph(value, value_style)], [Paragraph(sub, sub_style)]],
-        colWidths=[CARD_W],
+        [[Paragraph(label.upper(), label_style)],
+         [Paragraph(value, value_style)],
+         [Paragraph(sub, sub_style)]],
+        colWidths=[8.7 * cm],
     )
     card.setStyle(TableStyle([
-        ("BOX", (0, 0), (-1, -1), 0.8, BORDER_STRONG),
-        ("ROUNDEDCORNERS", [8, 8, 8, 8]),
-        ("BACKGROUND", (0, 0), (-1, -1), SURFACE_CARD),
-        ("TOPPADDING", (0, 0), (-1, -1), 11),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 11),
-        ("LEFTPADDING", (0, 0), (-1, -1), 13),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 13),
+        ("BOX", (0, 0), (-1, -1), 0.8, BORDER),
+        ("ROUNDEDCORNERS", [10, 10, 10, 10]),
+        ("BACKGROUND", (0, 0), (-1, -1), CANVAS_ELEVATED),
+        ("TOPPADDING", (0, 0), (-1, -1), 14),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 14),
+        ("LEFTPADDING", (0, 0), (-1, -1), 16),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 16),
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
     ]))
     return card
+
 
 def _kpi_cards(result: Dict[str, Any]) -> Table:
     cv = result.get("anova", {}).get("cv")
@@ -367,8 +233,8 @@ def _kpi_cards(result: Dict[str, Any]) -> Table:
     card2 = _kpi_card("Linhas analisadas", str(n_rows if n_rows is not None else "—"), "Observações")
     card3 = _kpi_card("Melhor tratamento", str(best_label), best_mean)
 
-    card_w = CARD_W
-    gap_w = CARD_GAP_W
+    card_w = 8.7 * cm
+    gap_w = 0.5 * cm
     layout = Table([[card1, "", card2, "", card3]], colWidths=[card_w, gap_w, card_w, gap_w, card_w])
     layout.setStyle(TableStyle([
         ("LEFTPADDING", (0, 0), (-1, -1), 0),
@@ -379,54 +245,46 @@ def _kpi_cards(result: Dict[str, Any]) -> Table:
     ]))
     return layout
 
+
 def _sig_colors(value: Optional[str]):
+    """Fundo + cor do texto para o badge de significância."""
     if value == "1%":
-        return SUCCESS_TINT, SUCCESS
+        return SUCCESS_DIM, BRAND
     if value == "5%":
-        return WARNING_TINT, WARNING
+        return WARNING_DIM, WARNING
     if value in (None, "—", "-", "ns"):
-        return NEUTRAL_TINT, NEUTRAL
+        return NEUTRAL_DIM, NEUTRAL
     return None, None
 
-def _styled_table(rows: List[List[Any]], sig_col: Optional[int] = None, col0_width: Optional[float] = None) -> Table:
-    """Tabela no estilo do dashboard: sem grade vertical, so linhas horizontais
-    finas + zebra, moldura externa arredondada - evita a cara de planilha crua.
 
-    col0_width: quando informado, fixa a largura da 1a coluna (FV/Tratamento/Nivel)
-    e envolve seu conteudo em Paragraph, para que nomes longos quebrem linha em vez
-    de forcar a tabela a ficar mais larga que o frame (relevante no A4 retrato, onde
-    a largura util e bem menor do que era na paisagem)."""
+def _styled_table(rows: List[List[Any]], sig_col: Optional[int] = None) -> Table:
+    """Tabela escura no estilo do dashboard: header verde-escuro, zebra sutil,
+    moldura arredondada."""
+    table = Table(rows, repeatRows=1)
     n_rows = len(rows)
-    col_widths = None
-    if col0_width is not None and rows:
-        n_cols = len(rows[0])
-        other_w = (CONTENT_W - col0_width) / max(n_cols - 1, 1)
-        col_widths = [col0_width] + [other_w] * (n_cols - 1)
-        col0_style = ParagraphStyle("TableCol0", fontName=FONT_HEADING, fontSize=8.5, textColor=TEXT_L1, leading=10.5)
-        rows = [rows[0]] + [
-            [Paragraph(str(row[0]), col0_style)] + list(row[1:])
-            for row in rows[1:]
-        ]
-    table = Table(rows, colWidths=col_widths, repeatRows=1)
-    table.hAlign = "LEFT"
     style = [
-        ("BACKGROUND", (0, 0), (-1, 0), BRAND_DEEP),
-        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-        ("FONTNAME", (0, 0), (-1, 0), FONT_HEADING),
+        # header
+        ("BACKGROUND", (0, 0), (-1, 0), CANVAS_ELEVATED_2),
+        ("TEXTCOLOR", (0, 0), (-1, 0), TEXT_D2),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, -1), 8.5),
-        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [SURFACE_CARD, SURFACE_CARD_ALT]),
-        ("LINEBELOW", (0, 0), (-1, n_rows - 2), 0.5, BORDER_LINE),
-        ("LINEBELOW", (0, 0), (-1, 0), 1.6, BRAND_BRIGHT),
-        ("BOX", (0, 0), (-1, -1), 0.8, BORDER_STRONG),
+        # corpo
+        ("TEXTCOLOR", (0, 1), (-1, -1), TEXT_D1),
+        ("BACKGROUND", (0, 1), (-1, -1), CANVAS_ELEVATED),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [CANVAS_ELEVATED, colors.HexColor("#0F0F0F")]),
+        # linhas separadoras
+        ("LINEBELOW", (0, 0), (-1, n_rows - 2), 0.5, BORDER),
+        ("LINEBELOW", (0, 0), (-1, 0), 1.4, BRAND),
+        ("BOX", (0, 0), (-1, -1), 0.8, BORDER),
         ("ROUNDEDCORNERS", [8, 8, 8, 8]),
+        # alinhamento e padding
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("TOPPADDING", (0, 0), (-1, -1), 7),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-        ("LEFTPADDING", (0, 0), (-1, -1), 10),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-        ("ALIGN", (1, 1), (-1, -1), "LEFT"),
-        ("FONTNAME", (0, 1), (0, -1), FONT_HEADING),
-        ("TEXTCOLOR", (0, 1), (-1, -1), TEXT_L1),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+        ("LEFTPADDING", (0, 0), (-1, -1), 12),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+        ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+        ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
     ]
     if sig_col is not None:
         for row_idx in range(1, n_rows):
@@ -435,10 +293,11 @@ def _styled_table(rows: List[List[Any]], sig_col: Optional[int] = None, col0_wid
                 continue
             style.append(("BACKGROUND", (sig_col, row_idx), (sig_col, row_idx), bg))
             style.append(("TEXTCOLOR", (sig_col, row_idx), (sig_col, row_idx), fg))
-            style.append(("FONTNAME", (sig_col, row_idx), (sig_col, row_idx), FONT_HEADING))
+            style.append(("FONTNAME", (sig_col, row_idx), (sig_col, row_idx), "Helvetica-Bold"))
             style.append(("ALIGN", (sig_col, row_idx), (sig_col, row_idx), "CENTER"))
     table.setStyle(TableStyle(style))
     return table
+
 
 def _intro_text(result: Dict[str, Any]) -> str:
     meta = result.get("meta", {})
@@ -461,12 +320,14 @@ def _intro_text(result: Dict[str, Any]) -> str:
         f"5% e 1% de probabilidade."
     )
 
-def _anova_caption(result: Dict[str, Any]) -> str:
+
+def _anova_caption() -> str:
     return (
         "Fontes de variação marcadas como <b>1%</b> ou <b>5%</b> apresentam efeito estatisticamente "
         "significativo sobre a variável resposta nesses níveis de probabilidade; <b>ns</b> "
         "(não significativo) indica que não houve evidência estatística de efeito."
     )
+
 
 def _means_caption(result: Dict[str, Any]) -> Optional[str]:
     comparison = (result.get("means") or {}).get("comparison")
@@ -480,333 +341,97 @@ def _means_caption(result: Dict[str, Any]) -> Optional[str]:
         f"entre si pelo teste de <b>{test_name.title()}</b>, ao nível de {alpha_pct} de significância."
     )
 
-def _fmt_p(value: Any) -> str:
-    if value is None:
-        return "—"
-    if value < 0.0001:
-        return "p &lt; 0,0001"
-    return f"p = {_fmt(value)}"
-
-def _accent_heading(text: str) -> str:
-    """Prefixa titulos de secao com um marcador colorido (acabamento do site)."""
-    return f'<font color="{BRAND_BRIGHT_HEX}">▪</font>&nbsp;&nbsp;{text}'
-
-def _anova_narrative(result: Dict[str, Any]) -> Optional[str]:
-    """Paragrafo cientifico que interpreta o teste F para as fontes de variacao reais do experimento."""
-    anova = result.get("anova", {})
-    table = anova.get("table", []) or []
-    cv = anova.get("cv")
-    cv_label = (anova.get("cv_label") or "").strip()
-    named_rows = [r for r in table if r.get("source") not in (None, "Total", "Resíduo", "Residual")]
-    sig_rows = [r for r in named_rows if r.get("significance") in ("1%", "5%")]
-    ns_rows = [r for r in named_rows if r.get("significance") == "ns"]
-    if not table:
-        return None
-
-    parts: List[str] = []
-    if sig_rows:
-        ranked = sorted(sig_rows, key=lambda r: r.get("f_calc") if r.get("f_calc") is not None else -1, reverse=True)
-        lead = ranked[0]
-        clauses = [f"{r['source']} (F = {_fmt(r.get('f_calc'))}; {_fmt_p(r.get('p_value'))})" for r in sig_rows]
-        levels = sorted({r["significance"] for r in sig_rows})
-        if len(sig_rows) > 1:
-            others = [c for r, c in zip(sig_rows, clauses) if r is not lead]
-            parts.append(
-                f"O teste F aponta <b>{lead['source']}</b> como a fonte de variação de maior efeito relativo "
-                f"(F = {_fmt(lead.get('f_calc'))}), acompanhada de efeito também significativo de " +
-                " e ".join(others) +
-                f" sobre a variável resposta, a {' e '.join(levels)} de probabilidade."
-            )
-        else:
-            parts.append(
-                "O teste F indica efeito estatisticamente significativo de " + clauses[0] +
-                f" sobre a variável resposta, a {' e '.join(levels)} de probabilidade."
-            )
-    else:
-        parts.append(
-            "O teste F não indicou efeito estatisticamente significativo para nenhuma fonte de variação testada, "
-            "a 5% de probabilidade — as diferenças observadas entre os grupos podem ser atribuídas ao acaso amostral."
-        )
-    if ns_rows:
-        names = ", ".join(r["source"] for r in ns_rows)
-        parts.append(f"Não houve evidência estatística de efeito para {names} (ns) nesse mesmo nível de exigência.")
-    if cv is not None:
-        qualifier = {
-            "ótimo": "reforça a confiabilidade das conclusões e sugere boa condução experimental",
-            "bom": "indica boa precisão experimental, compatível com ensaios de campo bem conduzidos",
-            "moderado": "sugere precisão experimental moderada — interprete as diferenças com alguma cautela",
-        }.get(cv_label.lower(), "deve ser considerado ao interpretar as diferenças observadas")
-        parts.append(f"O coeficiente de variação experimental (CV = {_fmt_pct(cv)}, {cv_label.lower()}) {qualifier}.")
-    return " ".join(parts)
-
-def _means_narrative(result: Dict[str, Any]) -> Optional[str]:
-    """Paragrafo que contextualiza o melhor e o pior tratamento com base na comparacao de medias real."""
-    means = result.get("means", {}) or {}
-    rows = means.get("treatment_means", []) or []
-    comparison = means.get("comparison")
-    if len(rows) < 2 or not comparison:
-        return None
-    best, worst = rows[0], rows[-1]
-    test_name = str(comparison.get("test", "Tukey")).title()
-    n_groups = len({r.get("group") for r in rows if r.get("group")})
-    group_txt = (
-        f" Ao todo, os {len(rows)} tratamentos avaliados se distribuíram em {n_groups} grupo(s) estatisticamente "
-        f"distinto(s) pelo teste de {test_name}."
-        if n_groups else ""
-    )
-    same_group = best.get("group") and best.get("group") == worst.get("group")
-    if same_group:
-        return (
-            f"O tratamento <b>{best['treatment']}</b> apresentou a maior média ({_fmt(best.get('mean'))}), mas não "
-            f"difere estatisticamente de <b>{worst['treatment']}</b> ({_fmt(worst.get('mean'))}) pelo teste de "
-            f"{test_name}, ambos no grupo '{best.get('group')}' — ou seja, nenhum tratamento se destacou isoladamente "
-            f"como superior aos demais.{group_txt}"
-        )
-    diff = None
-    pct_txt = ""
-    try:
-        diff = float(best.get("mean")) - float(worst.get("mean"))
-        if worst.get("mean"):
-            pct = diff / float(worst["mean"]) * 100
-            pct_txt = f" (+{pct:.1f}%)".replace(".", ",")
-    except Exception:
-        diff = None
-    diff_txt = f", uma diferença de {_fmt(diff)} unidades{pct_txt} em relação ao tratamento de menor média" if diff is not None else ""
-    return (
-        f"O tratamento <b>{best['treatment']}</b> apresentou a maior média ({_fmt(best.get('mean'))}, grupo "
-        f"'{best.get('group','')}'), estatisticamente superior a <b>{worst['treatment']}</b> "
-        f"({_fmt(worst.get('mean'))}, grupo '{worst.get('group','')}') pelo teste de {test_name}{diff_txt}.{group_txt}"
-    )
-
-def _regression_narrative(result: Dict[str, Any]) -> Optional[str]:
-    """Paragrafo que interpreta o modelo de regressao selecionado e o ponto otimo estimado."""
-    reg = result.get("regression")
-    if not reg:
-        return None
-    selected = reg.get("selected_model", {}) or {}
-    opt = selected.get("optimum") or {}
-    r2 = selected.get("adj_r2")
-    x_label = reg.get("x_label") or "x"
-    y_label = reg.get("y_label") or "resposta"
-    parts = [
-        f"O modelo de regressão de grau {reg.get('selected_degree')} apresentou o melhor ajuste entre os "
-        f"candidatos avaliados (R² ajustado = {_fmt(r2)}), descrevendo a relação entre {x_label} e {y_label}."
-    ]
-    if opt.get("x") is not None:
-        goal_word = "máxima" if opt.get("goal") == "max" else "mínima"
-        parts.append(
-            f" A resposta {goal_word} estimada pelo modelo ocorre em {x_label} = {_fmt(opt.get('x'))}, com valor "
-            f"previsto de {_fmt(opt.get('y'))} para {y_label}."
-        )
-        points = reg.get("points") or []
-        xs = [p.get("x") for p in points if p.get("x") is not None]
-        if xs:
-            try:
-                x_min, x_max = min(xs), max(xs)
-                opt_x = float(opt.get("x"))
-                if opt_x <= x_min or opt_x >= x_max:
-                    trend = "subindo" if goal_word == "máxima" else "descendo"
-                    parts.append(
-                        f" Esse ponto ótimo está no limite da faixa efetivamente testada ({_fmt(x_min)} a "
-                        f"{_fmt(x_max)}) — recomenda-se avaliar níveis adicionais além desse limite para confirmar "
-                        f"se a resposta continua {trend} fora do intervalo avaliado."
-                    )
-                else:
-                    parts.append(
-                        f" Como esse ponto está dentro da faixa efetivamente testada ({_fmt(x_min)} a {_fmt(x_max)}), "
-                        f"a estimativa tem boa confiabilidade prática, sem necessidade de extrapolação."
-                    )
-            except (TypeError, ValueError):
-                pass
-    return "".join(parts)
-
-def _executive_summary_box(messages: List[str], width: float) -> Table:
-    """Caixa destacada (callout) para o resumo executivo, com barra de acento a esquerda,
-    no lugar de uma lista solta de marcadores - visual mais premium/relatorio de verdade."""
-    head_style = ParagraphStyle("ExecHead", fontName=FONT_HEADING, fontSize=12, textColor=BRAND_BRIGHT, spaceAfter=9)
-    item_style = ParagraphStyle("ExecItem", fontName=FONT_BODY, fontSize=9.5, leading=14, textColor=TEXT_L1, spaceAfter=3)
-    content: List[Any] = [Paragraph(_accent_heading("Resumo executivo"), head_style)]
-    for msg in messages:
-        content.append(Paragraph("•&nbsp;&nbsp;" + msg, item_style))
-    inner = Table([[c] for c in content], colWidths=[width - 0.9 * cm])
-    inner.setStyle(TableStyle([
-        ("LEFTPADDING", (0, 0), (-1, -1), 0),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 0),
-        ("TOPPADDING", (0, 0), (-1, -1), 1),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-        ("BOTTOMPADDING", (0, 0), (0, 0), 9),
-    ]))
-    bar = Table([[""]], colWidths=[0.14 * cm], rowHeights=[inner.wrap(width - 0.9 * cm, 1000)[1]])
-    bar.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), BRAND)]))
-    outer = Table([[bar, inner]], colWidths=[0.14 * cm, width - 0.14 * cm])
-    outer.setStyle(TableStyle([
-        ("BACKGROUND", (1, 0), (1, -1), SUCCESS_TINT),
-        ("LEFTPADDING", (1, 0), (1, -1), 16),
-        ("RIGHTPADDING", (1, 0), (1, -1), 16),
-        ("TOPPADDING", (1, 0), (1, -1), 14),
-        ("BOTTOMPADDING", (1, 0), (1, -1), 14),
-        ("LEFTPADDING", (0, 0), (0, -1), 0),
-        ("RIGHTPADDING", (0, 0), (0, -1), 0),
-        ("TOPPADDING", (0, 0), (0, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (0, -1), 0),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-    ]))
-    return outer
 
 def build_pdf(payload: Dict[str, Any]) -> bytes:
-    """Gera relatorio tecnico em PDF, com identidade visual Solver, a partir do payload de analise."""
+    """Gera relatório técnico em PDF no estilo dashboard escuro."""
     result = analyze(payload)
     buffer = io.BytesIO()
+    page_size = landscape(A4)
     doc = BaseDocTemplate(
         buffer,
-        pagesize=PAGE_SIZE,
-        leftMargin=MARGIN,
-        rightMargin=MARGIN,
-        topMargin=2.6 * cm,
+        pagesize=page_size,
+        leftMargin=1.3 * cm,
+        rightMargin=1.3 * cm,
+        topMargin=2.75 * cm,
         bottomMargin=1.55 * cm,
         title="Relatório Solver Estatística",
     )
-    content_frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="solver-frame")
-    cover_frame = Frame(MARGIN, MARGIN, doc.width, PAGE_H - 2 * MARGIN, id="solver-cover-frame")
-    doc.addPageTemplates([
-        PageTemplate(id="cover", frames=[cover_frame], onPage=_draw_cover_page),
-        PageTemplate(id="solver", frames=[content_frame], onPage=_draw_header_footer),
-    ])
-
-    meta_for_cover = result.get("meta", {})
-    cv_for_cover = result.get("anova", {}).get("cv")
-    best_for_cover = (result.get("means") or {}).get("best")
-    doc._solver_meta = meta_for_cover
-    doc._solver_cover_stats = [
-        ("Observações", str(meta_for_cover.get("n_rows", "—"))),
-        ("CV experimental", _fmt_pct(cv_for_cover) if cv_for_cover is not None else "—"),
-        ("Melhor tratamento", str(best_for_cover.get("treatment")) if best_for_cover else "—"),
-    ]
+    frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="solver-frame")
+    doc.addPageTemplates([PageTemplate(id="solver", frames=[frame], onPage=_draw_header_footer)])
 
     styles = getSampleStyleSheet()
-    meta_style = ParagraphStyle("SolverMeta", parent=styles["BodyText"], fontName=FONT_BODY, fontSize=9.5, textColor=TEXT_L2, spaceAfter=4)
-    h2 = ParagraphStyle("SolverH2", parent=styles["Heading2"], fontName=FONT_HEADING, fontSize=12.5, textColor=BRAND_BRIGHT, spaceBefore=4, spaceAfter=7)
-    body = ParagraphStyle("SolverBody", parent=styles["BodyText"], fontName=FONT_BODY, fontSize=9.5, leading=14.5, textColor=TEXT_L1)
-    bullet = ParagraphStyle("SolverBullet", parent=body, leftIndent=10, spaceAfter=2)
-    caption = ParagraphStyle("SolverCaption", parent=body, fontSize=8.5, textColor=TEXT_L2, leading=12.5, spaceBefore=6)
+    meta_style = ParagraphStyle(
+        "SolverMeta", parent=styles["BodyText"],
+        fontName="Helvetica", fontSize=9.5, textColor=TEXT_D2, spaceAfter=4,
+    )
+    h2 = ParagraphStyle(
+        "SolverH2", parent=styles["Heading2"],
+        fontName="Helvetica-Bold", fontSize=13, textColor=TEXT_D1,
+        spaceBefore=6, spaceAfter=9,
+    )
+    body = ParagraphStyle(
+        "SolverBody", parent=styles["BodyText"],
+        fontName="Helvetica", fontSize=9.5, leading=14.5, textColor=TEXT_D1,
+    )
+    body_dim = ParagraphStyle(
+        "SolverBodyDim", parent=body, textColor=TEXT_D2,
+    )
+    bullet = ParagraphStyle(
+        "SolverBullet", parent=body, leftIndent=10, spaceAfter=3, textColor=TEXT_D2,
+    )
+    caption = ParagraphStyle(
+        "SolverCaption", parent=body_dim,
+        fontSize=8.5, leading=12.5, spaceBefore=8,
+    )
+    tag = ParagraphStyle(
+        "SolverTag", parent=body, fontName="Helvetica-Bold",
+        fontSize=8.5, textColor=BRAND, leading=11, spaceBefore=0, spaceAfter=6,
+    )
 
     meta = result.get("meta", {})
     story: List[Any] = [
-        NextPageTemplate("solver"),
-        Spacer(1, 1),
-        PageBreak(),
         Paragraph(
-            f"Delineamento <b>{meta.get('design')}</b> · Tipo <b>{meta.get('analysis_type')}</b> · "
-            f"{meta.get('n_rows')} linhas analisadas",
-            meta_style,
+            f"DELINEAMENTO {meta.get('design')} · TIPO {meta.get('analysis_type')} · "
+            f"{meta.get('n_rows')} LINHAS",
+            tag,
         ),
         Paragraph(_intro_text(result), body),
-        Spacer(1, 0.3 * cm),
+        Spacer(1, 0.35 * cm),
         _kpi_cards(result),
-        Spacer(1, 0.4 * cm),
+        Spacer(1, 0.5 * cm),
+        Paragraph("Resumo executivo", h2),
     ]
-    exec_messages = list(result.get("recommendations", []))
-    for note in result.get("anova", {}).get("model_notes", []) or []:
-        exec_messages.append("Nota técnica: " + note)
-    if exec_messages:
-        story.append(_executive_summary_box(exec_messages, doc.width))
-    story.append(Spacer(1, 0.4 * cm))
+    for msg in result.get("recommendations", []):
+        story.append(Paragraph("• " + msg, bullet))
+    story.append(Spacer(1, 0.35 * cm))
 
     anova_rows = [["FV", "GL", "SQ", "QM", "F calc", "F 5%", "F 1%", "p", "Sig"]]
     for r in result.get("anova", {}).get("table", []):
         anova_rows.append([
             r.get("source"), _fmt(r.get("df")), _fmt(r.get("sum_sq")), _fmt(r.get("mean_sq")),
-            _fmt(r.get("f_calc")), _fmt(r.get("f_5")), _fmt(r.get("f_1")), _fmt(r.get("p_value")), r.get("significance"),
+            _fmt(r.get("f_calc")), _fmt(r.get("f_5")), _fmt(r.get("f_1")), _fmt(r.get("p_value")),
+            r.get("significance"),
         ])
-    if len(anova_rows) > 1:
-        anova_block: List[Any] = [
-            Paragraph(_accent_heading("Quadro de ANOVA · Teste F"), h2),
-            _styled_table(anova_rows, sig_col=8, col0_width=4.6 * cm),
-        ]
-        anova_narrative = _anova_narrative(result)
-        if anova_narrative:
-            anova_block.append(Spacer(1, 0.14 * cm))
-            anova_block.append(Paragraph(anova_narrative, body))
-        anova_block.append(Paragraph(_anova_caption(result), caption))
-        story.append(CondPageBreak(3.2 * cm))
-        story.append(KeepTogether(anova_block))
-        story.append(Spacer(1, 0.35 * cm))
+    story.append(KeepTogether([
+        Paragraph("Quadro de ANOVA · Teste F", h2),
+        _styled_table(anova_rows, sig_col=8),
+        Paragraph(_anova_caption(), caption),
+    ]))
+    story.append(Spacer(1, 0.4 * cm))
 
     means_rows = [["Tratamento", "Média", "n", "DP", "Grupo"]]
     for r in result.get("means", {}).get("treatment_means", []):
-        means_rows.append([r.get("treatment"), _fmt(r.get("mean")), _fmt(r.get("n")), _fmt(r.get("sd")), r.get("group", "")])
+        means_rows.append([
+            r.get("treatment"), _fmt(r.get("mean")), _fmt(r.get("n")),
+            _fmt(r.get("sd")), r.get("group", ""),
+        ])
     if len(means_rows) > 1:
-        means_block: List[Any] = [
-            Paragraph(_accent_heading("Médias por tratamento"), h2),
-            _styled_table(means_rows),
-        ]
-        means_narrative = _means_narrative(result)
-        if means_narrative:
-            means_block.append(Spacer(1, 0.14 * cm))
-            means_block.append(Paragraph(means_narrative, body))
-        means_caption = _means_caption(result)
-        if means_caption:
-            means_block.append(Paragraph(means_caption, caption))
-        story.append(CondPageBreak(3.2 * cm))
+        means_block = [Paragraph("Médias por tratamento", h2), _styled_table(means_rows)]
+        m_caption = _means_caption(result)
+        if m_caption:
+            means_block.append(Paragraph(m_caption, caption))
         story.append(KeepTogether(means_block))
-        story.append(Spacer(1, 0.3 * cm))
-
-    comparison = result.get("means", {}).get("comparison")
-    if comparison and comparison.get("comparisons"):
-        comp_rows = [["Grupo A", "Grupo B", "Diferença", "Dif. crítica", "p", "Significativo"]]
-        for c in comparison["comparisons"]:
-            comp_rows.append([
-                c.get("group_a"), c.get("group_b"), _fmt(c.get("diff")), _fmt(c.get("critical_diff")),
-                _fmt(c.get("p_value")), "Sim" if c.get("significant") else "Não",
-            ])
-        comp_block: List[Any] = [
-            Paragraph(_accent_heading(f"Teste de comparação de médias · {comparison.get('test')} (α = {comparison.get('alpha')})"), h2),
-            _styled_table(comp_rows),
-        ]
-        if comparison.get("note"):
-            comp_block.append(Paragraph(comparison.get("note"), caption))
-        story.append(CondPageBreak(3.2 * cm))
-        story.append(KeepTogether(comp_block))
-        story.append(Spacer(1, 0.3 * cm))
-
-    for fc in result.get("factor_comparisons", []) or []:
-        fc_rows = [["Nível", "Média", "n", "Grupo"]]
-        for lv in fc.get("levels", []):
-            fc_rows.append([lv.get("treatment"), _fmt(lv.get("mean")), _fmt(lv.get("n")), lv.get("group", "")])
-        if len(fc_rows) <= 1:
-            continue
-        error_label = "Erro (a)" if fc.get("error_used") == "a" else "Erro (b)"
-        story.append(CondPageBreak(3.2 * cm))
-        story.append(Paragraph(_accent_heading(f"Médias marginais · fator {fc.get('factor')} ({fc.get('test')}, {error_label})"), h2))
-        story.append(_styled_table(fc_rows))
-        alpha_pct = f"{fc.get('alpha', 0.05) * 100:.0f}%".replace(".", ",")
-        story.append(Paragraph(
-            f"Médias do fator <b>{fc.get('factor')}</b> seguidas pela mesma letra não diferem "
-            f"estatisticamente entre si (α = {alpha_pct}).", caption,
-        ))
-        story.append(Spacer(1, 0.3 * cm))
-
-    interaction_blocks = result.get("interaction_breakdown", []) or []
-    if interaction_blocks:
-        story.append(CondPageBreak(3.2 * cm))
-        first_block = interaction_blocks[0]
-        story.append(Paragraph(_accent_heading(
-            f"Desdobramento da interação · {first_block.get('factor')} × {first_block.get('sub_factor')}"), h2,
-        ))
-        story.append(Paragraph(
-            "Interação significativa: cada nível do fator de parcela é analisado separadamente, "
-            "comparando os níveis do outro fator dentro dele (efeitos simples).", caption,
-        ))
-        for block in interaction_blocks:
-            ib_rows = [["Nível", "Média", "n", "Grupo"]]
-            for lv in block.get("levels", []):
-                ib_rows.append([lv.get("treatment"), _fmt(lv.get("mean")), _fmt(lv.get("n")), lv.get("group", "")])
-            if len(ib_rows) <= 1:
-                continue
-            story.append(Spacer(1, 0.15 * cm))
-            story.append(Paragraph(f"{block.get('factor')} = {block.get('level')}", body))
-            story.append(_styled_table(ib_rows))
-        story.append(Spacer(1, 0.3 * cm))
+        story.append(Spacer(1, 0.35 * cm))
 
     reg = result.get("regression")
     if reg:
@@ -814,42 +439,26 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         opt = selected.get("optimum") or {}
         reg_text = f"{selected.get('equation')} &nbsp;·&nbsp; R² ajustado: <b>{_fmt(selected.get('adj_r2'))}</b>"
         if opt.get("x") is not None:
-            reg_text += f" &nbsp;·&nbsp; Ponto ótimo estimado: <b>x = {_fmt(opt.get('x'))}</b>, y = {_fmt(opt.get('y'))}"
-        story.append(CondPageBreak(3.2 * cm))
-        story.append(Paragraph(_accent_heading("Regressão"), h2))
-        story.append(Paragraph(reg_text, body))
-        reg_narrative = _regression_narrative(result)
-        if reg_narrative:
-            story.append(Spacer(1, 0.12 * cm))
-            story.append(Paragraph(reg_narrative, body))
-        plot_b64 = reg.get("plot_png_base64")
-        if plot_b64:
-            img_buffer = io.BytesIO(base64.b64decode(plot_b64))
-            story.append(Spacer(1, 0.25 * cm))
-            story.append(Image(img_buffer, width=17.5 * cm, height=10.13 * cm))
+            reg_text += (
+                f" &nbsp;·&nbsp; Ponto ótimo estimado: "
+                f"<b>x = {_fmt(opt.get('x'))}</b>, y = {_fmt(opt.get('y'))}"
+            )
+        story.append(KeepTogether([
+            Paragraph("Regressão", h2),
+            Paragraph(reg_text, body),
+        ]))
 
     doc.build(story)
     return buffer.getvalue()
 
-_EXCEL_SIG_STYLE = {
-    "1%": ("E5F3EA", "1E6B3E"),
-    "5%": ("FBF1DC", "8A6D1F"),
-    "ns": ("EEF2F0", "6B7A72"),
-    "sim": ("E5F3EA", "1E6B3E"),
-    "não": ("EEF2F0", "6B7A72"),
-    "true": ("E5F3EA", "1E6B3E"),
-    "false": ("EEF2F0", "6B7A72"),
-}
 
-def _style_excel_sheet(worksheet, n_cols: int, sig_col: Optional[int] = None) -> None:
-    """Aplica cabecalho com a cor da marca, zebra e largura automatica as planilhas exportadas.
-
-    sig_col: quando informado (1-indexado), pinta a coluna de significancia/booleano
-    (1%/5%/ns ou Sim/Não/True/False) com o mesmo codigo de cores do PDF - realce visual
-    de dashboard em vez de texto cru, sem precisar abrir o PDF para ver o que e relevante."""
+# ============================================================================
+# EXCEL — mantém cabeçalho escuro + corpo claro (impressão amigável)
+# ============================================================================
+def _style_excel_sheet(worksheet, n_cols: int) -> None:
     header_fill = PatternFill(start_color=HEX["brand_deep"], end_color=HEX["brand_deep"], fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True, size=10)
-    body_font = Font(color=HEX["text_l1"], size=10)
+    header_font = Font(color=HEX["white"], bold=True, size=10, name="Calibri")
+    body_font = Font(color=HEX["text_l1"], size=10, name="Calibri")
     zebra_fill = PatternFill(start_color=HEX["surface_subtle"], end_color=HEX["surface_subtle"], fill_type="solid")
     thin = Side(style="thin", color=HEX["surface_line"])
     border = Border(left=thin, right=thin, top=thin, bottom=thin)
@@ -868,208 +477,59 @@ def _style_excel_sheet(worksheet, n_cols: int, sig_col: Optional[int] = None) ->
             cell.border = border
             if row % 2 == 0:
                 cell.fill = zebra_fill
-        if sig_col is not None:
-            sig_cell = worksheet.cell(row=row, column=sig_col)
-            key = str(sig_cell.value).strip().lower()
-            style = _EXCEL_SIG_STYLE.get(key)
-            if style:
-                bg, fg = style
-                sig_cell.fill = PatternFill(start_color=bg, end_color=bg, fill_type="solid")
-                sig_cell.font = Font(color=fg, bold=True, size=10)
-                sig_cell.alignment = Alignment(horizontal="center", vertical="center")
 
     for col in range(1, n_cols + 1):
         letter = get_column_letter(col)
-        max_len = max((len(str(worksheet.cell(row=r, column=col).value or "")) for r in range(1, worksheet.max_row + 1)), default=10)
+        max_len = max(
+            (len(str(worksheet.cell(row=r, column=col).value or "")) for r in range(1, worksheet.max_row + 1)),
+            default=10,
+        )
         worksheet.column_dimensions[letter].width = min(max(max_len + 4, 12), 40)
 
     worksheet.freeze_panes = "A2"
-    worksheet.row_dimensions[1].height = 20
-    worksheet.sheet_view.showGridLines = False
-    worksheet.sheet_properties.tabColor = HEX["brand"]
+    worksheet.row_dimensions[1].height = 22
 
-def _kpi_block(ws, row: int, col: int, span: int, label: str, value: str, sub: str) -> None:
-    """Escreve um card de KPI (label/valor/sub) mesclado, no estilo dos cards do site/PDF."""
-    fill = PatternFill(start_color="0D1E15", end_color="0D1E15", fill_type="solid")
-    border = Border(
-        left=Side(style="thin", color="8FC378"), right=Side(style="thin", color="8FC378"),
-        top=Side(style="thin", color="8FC378"), bottom=Side(style="thin", color="8FC378"),
-    )
-    for r in range(row, row + 3):
-        ws.merge_cells(start_row=r, start_column=col, end_row=r, end_column=col + span - 1)
-        for c in range(col, col + span):
-            ws.cell(row=r, column=c).fill = fill
-            ws.cell(row=r, column=c).border = border
-    label_cell = ws.cell(row=row, column=col, value=label.upper())
-    label_cell.font = Font(color="A8B8AC", bold=True, size=9)
-    label_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    value_cell = ws.cell(row=row + 1, column=col, value=value)
-    value_cell.font = Font(color="F6F9F6", bold=True, size=20)
-    value_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    sub_cell = ws.cell(row=row + 2, column=col, value=sub)
-    sub_cell.font = Font(color="8FC378", bold=True, size=9)
-    sub_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws.row_dimensions[row + 1].height = 26
-
-def _build_dashboard_sheet(workbook, result: Dict[str, Any], means_df: "pd.DataFrame") -> None:
-    """Aba 'Painel', sempre a primeira: banner com a marca, KPIs em cards, resumo executivo
-    e um grafico de barras das medias por tratamento - visao geral antes de mergulhar nas
-    abas de dados brutos, no espirito de um dashboard em vez de uma planilha crua."""
-    ws = workbook.create_sheet("Painel", 0)
-    ws.sheet_view.showGridLines = False
-    ws.sheet_properties.tabColor = HEX["brand"]
-    ws.sheet_view.zoomScale = 100
-
-    n_cols_layout = 12
-    for col in range(1, n_cols_layout + 1):
-        ws.column_dimensions[get_column_letter(col)].width = 9.5
-
-    dark_fill = PatternFill(start_color="06120C", end_color="06120C", fill_type="solid")
-    for row in range(1, 40):
-        for col in range(1, n_cols_layout + 1):
-            ws.cell(row=row, column=col).fill = dark_fill
-
-    ws.merge_cells("B2:L2")
-    title_cell = ws["B2"]
-    title_cell.value = "SOLVER · Relatório Estatístico"
-    title_cell.font = Font(color="F6F9F6", bold=True, size=18)
-    title_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws.row_dimensions[2].height = 30
-
-    meta = result.get("meta", {})
-    design_label = DESIGN_LABELS.get(meta.get("design"), meta.get("design") or "—")
-    type_label = TYPE_LABELS.get(meta.get("analysis_type"), meta.get("analysis_type") or "—")
-    subtitle = design_label if meta.get("analysis_type") in (None, "single") else f"{design_label} · {type_label.capitalize()}"
-    ws.merge_cells("B3:L3")
-    sub_cell = ws["B3"]
-    sub_cell.value = f"{subtitle} · {meta.get('n_rows', '—')} observações · Gerado em {datetime.now().strftime('%d/%m/%Y às %H:%M')}"
-    sub_cell.font = Font(color="8FC378", bold=True, size=10.5)
-    sub_cell.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    ws.row_dimensions[3].height = 18
-
-    cv = result.get("anova", {}).get("cv")
-    cv_label = result.get("anova", {}).get("cv_label", "Indisponível")
-    best = (result.get("means") or {}).get("best")
-    best_label = str(best.get("treatment")) if best else "—"
-    best_sub = f"Média {_fmt(best.get('mean'))}" if best else "—"
-
-    _kpi_block(ws, 5, 2, 3, "CV experimental", _fmt_pct(cv) if cv is not None else "—", cv_label)
-    _kpi_block(ws, 5, 6, 3, "Linhas analisadas", str(meta.get("n_rows", "—")), "Observações")
-    _kpi_block(ws, 5, 10, 3, "Melhor tratamento", best_label, best_sub)
-
-    row = 9
-    ws.merge_cells(f"B{row}:L{row}")
-    exec_head = ws.cell(row=row, column=2, value="▪  Resumo executivo")
-    exec_head.font = Font(color="8FC378", bold=True, size=12.5)
-    exec_head.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-    row += 1
-    messages = list(result.get("recommendations", []))
-    for note in result.get("anova", {}).get("model_notes", []) or []:
-        messages.append("Nota técnica: " + note)
-    exec_start_row = row
-    for msg in messages:
-        ws.merge_cells(f"B{row}:L{row}")
-        item_cell = ws.cell(row=row, column=2, value="•  " + msg)
-        item_cell.font = Font(color="F6F9F6", size=10)
-        item_cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True, indent=1)
-        ws.row_dimensions[row].height = 28
-        row += 1
-    for r in range(exec_start_row, row):
-        for c in range(2, n_cols_layout + 1):
-            ws.cell(row=r, column=c).fill = PatternFill(start_color="0D1E15", end_color="0D1E15", fill_type="solid")
-
-    row += 1
-    if means_df is not None and not means_df.empty and "mean" in means_df.columns:
-        chart_head_row = row
-        ws.merge_cells(f"B{chart_head_row}:L{chart_head_row}")
-        chart_head = ws.cell(row=chart_head_row, column=2, value="▪  Médias por tratamento")
-        chart_head.font = Font(color="8FC378", bold=True, size=12.5)
-        chart_head.alignment = Alignment(horizontal="left", vertical="center", indent=1)
-        row += 1
-
-        chart = BarChart()
-        chart.type = "col"
-        chart.style = 10
-        chart.title = None
-        chart.y_axis.title = None
-        chart.x_axis.title = None
-        chart.legend = None
-        chart.height = 8
-        chart.width = 24
-        treat_col = list(means_df.columns).index("treatment") + 1
-        mean_col = list(means_df.columns).index("mean") + 1
-        n_data_rows = len(means_df)
-        values_ref = Reference(workbook["Medias"], min_col=mean_col, min_row=1, max_row=1 + n_data_rows)
-        cats_ref = Reference(workbook["Medias"], min_col=treat_col, min_row=2, max_row=1 + n_data_rows)
-        chart.add_data(values_ref, titles_from_data=True)
-        chart.set_categories(cats_ref)
-        series = chart.series[0]
-        series.graphicalProperties.solidFill = "3E7E54"
-        series.graphicalProperties.line.noFill = True
-        ws.add_chart(chart, f"B{row}")
 
 def build_excel(payload: Dict[str, Any]) -> bytes:
-    """Gera planilha Excel com abas de ANOVA, medias e recomendacoes, com a identidade visual Solver."""
     result = analyze(payload)
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
         anova_df = pd.DataFrame(result.get("anova", {}).get("table", []))
         anova_df.to_excel(writer, index=False, sheet_name="ANOVA")
-        anova_sig_col = list(anova_df.columns).index("significance") + 1 if "significance" in anova_df.columns else None
-        _style_excel_sheet(writer.sheets["ANOVA"], len(anova_df.columns) if not anova_df.empty else 1, sig_col=anova_sig_col)
+        _style_excel_sheet(writer.sheets["ANOVA"], len(anova_df.columns) if not anova_df.empty else 1)
 
         means_df = pd.DataFrame(result.get("means", {}).get("treatment_means", []))
         means_df.to_excel(writer, index=False, sheet_name="Medias")
         _style_excel_sheet(writer.sheets["Medias"], len(means_df.columns) if not means_df.empty else 1)
 
-        comparison = result.get("means", {}).get("comparison") or {}
-        if comparison.get("comparisons"):
-            comp_df = pd.DataFrame(comparison.get("comparisons", []))
-            comp_df.to_excel(writer, index=False, sheet_name="Comparacoes")
-            comp_sig_col = list(comp_df.columns).index("significant") + 1 if "significant" in comp_df.columns else None
-            _style_excel_sheet(writer.sheets["Comparacoes"], len(comp_df.columns) if not comp_df.empty else 1, sig_col=comp_sig_col)
-
-        factor_rows = []
-        for fc in result.get("factor_comparisons", []) or []:
-            for lv in fc.get("levels", []):
-                factor_rows.append({
-                    "fator": fc.get("factor"), "nivel": lv.get("treatment"),
-                    "media": lv.get("mean"), "n": lv.get("n"), "grupo": lv.get("group", ""),
-                    "teste": fc.get("test"), "alpha": fc.get("alpha"),
-                })
-        if factor_rows:
-            factor_df = pd.DataFrame(factor_rows)
-            factor_df.to_excel(writer, index=False, sheet_name="Fatores")
-            _style_excel_sheet(writer.sheets["Fatores"], len(factor_df.columns))
-
-        interaction_rows = []
-        for block in result.get("interaction_breakdown", []) or []:
-            for lv in block.get("levels", []):
-                interaction_rows.append({
-                    "fator_parcela": block.get("factor"), "nivel_parcela": block.get("level"),
-                    "fator_subparcela": block.get("sub_factor"), "nivel_subparcela": lv.get("treatment"),
-                    "media": lv.get("mean"), "n": lv.get("n"), "grupo": lv.get("group", ""),
-                })
-        if interaction_rows:
-            interaction_df = pd.DataFrame(interaction_rows)
-            interaction_df.to_excel(writer, index=False, sheet_name="Interacao")
-            _style_excel_sheet(writer.sheets["Interacao"], len(interaction_df.columns))
-
         resumo_df = pd.DataFrame({"recomendacao": result.get("recommendations", [])})
-        resumo_df.to_excel(writer, index=False, sheet_name="Recomendacoes")
-        _style_excel_sheet(writer.sheets["Recomendacoes"], 1)
+        resumo_df.to_excel(writer, index=False, sheet_name="Resumo")
+        _style_excel_sheet(writer.sheets["Resumo"], 1)
 
         if result.get("regression"):
             reg_df = pd.DataFrame(result["regression"].get("models", [])).drop(columns=["coefficients"], errors="ignore")
             reg_df.to_excel(writer, index=False, sheet_name="Regressao")
             _style_excel_sheet(writer.sheets["Regressao"], len(reg_df.columns) if not reg_df.empty else 1)
-
-        _build_dashboard_sheet(writer.book, result, means_df)
-        writer.book.active = 0
     return buffer.getvalue()
 
+
+# ============================================================================
+# GRÁFICOS — matplotlib com tema escuro (idêntico ao site)
+# ============================================================================
+def _apply_dark_theme(ax) -> None:
+    ax.set_facecolor("#0A0A0A")
+    ax.figure.patch.set_facecolor("#0A0A0A")
+    for spine in ax.spines.values():
+        spine.set_color("#262626")
+    ax.tick_params(colors="#A3A3A3", which="both")
+    ax.xaxis.label.set_color("#A3A3A3")
+    ax.yaxis.label.set_color("#A3A3A3")
+    ax.title.set_color("#F5F5F5")
+    ax.grid(True, color="#1F1F1F", alpha=1.0, linewidth=0.6)
+
+
 def build_regression_plot(payload: Dict[str, Any], fmt: str = "png") -> bytes:
-    """Exporta grafico de regressao em PNG ou PDF vetorial."""
+    """Exporta gráfico de regressão em PNG ou PDF vetorial no tema escuro."""
     result = analyze(payload)
     reg = result.get("regression")
     if not reg:
@@ -1078,27 +538,32 @@ def build_regression_plot(payload: Dict[str, Any], fmt: str = "png") -> bytes:
     curve = pd.DataFrame(reg["fitted_curve"])
     selected = reg["selected_model"]
 
-    # [FIX P0-9] Grafico no tema escuro do site (fundo #0d1e15, texto claro,
-    # verde vivo para os dados) em vez do fundo branco original.
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=200)
-    fig.patch.set_facecolor("#0d1e15")
-    ax.set_facecolor("#0d1e15")
-    ax.scatter(points["x"], points["y"], label="Observado", color="#8FC378", edgecolors="#3E7E54", linewidths=0.8, s=45, zorder=3)
-    ax.plot(curve["x"], curve["y"], label=f"Grau {reg['selected_degree']} · R²aj {selected['adj_r2']:.3f}", color="#8FC378", linewidth=2.2)
+    _apply_dark_theme(ax)
+
+    ax.scatter(points["x"], points["y"], label="Observado", color="#22C55E", edgecolor="#0A0A0A", s=55, zorder=3)
+    ax.plot(
+        curve["x"], curve["y"],
+        label=f"Grau {reg['selected_degree']} · R²aj {selected['adj_r2']:.3f}",
+        color="#4ADE80", linewidth=2.4, zorder=2,
+    )
+    ax.fill_between(curve["x"], curve["y"], curve["y"].min(), color="#22C55E", alpha=0.08, zorder=1)
+
     opt = selected.get("optimum") or {}
     if opt.get("x") is not None:
-        ax.axvline(opt["x"], linestyle="--", linewidth=1, color="#D4B14A")
-        ax.scatter([opt["x"]], [opt["y"]], marker="o", s=70, label="Ótimo", color="#D4B14A", zorder=4)
-    ax.set_xlabel(reg.get("x_label", "x"), color="#a8b8ac", fontsize=10)
-    ax.set_ylabel(reg.get("y_label", "Resposta"), color="#a8b8ac", fontsize=10)
-    ax.set_title("Regressão Solver", color="#F6F9F6", fontsize=13, fontweight="bold")
-    ax.tick_params(colors="#a8b8ac")
-    for spine in ax.spines.values():
-        spine.set_color("#8FC37833")
-    ax.grid(True, color="#8FC378", alpha=0.15)
-    legend = ax.legend(facecolor="#122820", edgecolor="#8FC37855", labelcolor="#F6F9F6")
+        ax.axvline(opt["x"], linestyle="--", linewidth=1.1, color="#F5A85B", alpha=0.7)
+        ax.scatter([opt["x"]], [opt["y"]], marker="o", s=90, label="Ótimo",
+                   color="#F5A85B", edgecolor="#0A0A0A", linewidth=2, zorder=4)
+
+    ax.set_xlabel(reg.get("x_label", "x"))
+    ax.set_ylabel(reg.get("y_label", "Resposta"))
+    ax.set_title("Regressão Solver", pad=14, fontweight="bold")
+    leg = ax.legend(facecolor="#121212", edgecolor="#262626", labelcolor="#F5F5F5", framealpha=1.0)
+    for text in leg.get_texts():
+        text.set_color("#F5F5F5")
+
     output = io.BytesIO()
     fig.tight_layout()
-    fig.savefig(output, format=fmt, facecolor=fig.get_facecolor())
+    fig.savefig(output, format=fmt, facecolor=fig.get_facecolor(), edgecolor="none")
     plt.close(fig)
     return output.getvalue()
