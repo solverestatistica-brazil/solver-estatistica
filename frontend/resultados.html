@@ -1,580 +1,229 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<meta name="description" content="Solver Estatistica Experimental: ANOVA, comparacao de medias e regressao para ensaios de campo." />
-  <!-- [FIX 3.6] Favicon inline (SVG, zero request extra) -->
-  <link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="%23081C13" stroke="%233E7E54" stroke-width="1.6"/><polyline points="10,25 16,18 20,21 28,12" stroke="%238FC378" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><polyline points="23,12 28,12 28,17" stroke="%238FC378" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>' />
-  <meta name="theme-color" content="#06120C" />
-  <!-- Open Graph -->
-  <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Solver Estatistica Experimental" />
-  <meta property="og:title" content="Solver Estatistica Experimental" />
-  <meta property="og:description" content="ANOVA para DIC, DBC e DQL, comparacao de medias, regressao e exportacao PDF/Excel em portugues, direto no navegador." />
-  <meta property="og:url" content="https://www.solver-estatistica.com.br/" />
-  <meta property="og:locale" content="pt_BR" />
-  <!-- Twitter/X card -->
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Solver Estatistica Experimental" />
-  <meta name="twitter:description" content="ANOVA, comparacao de medias e regressao para ensaios de campo." />
-<title>Solver Estatística — Ambiente de análise</title>
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700&family=Montserrat:wght@500;600;700&family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="assets/css/styles.css?v=20260720" />
-<style id=pbi>body{background:#06120C!important;color:#F6F9F6!important;font-family:"Open Sans",sans-serif!important}.btn{font-family:"Exo 2"!important;font-weight:600!important;border-radius:10px!important}.btn.solid{background:#3E7E54!important;color:#fff!important;border:none!important}.btn.ghost{background:transparent!important;color:#F6F9F6!important;border:1px solid rgba(143,195,120,.28)!important}.app-panel{background:transparent!important;border:none!important;padding:0!important;box-shadow:none!important}.section-head span{color:#8FC378!important;font-family:"Exo 2"!important;font-weight:700!important;letter-spacing:3px!important;text-transform:uppercase!important;font-size:11px!important}.section-head h2{font-family:"Exo 2"!important;color:#F6F9F6!important;font-weight:700!important}.section-head p{color:#a8b8ac!important}.status-bar{background:#0d1e15!important;border:1px solid rgba(143,195,120,.14)!important;border-radius:14px!important;padding:14px 20px!important}.status-pill{background:rgba(143,195,120,.14)!important;color:#8FC378!important;padding:4px 12px!important;border-radius:999px!important;font-family:"Exo 2"!important;font-weight:700!important}.stepper{background:transparent!important;border:none!important;padding:0!important;display:grid!important;grid-template-columns:repeat(4,1fr)!important;gap:12px!important;margin-bottom:24px!important}.step-pill{background:#0d1e15!important;border:1px solid rgba(143,195,120,.14)!important;border-radius:12px!important;padding:16px 20px!important;color:#F6F9F6!important;font-family:"Exo 2"!important;font-weight:700!important;font-size:14px!important;display:flex!important;align-items:center!important;gap:10px!important;justify-content:flex-start!important}.step-pill.active{background:linear-gradient(140deg,rgba(62,126,84,.22),#0d1e15)!important;border-color:#8FC378!important}.step-pill i{background:transparent!important;color:#6a7a6f!important;font-style:normal!important;font-weight:700!important;font-size:13px!important;width:auto!important;height:auto!important;border-radius:0!important;display:inline!important;font-family:"Exo 2"!important}.step-pill.active i{color:#8FC378!important}.workspace-flat{background:transparent!important;border:none!important;padding:0!important}.step{background:#0d1e15!important;border:1px solid rgba(143,195,120,.14)!important;border-radius:16px!important;padding:24px!important;color:#F6F9F6!important;margin-bottom:16px!important}.type-grid,.choice-grid{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))!important;gap:14px!important}.type-card,.choice-card{background:linear-gradient(180deg,rgba(143,195,120,.05),rgba(143,195,120,.015))!important;border:1px solid rgba(143,195,120,.14)!important;border-radius:14px!important;padding:20px!important;color:#F6F9F6!important;text-align:left!important;display:flex!important;flex-direction:column!important;gap:8px!important;font-family:"Exo 2"!important}.type-card b,.choice-card b{color:#F6F9F6!important;font-size:15px!important}.type-card span,.choice-card span{color:#a8b8ac!important;font-size:12.5px!important;font-family:"Open Sans"!important}.type-card.active,.choice-card.active{border-color:#8FC378!important;background:linear-gradient(140deg,rgba(62,126,84,.15),#0d1e15)!important}.icon-circle{background:rgba(143,195,120,.12)!important;color:#8FC378!important;border-radius:10px!important}.sub-options-row label,.form-grid label{color:#a8b8ac!important;font-family:"Exo 2"!important;font-size:12px!important;text-transform:uppercase!important;letter-spacing:.5px!important;font-weight:600!important}.sub-options-row select,.form-grid select,.form-grid input,.sub-options-row input,.data-subpanel input{background:rgba(0,0,0,.25)!important;border:1px solid rgba(143,195,120,.14)!important;color:#F6F9F6!important;padding:10px 14px!important;border-radius:9px!important}.hint-card{background:linear-gradient(135deg,rgba(212,177,74,.08),#0d1e15)!important;border:1px solid rgba(212,177,74,.22)!important;border-radius:12px!important;padding:18px 22px!important;color:#a8b8ac!important}.hint-card b{color:#D4B14A!important;font-family:"Exo 2"!important}.data-subpanel{background:rgba(143,195,120,.03)!important;border:1px solid rgba(143,195,120,.14)!important;border-radius:12px!important;padding:18px!important}.small-note{color:#6a7a6f!important}.link-btn{color:#8FC378!important;background:transparent!important;border:none!important;text-decoration:underline!important}.table-wrap{border-radius:12px;border:1px solid rgba(143,195,120,.14)!important;background:#0d1e15!important}.data-table,.result-table{width:100%!important;border-collapse:collapse!important;background:transparent!important}.data-table th,.result-table th{color:#a8b8ac!important;text-transform:uppercase!important;font-size:11px!important;letter-spacing:1px!important;font-family:"Exo 2"!important;font-weight:700!important;padding:12px 10px!important;border-bottom:1px solid rgba(143,195,120,.14)!important;background:rgba(143,195,120,.06)!important}.data-table td,.result-table td{color:#F6F9F6!important;padding:11px 10px!important;border-bottom:1px solid rgba(143,195,120,.14)!important;font-size:13px!important;background:transparent!important}.data-table input{background:transparent!important;border:1px solid transparent!important;color:#F6F9F6!important;width:100%}mark{background:rgba(212,177,74,.18)!important;color:#D4B14A!important;padding:3px 10px!important;border-radius:999px!important;font-family:"Exo 2"!important;font-size:10.5px!important;font-weight:700!important;display:inline-block!important}.result-cards{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))!important;gap:16px!important}.result-cards article{background:linear-gradient(140deg,rgba(62,126,84,.22),#0d1e15)!important;border:1px solid rgba(143,195,120,.35)!important;border-radius:16px!important;padding:22px!important;color:#F6F9F6!important}.result-cards article span{color:#a8b8ac!important;font-family:"Exo 2"!important;text-transform:uppercase!important;letter-spacing:2px!important;font-size:11px!important;display:block!important;margin-bottom:12px!important;font-weight:600!important}.result-cards article strong{font-family:"Exo 2"!important;font-size:36px!important;color:#F6F9F6!important;display:block!important;letter-spacing:-.02em!important;margin-bottom:8px!important;font-weight:700!important;line-height:1!important}.result-cards article em{font-style:normal!important;font-size:11.5px!important;color:#8FC378!important;background:rgba(143,195,120,.14)!important;padding:3px 10px!important;border-radius:6px!important;display:inline-block!important;font-family:"Exo 2"!important;font-weight:600!important}.result-box{background:#0d1e15!important;border:1px solid rgba(143,195,120,.14)!important;border-radius:16px!important;padding:22px!important;margin:16px 0!important}.result-box h3{font-family:"Exo 2"!important;font-size:13px!important;text-transform:uppercase!important;letter-spacing:1px!important;color:#a8b8ac!important;font-weight:700!important;background:transparent!important;border:none!important;padding:0!important;margin-bottom:14px!important}.recommendations{list-style:none!important;padding:0!important;display:grid!important;gap:10px!important}.recommendations li{background:rgba(143,195,120,.05)!important;border-left:3px solid #8FC378!important;padding:12px 16px!important;border-radius:0 10px 10px 0!important;color:#F6F9F6!important}.empty-state{background:#0d1e15!important;border:1px dashed rgba(143,195,120,.28)!important;border-radius:16px!important;padding:40px 24px!important;color:#a8b8ac!important;text-align:center}.empty-state b{color:#F6F9F6!important;font-family:"Exo 2"!important}.advisory{background:linear-gradient(135deg,rgba(212,177,74,.1),#0d1e15)!important;border:1px solid rgba(212,177,74,.28)!important;border-radius:12px!important;padding:18px 22px!important;color:#a8b8ac!important}.advisory b{color:#D4B14A!important;font-family:"Exo 2"!important;display:block;margin-bottom:6px}.export-grid{display:grid!important;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))!important;gap:16px!important}.export-card{background:#0d1e15!important;border:1px solid rgba(143,195,120,.14)!important;border-radius:14px!important;padding:22px!important;color:#F6F9F6!important;text-align:left!important;display:flex!important;flex-direction:column!important;gap:6px!important}.export-card:hover{border-color:#8FC378!important;background:linear-gradient(140deg,rgba(62,126,84,.12),#0d1e15)!important}.export-card b{color:#F6F9F6!important;font-family:"Exo 2"!important;font-size:15px!important}.export-card span{color:#a8b8ac!important;font-size:12.5px!important}.step-nav{border-top:1px solid rgba(143,195,120,.14);margin-top:22px;padding-top:20px;display:flex;justify-content:space-between}.site-footer{background:transparent!important;border-top:1px solid rgba(143,195,120,.14)!important}.footer-credit b{color:#F6F9F6!important;font-family:"Exo 2"!important}.footer-link{color:#a8b8ac!important}.footer-link:hover{color:#8FC378!important}dialog.formatos-modal{background:#0d1e15!important;color:#F6F9F6!important;border:1px solid rgba(143,195,120,.28)!important;border-radius:18px!important;max-width:640px!important;margin:auto!important;padding:30px 32px!important;box-sizing:border-box!important}.modal-close{background:transparent!important;border:none!important;color:#a8b8ac!important;font-size:22px!important}.metodologia-body b{color:#8FC378!important;font-family:"Exo 2"!important}.metodologia-body{padding-bottom:4px!important}.page-shell{max-width:1360px!important;margin:0 auto!important;padding:0 32px!important}</style><style id='pbi-fix'>:root{--brand:#3E7E54!important;--brand-bright:#8FC378!important;--surface:#0d1e15!important;--surface-line:rgba(143,195,120,.14)!important;--surface-elev:#0d1e15!important;--surface-elev-2:#122820!important;--text-l1:#F6F9F6!important;--text-l2:#a8b8ac!important;--text-l3:#6a7a6f!important;--bg:#06120C!important;--card-bg:#0d1e15!important;--input-bg:rgba(0,0,0,.35)!important}.logo-group svg rect{stroke:#3E7E54!important}.logo-group svg polyline{stroke:#8FC378!important}.logo-group strong{font-family:"Exo 2",system-ui,sans-serif!important;font-size:18px!important;font-weight:700!important;letter-spacing:2px!important;color:#F6F9F6!important}.logo-group small{font-family:"Open Sans",system-ui,sans-serif!important;font-size:9px!important;font-weight:400!important;letter-spacing:3px!important;color:#a8b8ac!important}html,body{background:#06120C!important;color:#F6F9F6!important}.sub-options-row,.sub-options-row>*{background:transparent!important}.sub-options-row label{background:rgba(143,195,120,.03)!important;border:1px solid rgba(143,195,120,.14)!important;border-radius:12px!important;padding:14px 18px!important}select,input[type='text'],input[type='url'],input[type='number'],input:not([type]){background:rgba(0,0,0,.35)!important;color:#F6F9F6!important;border:1px solid rgba(143,195,120,.14)!important;padding:10px 14px!important;border-radius:9px!important;font-family:'Open Sans',sans-serif!important;font-size:14px!important;-webkit-appearance:none;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23a8b8ac%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>')!important;background-repeat:no-repeat!important;background-position:right 12px center!important;background-size:16px!important;padding-right:36px!important}select option{background:#0d1e15!important;color:#F6F9F6!important}.advanced-toggle{background:rgba(143,195,120,.03)!important;border:1px solid rgba(143,195,120,.14)!important;border-radius:12px!important;padding:0!important;margin-top:14px!important}.advanced-toggle summary{color:#a8b8ac!important;padding:14px 18px!important;font-family:'Exo 2',sans-serif!important;font-weight:600!important;font-size:13px!important;background:transparent!important;list-style:none!important;cursor:pointer!important}.advanced-toggle summary::-webkit-details-marker{display:none}.advanced-toggle[open] summary{border-bottom:1px solid rgba(143,195,120,.14)!important}.advanced-toggle .form-grid,.advanced-toggle .api-settings-body{padding:18px!important;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}.result-cards article em{background:rgba(143,195,120,.14)!important;color:#8FC378!important;padding:4px 12px!important;border-radius:6px!important;font-family:'Exo 2',sans-serif!important;font-weight:600!important;font-size:11.5px!important;text-transform:none!important;letter-spacing:0!important;font-style:normal!important;display:inline-block!important}.hint-card,.advisory{color:#a8b8ac!important}.hint-card p,.advisory p{color:#a8b8ac!important}.result-box .table-wrap{background:transparent!important;border:none!important;padding:0!important}.result-box table{background:transparent!important}.step-nav .btn.ghost{background:transparent!important;color:#F6F9F6!important;border:1px solid rgba(143,195,120,.28)!important}.step-nav .btn.solid.big{background:#3E7E54!important;color:#fff!important}.btn:not(.solid):not(.ghost){background:rgba(143,195,120,.08)!important;color:#F6F9F6!important;border:1px solid rgba(143,195,120,.14)!important}.type-card:hover,.choice-card:hover,.export-card:hover{border-color:#8FC378!important}.type-card b,.choice-card b,.export-card b{font-family:'Exo 2',sans-serif!important;font-weight:700!important;color:#F6F9F6!important}.status-bar .api-indicator{color:#a8b8ac!important;font-family:'Exo 2',sans-serif!important}.api-dot{background:#8FC378!important;box-shadow:0 0 12px #8FC378!important}.manual-fields-dynamic{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}.regression-summary span{background:rgba(143,195,120,.08)!important;color:#F6F9F6!important;border:1px solid rgba(143,195,120,.14)!important;padding:6px 12px!important;border-radius:8px!important;font-family:'Exo 2',sans-serif!important;font-size:12px!important}.table-tools{display:flex;gap:8px;margin:12px 0}.table-tools .btn{padding:8px 14px!important;font-size:12.5px!important}.btn.ghost.danger{background:rgba(217,82,82,.1)!important;color:#d95252!important;border-color:rgba(217,82,82,.25)!important}.comparison-controls .btn.solid{background:#3E7E54!important;color:#fff!important;padding:10px 20px!important}#regressionChart{background:transparent!important;filter:invert(0)}</style><style id='pbi-fix2'>/* Table rows all dark */.result-table tr,.result-table tbody tr,.result-table tr:nth-child(even),.result-table tr:nth-child(odd),.result-table tbody tr:nth-child(even),.result-table tbody tr:nth-child(odd),.result-table thead tr,.data-table tr,.data-table tbody tr,.data-table tr:nth-child(even),.data-table tr:nth-child(odd){background:transparent!important;background-color:transparent!important;background-image:none!important}.result-table tr:hover,.data-table tr:hover{background:rgba(143,195,120,.04)!important}/* Comparison controls no white card */#comparisonPanel,.comparison-controls,.result-box #comparisonPanel{background:transparent!important;border:none!important;padding:0!important}#comparisonPanel>*,.comparison-controls>*{background:transparent!important}.result-box .comparison-controls{background:transparent!important;border:none!important;padding:8px 0!important}#meansResultBox{background:rgba(143,195,120,.03)!important;border:1px solid rgba(143,195,120,.14)!important;border-radius:12px!important;padding:16px!important;margin-top:14px!important}/* Comparar medias button */.comparison-controls .btn,.btn.solid.big,button.btn.solid{background:#3E7E54!important;color:#fff!important;border:none!important;padding:10px 24px!important;font-family:'Exo 2',sans-serif!important;font-weight:700!important;opacity:1!important}.comparison-controls .btn.solid:hover{background:#8FC378!important}/* Comparison select stays dark */.comparison-controls select,#comparisonTestPost,#regressionDegreePost{background:rgba(0,0,0,.35)!important;color:#F6F9F6!important;border:1px solid rgba(143,195,120,.28)!important;padding:9px 14px!important;border-radius:9px!important;-webkit-appearance:none;appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23a8b8ac%22 stroke-width=%222%22><polyline points=%226 9 12 15 18 9%22/></svg>')!important;background-repeat:no-repeat!important;background-position:right 12px center!important;background-size:16px!important;padding-right:36px!important}/* File input button */input[type='file']{background:transparent!important;color:#a8b8ac!important;padding:0!important;font-family:'Open Sans',sans-serif!important;font-size:13px!important;border:none!important;background-image:none!important;padding-right:0!important}input[type='file']::-webkit-file-upload-button,input[type='file']::file-selector-button{background:#3E7E54!important;color:#fff!important;border:none!important;border-radius:8px!important;padding:10px 18px!important;font-family:'Exo 2',sans-serif!important;font-weight:600!important;font-size:13px!important;cursor:pointer!important;margin-right:12px!important}input[type='file']::-webkit-file-upload-button:hover,input[type='file']::file-selector-button:hover{background:#8FC378!important}/* Dose advisory MUST be visible when not .hidden */#doseAdvisory:not(.hidden){display:block!important;background:linear-gradient(135deg,rgba(212,177,74,.15),#0d1e15)!important;border:1px solid rgba(212,177,74,.35)!important;border-radius:14px!important;padding:20px 24px!important;margin:16px 0!important;color:#F6F9F6!important}#doseAdvisory b{color:#D4B14A!important;font-family:'Exo 2',sans-serif!important;font-size:15px!important;display:block;margin-bottom:8px}#doseAdvisory p{color:#a8b8ac!important;margin-bottom:14px}#switchToRegression{background:#D4B14A!important;color:#0d1e15!important;border:none!important;padding:10px 20px!important;border-radius:9px!important;font-family:'Exo 2',sans-serif!important;font-weight:700!important;cursor:pointer!important}#switchToRegression:hover{background:#B8933A!important;color:#fff!important}/* Result box uniform bg */.result-box.full{background:#0d1e15!important}/* Empty state clear */#emptyResults{background:transparent!important;border:1px dashed rgba(143,195,120,.28)!important}/* Ensure white boxes in dark */.result-box>*{background:transparent!important}.result-box .table-wrap{background:transparent!important;border:1px solid rgba(143,195,120,.14)!important;border-radius:10px!important;overflow:hidden}/* Fix any stray white cards */body div[class*='card']:not(.type-card):not(.choice-card):not(.export-card):not(.result-cards):not(.capability-card):not(.audience-card){background-color:transparent!important}</style></head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Solver — dashboard de análise estatística (ANOVA, médias e regressão)." />
+  <title>Análise · Solver Estatística</title>
+
+  <link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="%230A0A0A" stroke="%2322C55E" stroke-width="1.6"/><polyline points="10,25 16,18 20,21 28,12" stroke="%234ADE80" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><polyline points="23,12 28,12 28,17" stroke="%234ADE80" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>' />
+  <meta name="theme-color" content="#0A0A0A" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/styles.css" />
+</head>
 <body>
 <div class="page-shell">
-<nav class="nav">
-<a class="logo-group" href="index.html" id="logoHome" aria-label="Solver Estatística">
-<svg width="42" height="42" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-<rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="rgba(255,255,255,0.03)" style="stroke:var(--brand)" stroke-width="1.6"/>
-<polyline points="10,25 16,18 20,21 28,12" style="stroke:var(--brand-bright)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-<polyline points="23,12 28,12 28,17" style="stroke:var(--brand-bright)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-</svg>
-<span>
-<strong>SOLVER</strong>
-<small>INTELLIGENCE FOR FIELD TRIALS</small>
-</span>
-</a>
-<div class="nav-actions hidden" id="navActionsLanding">
-<button class="btn ghost" type="button" id="openFormatosModalNav">Formato dos dados</button>
-<button class="btn solid" id="navOpenApp" type="button">Iniciar análise</button>
-</div>
-<div class="nav-actions" id="navActionsApp">
-<button class="btn ghost" id="newAnalysisBtn" type="button">↺ Nova análise</button>
-<a class="btn ghost" href="index.html" id="navBackToSite">← Voltar à capa</a>
-</div>
-</nav>
 
-<div id="view-landing" class="hidden">
-<header class="hero" id="top">
-<section class="hero-copy">
-<span class="badge"><i></i>Estatística experimental de precisão</span>
-<h1>Transforme ensaios de campo em <em>decisões estatísticas seguras</em>.</h1>
-<p>Faça ANOVA para DIC, DBC e DQL, compare médias, avalie regressões e gere relatórios técnicos em PDF ou Excel com visual profissional.</p>
-<div class="cta-row">
-<button class="btn big solid" id="heroOpenApp" type="button">Criar análise</button>
-<button class="btn big ghost" type="button" id="openFormatosModalHero">Ver formato dos dados</button>
-</div>
-<div class="feature-grid">
-<article><b>ANOVA</b><span>Teste F interpretado</span></article>
-<article><b>Tukey + testes</b><span>Duncan, Dunnett, SNK, Scheffé</span></article>
-<article><b>Regressão</b><span>Linear, quadrática e cúbica</span></article>
-<article><b>Exportação</b><span>PDF, Excel, PNG e PDF vetorial</span></article>
-</div>
-</section>
+  <nav class="nav">
+    <a class="logo-group" href="index.html" aria-label="Solver Estatística">
+      <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="#0A0A0A" stroke="#22C55E" stroke-width="1.6"/>
+        <polyline points="10,25 16,18 20,21 28,12" stroke="#4ADE80" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <polyline points="23,12 28,12 28,17" stroke="#4ADE80" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      </svg>
+      <span>
+        <strong>SOLVER</strong>
+        <small>INTELLIGENCE FOR FIELD TRIALS</small>
+      </span>
+    </a>
+    <div class="nav-actions">
+      <a class="btn ghost" href="index.html">← Voltar ao site</a>
+    </div>
+  </nav>
 
-<section class="preview-card" aria-label="Prévia do relatório">
-<div class="window-head"><span><i></i><i></i><i></i></span><b>PREVIEW DO RELATÓRIO</b></div>
-<div class="stats-row">
-<div class="stat-cv"><label>CV experimental</label><div class="cv-ring-row"><svg class="cv-ring" viewBox="0 0 52 52" width="36" height="36" aria-hidden="true"><circle cx="26" cy="26" r="21" fill="none" style="stroke:var(--surface-line)" stroke-width="6"/><circle cx="26" cy="26" r="21" fill="none" style="stroke:var(--brand)" stroke-width="6" stroke-linecap="round" stroke-dasharray="131.9" stroke-dashoffset="21" transform="rotate(-90 26 26)"/></svg><div class="cv-ring-text"><strong class="cv-headline">Ótimo</strong><span id="previewCv">8,40%</span></div></div><em>Precisão alta</em></div>
-<div><label>Teste F</label><strong id="previewF">41,32</strong><em>p &lt; 0,01</em></div>
-<div><label>Comparação de médias</label><strong>Tukey 5%</strong><em>4 grupos</em></div>
-<div><label>R² regressão</label><strong id="previewR2">0,95</strong><em>Ótimo ajuste</em></div>
-</div>
-<div class="preview-split">
-<div class="chart-placeholder">
-<div class="chart-title"><span>Curva ajustada e dose ótima</span></div>
-<div class="chart-wrap">
-<div class="dose-callout" style="left:27.9%"><b id="previewDose">124,8 kg/ha</b></div>
-<svg width="100%" height="112" viewBox="0 0 340 90" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M8,70 C38,56 60,28 95,20 L95,78 L8,78 Z" style="fill:var(--brand)" opacity="0.14"/>
-<path d="M95,20 C112,18 120,44 148,40 C168,38 178,26 205,24 C250,22 290,46 330,58 L330,78 L95,78 Z" style="fill:var(--brand-bright)" opacity="0.1"/>
-<path d="M8,70 C38,56 60,28 95,20" fill="none" style="stroke:var(--brand)" stroke-width="2.2" stroke-linecap="round"/>
-<path d="M95,20 C112,18 120,44 148,40 C168,38 178,26 205,24 C250,22 290,46 330,58" fill="none" style="stroke:var(--brand-bright)" stroke-width="2.2" stroke-linecap="round"/>
-<line x1="95" y1="20" x2="95" y2="76" style="stroke:var(--surface-line)" stroke-width="1.2" stroke-dasharray="3,3"/>
-<circle cx="37.5" cy="51.6" r="2.3" style="fill:var(--surface)" stroke="var(--brand)" stroke-width="1.5"/>
-<circle cx="68.2" cy="30.7" r="2.3" style="fill:var(--surface)" stroke="var(--brand)" stroke-width="1.5"/>
-<circle cx="119.7" cy="32.5" r="2.3" style="fill:var(--surface)" stroke="var(--brand-bright)" stroke-width="1.5"/>
-<circle cx="173.9" cy="32" r="2.3" style="fill:var(--surface)" stroke="var(--brand-bright)" stroke-width="1.5"/>
-<circle cx="205" cy="24" r="2.3" style="fill:var(--surface)" stroke="var(--brand-bright)" stroke-width="1.5"/>
-<circle cx="234" cy="26.1" r="2.3" style="fill:var(--surface)" stroke="var(--brand-bright)" stroke-width="1.5"/>
-<circle cx="269.4" cy="35.8" r="2.3" style="fill:var(--surface)" stroke="var(--brand-bright)" stroke-width="1.5"/>
-<circle cx="306" cy="49.7" r="2.3" style="fill:var(--surface)" stroke="var(--brand-bright)" stroke-width="1.5"/>
-<circle cx="95" cy="20" r="7.5" style="fill:var(--brand)" opacity="0.16"/>
-<circle cx="95" cy="20" r="4.5" style="fill:var(--brand-bright)" stroke="var(--surface)" stroke-width="2"/>
-<text x="8" y="85" font-size="8" style="fill:var(--text-l2);font-family:'Open Sans',sans-serif">Dose</text>
-<text x="330" y="85" text-anchor="end" font-size="8" style="fill:var(--text-l2);font-family:'Open Sans',sans-serif">Resposta</text>
-</svg>
-</div>
-</div>
-<div class="mini-anova-card">
-<div class="chart-title"><span>Resumo ANOVA</span></div>
-<div class="mini-anova">
-<div class="mini-anova-head"><span>FV</span><span>F</span><span>Sig.</span></div>
-<div class="mini-anova-row"><span>Parcela</span><b>24,86</b><mark>1%</mark></div>
-<div class="mini-anova-row"><span>Subparcela</span><b>41,32</b><mark>1%</mark></div>
-<div class="mini-anova-row"><span>Parcela × Sub</span><b>9,74</b><mark>1%</mark></div>
-</div>
-</div>
-</div>
-<div class="preview-actions">
-<div class="preview-action">
-<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg></div>
-<b>Dados</b><span>CSV ou matriz</span>
-</div>
-<div class="preview-action">
-<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M3 20h18"/></svg></div>
-<b>ANOVA</b><span>Teste F</span>
-</div>
-<div class="preview-action">
-<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="12" height="12" rx="2"/><path d="M9 9h11v11H9z"/></svg></div>
-<b>Pós-teste</b><span>Médias ou curva</span>
-</div>
-<div class="preview-action">
-<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M15 2v5h5"/><path d="M9 13h6M9 16.5h6"/></svg></div>
-<b>PDF</b><span>Laudo final</span>
-</div>
-</div>
-</section>
-</header>
+  <!-- Elementos preview (invisíveis) — mantidos porque o app.js atualiza eles quando roda análise -->
+  <div class="hidden">
+    <span id="previewCv">—</span>
+    <span id="previewF">—</span>
+    <span id="previewR2">—</span>
+    <span id="previewDose">—</span>
+  </div>
 
-<main>
-<section class="panel" id="capacidades">
-<div class="section-head">
-<span>O que você recebe</span>
-<h2>Tudo que o experimento precisa, num só lugar</h2>
-</div>
-<div class="capability-grid">
-<article class="capability-card">
-<div class="icon-circle">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></svg>
-</div>
-<h3>KPIs estatísticos</h3>
-<p>CV, F calculado, significância e R² aparecem em cards de leitura imediata.</p>
-</article>
-<article class="capability-card">
-<div class="icon-circle">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16"/><path d="M6 15l4-5 4 2 5-7"/></svg>
-</div>
-<h3>Gráfico de regressão</h3>
-<p>Visual com curva ajustada, pontos observados e destaque para a dose ótima.</p>
-</article>
-<article class="capability-card">
-<div class="icon-circle">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/></svg>
-</div>
-<h3>Resumo da ANOVA</h3>
-<p>Tabela compacta com badges de significância para orientar o pós-teste.</p>
-</article>
-<article class="capability-card">
-<div class="icon-circle">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="6" r="2"/><circle cx="19" cy="6" r="2"/><circle cx="12" cy="13" r="2"/><circle cx="5" cy="20" r="2"/><circle cx="19" cy="20" r="2"/><path d="M6.6 7.4L10.6 11.8M17.4 7.4L13.4 11.8M10.6 14.4L6.6 18.6M13.4 14.4L17.4 18.6"/></svg>
-</div>
-<h3>Fluxo guiado</h3>
-<p>Você segue a sequência: modelo, dados, ANOVA, comparação/regressão e exportação.</p>
-</article>
-</div>
-</section>
+  <main>
+    <section class="panel app-panel" id="analisar">
+      <div class="section-head">
+        <span>Dashboard estatístico</span>
+        <h2>Monte a análise sem sair do navegador</h2>
+        <p>Preencha manualmente ou envie CSV/XLSX. O frontend fala com o backend FastAPI hospedado no Render.</p>
+      </div>
 
-<section class="panel" id="publico">
-<div class="section-head">
-<span>Para quem é</span>
-<h2>Feito para quem decide com base em dados de campo</h2>
-</div>
-<div class="audience-grid">
-<article class="audience-card">
-<div class="icon-circle">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V10"/><path d="M12 10c0-4 3-6 7-6 0 4-3 7-7 6z"/><path d="M12 13c0-3-3-5-7-5 0 3 3 6 7 5z"/></svg>
-</div>
-<h3>Agronegócio</h3>
-<p>Decisões de campo com comparação de tratamentos e relatórios claros para o produtor.</p>
-</article>
-<article class="audience-card">
-<div class="icon-circle">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 4-9 4-9-4 9-4z"/><path d="M6 10v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"/><path d="M21 8v6"/></svg>
-</div>
-<h3>Acadêmico</h3>
-<p>Validação de exercícios, TCCs, aulas práticas e interpretação passo a passo da ANOVA.</p>
-</article>
-<article class="audience-card">
-<div class="icon-circle">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3h6"/><path d="M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/><path d="M7.5 15h9"/></svg>
-</div>
-<h3>P&D e pesquisa</h3>
-<p>Padronização de análises e apresentação profissional dos resultados de ensaios.</p>
-</article>
-</div>
-</section>
-</main>
-</div>
+      <div class="status-bar">
+        <label for="apiBase">URL do backend</label>
+        <input id="apiBase" type="url" placeholder="https://seu-backend.onrender.com" />
+        <button class="btn ghost" id="saveApi">Salvar URL</button>
+        <span id="apiStatus" class="status-pill">API não testada</span>
+      </div>
 
-<div id="view-app">
-<main>
-<section class="panel app-panel" id="analisar">
-<div class="section-head">
-<span>Dashboard estatístico</span>
-<h2>Monte a análise em 4 passos</h2>
-<p>Escolha o modelo, informe os dados, interprete a ANOVA e só então decida o pós-teste ou a regressão.</p>
-</div>
+      <div class="workspace">
+        <aside class="sidebar" aria-label="Configurações da análise">
+          <button class="side-item active" data-tab="config"><i></i>Configuração</button>
+          <button class="side-item" data-tab="dados"><i></i>Dados</button>
+          <button class="side-item" data-tab="resultados"><i></i>Resultados</button>
+          <button class="side-item" data-tab="exports"><i></i>Exportações</button>
+        </aside>
 
-<div class="status-bar">
-<div class="api-indicator">
-<span class="api-dot" id="apiDot"></span>
-<span id="apiStatus" class="status-pill">Verificando API…</span>
-</div>
-<details class="advanced-toggle api-settings">
-<summary>Configurações do backend</summary>
-<div class="api-settings-body">
-<label for="apiBase">URL do backend Render</label>
-<input id="apiBase" type="url" placeholder="https://seu-backend.onrender.com" />
-<button class="btn ghost" id="saveApi">Salvar URL</button>
-</div>
-</details>
-</div>
+        <section class="workarea">
 
-<nav class="stepper" aria-label="Etapas da análise">
-<button class="step-pill active" data-step="modelo" type="button"><i>1</i>Modelo</button>
-<button class="step-pill" data-step="dados" type="button"><i>2</i>Dados</button>
-<button class="step-pill" data-step="resultados" type="button"><i>3</i>Resultados</button>
-<button class="step-pill" data-step="exports" type="button"><i>4</i>Exportações</button>
-</nav>
+          <!-- TAB CONFIG -->
+          <div class="tab active" id="tab-config">
+            <div class="form-grid">
+              <label>Delineamento
+                <select id="design">
+                  <option value="DIC">DIC · Inteiramente casualizado</option>
+                  <option value="DBC">DBC · Blocos casualizados</option>
+                  <option value="DQL">DQL · Quadrado latino</option>
+                </select>
+              </label>
+              <label>Tipo de análise
+                <select id="analysisType">
+                  <option value="single">Fator único / tratamento</option>
+                  <option value="factorial">Fatorial</option>
+                  <option value="split_plot">Parcelas subdivididas</option>
+                  <option value="regression">Regressão direta</option>
+                </select>
+              </label>
+              <label>Teste de médias
+                <select id="comparisonTest">
+                  <option value="tukey">Tukey</option>
+                  <option value="duncan">Duncan</option>
+                  <option value="dunnett">Dunnett</option>
+                  <option value="snk">SNK</option>
+                  <option value="scheffe">Scheffé</option>
+                </select>
+              </label>
+              <label>Objetivo
+                <select id="goal">
+                  <option value="max">Maior resposta é melhor</option>
+                  <option value="min">Menor resposta é melhor</option>
+                </select>
+              </label>
+              <label>Coluna resposta
+                <input id="responseColumn" value="valor" />
+              </label>
+              <label>Coluna tratamento
+                <input id="treatmentColumn" value="tratamento" />
+              </label>
+              <label>Coluna bloco
+                <input id="blockColumn" value="bloco" />
+              </label>
+              <label>Coluna linha · DQL
+                <input id="rowColumn" value="linha" />
+              </label>
+              <label>Coluna coluna · DQL
+                <input id="columnColumn" value="coluna" />
+              </label>
+              <label>Fatores fatorial/subparcelas
+                <input id="factorColumns" placeholder="Ex.: hibrido,dose" />
+              </label>
+              <label>Fator numérico / dose
+                <input id="numericFactorColumn" placeholder="Ex.: dose" />
+              </label>
+              <label>Grau de regressão solicitado
+                <select id="regressionDegree">
+                  <option value="">Automático (melhor R² ajustado)</option>
+                  <option value="1">Linear (grau 1)</option>
+                  <option value="2">Quadrático (grau 2)</option>
+                  <option value="3">Cúbico (grau 3)</option>
+                </select>
+              </label>
+            </div>
+            <div class="hint-card">
+              <b>Regra do Solver</b>
+              <p>Se uma regressão solicitada não for a melhor para os dados, o backend recomenda automaticamente o modelo com maior R² ajustado. A regressão só é calculada quando há um fator numérico com pelo menos 3 níveis distintos.</p>
+            </div>
+          </div>
 
-<div class="workspace-flat">
-<section class="step active" id="step-modelo">
-<div class="section-head left" style="margin-bottom:18px">
-<span>Passo 1</span>
-<h2 style="font-size:20px;margin:6px 0 4px">Qual é o tipo do seu experimento?</h2>
-<p>Escolha o delineamento. Os campos de coleta de dados vão se ajustar sozinhos na próxima etapa.</p>
-</div>
+          <!-- TAB DADOS -->
+          <div class="tab" id="tab-dados">
+            <div class="data-actions">
+              <div class="manual-builder">
+                <label>Tratamentos <input id="nTreatments" type="number" min="2" value="4"></label>
+                <label>Blocos / Repetições <input id="nBlocks" type="number" min="1" value="4"></label>
+                <button class="btn solid" id="generateTable">Gerar tabela manual</button>
+              </div>
+              <div class="upload-box">
+                <label for="fileInput">Upload CSV/XLSX</label>
+                <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" />
+                <button class="btn ghost" id="loadExample">Carregar exemplo</button>
+              </div>
+            </div>
+            <div class="table-tools">
+              <button class="btn ghost" id="addRow">+ Adicionar linha</button>
+              <button class="btn ghost danger" id="clearRows">Limpar</button>
+              <button class="btn solid" id="runAnalysis">Rodar análise →</button>
+            </div>
+            <div class="table-wrap">
+              <table id="dataTable" class="data-table" aria-label="Tabela de dados editável"></table>
+            </div>
+            <p class="small-note" id="rowCount">Nenhuma linha carregada.</p>
+          </div>
 
-<div class="type-grid" id="typeGrid">
-<button class="type-card" data-type="DIC" type="button">
-<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 12h16"/></svg></div>
-<b>DIC</b>
-<span>Inteiramente casualizado · fator único, sem blocos</span>
-</button>
-<button class="type-card" data-type="DBC" type="button">
-<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 14h18"/></svg></div>
-<b>DBC</b>
-<span>Blocos casualizados · fator único, com blocos</span>
-</button>
-<button class="type-card" data-type="DQL" type="button">
-<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg></div>
-<b>DQL</b>
-<span>Quadrado latino · controla linha e coluna</span>
-</button>
-<button class="type-card" data-type="factorial" type="button">
-<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="12" r="6"/><circle cx="15" cy="12" r="6"/></svg></div>
-<b>Fatorial</b>
-<span>Dois fatores combinados (A × B)</span>
-</button>
-<button class="type-card" data-type="split_plot" type="button">
-<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="8" y="8" width="8" height="8" rx="1"/></svg></div>
-<b>Parcelas subdivididas</b>
-<span>Fator na parcela e fator na subparcela</span>
-</button>
-<button class="type-card" data-type="regression" type="button">
-<div class="icon-circle small"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16"/><path d="M6 15l4-5 4 2 5-7"/></svg></div>
-<b>Regressão / dose</b>
-<span>Fator numérico contínuo (dose, concentração...)</span>
-</button>
-</div>
+          <!-- TAB RESULTADOS -->
+          <div class="tab" id="tab-resultados">
+            <div id="emptyResults" class="empty-state">
+              <b>Sem resultado ainda</b>
+              <p>Volte à aba "Dados", gere ou carregue os valores e clique em "Rodar análise".</p>
+            </div>
+            <div id="results" class="results hidden">
+              <div class="result-cards">
+                <article><span>CV experimental</span><strong id="resCv">—</strong><em id="resCvLabel">—</em></article>
+                <article><span>Linhas analisadas</span><strong id="resRows">—</strong><em>Observações</em></article>
+                <article><span>Melhor tratamento</span><strong id="resBest">—</strong><em id="resBestMean">—</em></article>
+              </div>
+              <div class="grid-two">
+                <section class="result-box">
+                  <h3>Quadro de ANOVA · Teste F</h3>
+                  <div class="table-wrap compact"><table id="anovaTable" class="result-table"></table></div>
+                </section>
+                <section class="result-box">
+                  <h3>Médias e grupos</h3>
+                  <div class="table-wrap compact"><table id="meansTable" class="result-table"></table></div>
+                </section>
+              </div>
+              <section class="result-box" id="regressionBox">
+                <h3>Regressão</h3>
+                <div id="regressionSummary" class="regression-summary"></div>
+                <canvas id="regressionChart" height="120"></canvas>
+              </section>
+              <section class="result-box">
+                <h3>Recomendações</h3>
+                <ul id="recommendations" class="recommendations"></ul>
+              </section>
+            </div>
+          </div>
 
-<div class="sub-options-row" id="baseDesignWrap" style="display:none">
-<label>Delineamento base
-<select id="baseDesign">
-<option value="DBC">DBC · com blocos</option>
-<option value="DIC">DIC · sem blocos</option>
-</select>
-</label>
-<p class="small-note" style="margin:8px 0 0">A matriz manual só é gerada automaticamente para bases DIC/DBC. Para DQL combinado com fatorial, use o upload de arquivo.</p>
-</div>
+          <!-- TAB EXPORTS -->
+          <div class="tab" id="tab-exports">
+            <div class="export-grid">
+              <button class="export-card" id="downloadPdf"><b>PDF técnico</b><span>Relatório em estilo dashboard para diretoria/laudo.</span></button>
+              <button class="export-card" id="downloadExcel"><b>Excel</b><span>ANOVA, médias e resumo em planilha completa.</span></button>
+              <button class="export-card" id="downloadPng"><b>PNG regressão</b><span>Imagem em alta resolução do gráfico.</span></button>
+              <button class="export-card" id="downloadPlotPdf"><b>PDF vetorial</b><span>Gráfico de regressão editável.</span></button>
+            </div>
+            <p class="small-note">As exportações são geradas pelo backend. Configure a URL antes de baixar.</p>
+          </div>
 
-<div class="sub-options-row">
-<label>Objetivo
-<select id="goal">
-<option value="max">Maior resposta é melhor</option>
-<option value="min">Menor resposta é melhor</option>
-</select>
-</label>
-</div>
+        </section>
+      </div>
+    </section>
+  </main>
 
-<details class="advanced-toggle">
-<summary>Opções avançadas (nomes de colunas e grau de regressão)</summary>
-<div class="form-grid" style="margin-top:14px">
-<label data-field="responseColumn">Coluna resposta
-<input id="responseColumn" value="valor" />
-</label>
-<label data-field="treatmentColumn">Coluna tratamento
-<input id="treatmentColumn" value="tratamento" />
-</label>
-<label data-field="blockColumn">Coluna bloco
-<input id="blockColumn" value="bloco" />
-</label>
-<label data-field="rowColumn">Coluna linha · DQL
-<input id="rowColumn" value="linha" />
-</label>
-<label data-field="columnColumn">Coluna coluna · DQL
-<input id="columnColumn" value="coluna" />
-</label>
-<label data-field="factorColumns">Fatores (nomes separados por vírgula)
-<input id="factorColumns" placeholder="Ex.: fator_a,fator_b" />
-</label>
-<label data-field="numericFactorColumn">Fator numérico / dose
-<input id="numericFactorColumn" placeholder="Ex.: dose" />
-</label>
-<label data-field="regressionDegree">Grau de regressão solicitado
-<select id="regressionDegree">
-<option value="1">Linear (grau 1)</option>
-<option value="2" selected>Quadrático (grau 2) — padrão para curva dose-resposta</option>
-<option value="3">Cúbico (grau 3)</option>
-</select>
-</label>
-</div>
-</details>
+  <footer class="footer">
+    <p>Desenvolvido por <b>Fernando Paes Lorena</b> · Solver Estatística Experimental</p>
+    <nav>
+      <a href="index.html">← Voltar ao site</a>
+      <a href="https://github.com/solverestatistica-brazil/solver-estatistica">GitHub</a>
+    </nav>
+  </footer>
 
-<div class="hidden" id="legacyModelFields">
-<select id="design"><option value="DIC">DIC</option><option value="DBC">DBC</option><option value="DQL">DQL</option></select>
-<select id="analysisType"><option value="single">single</option><option value="factorial">factorial</option><option value="split_plot">split_plot</option><option value="regression">regression</option></select>
-</div>
-
-<div class="hint-card">
-<b>Regra do Solver</b>
-<p>Se uma regressão solicitada não for a melhor para os dados, o backend recomenda automaticamente o modelo com maior R² ajustado. O teste de comparação de médias você escolhe depois, já vendo a ANOVA. A regressão só é calculada quando há um fator numérico (dose) com pelo menos 3 níveis distintos e 1 grau de liberdade residual — isso evita curvas superajustadas/instáveis fora dos pontos observados.</p>
-</div>
-<div class="step-nav">
-<span></span>
-<button class="btn solid big" id="toDadosNext" type="button">Avançar para os dados →</button>
-</div>
-</section>
-
-<section class="step" id="step-dados">
-<div class="choice-grid">
-<button class="choice-card" id="chooseUpload" type="button">
-<div class="icon-circle small">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
-</div>
-<b>Enviar arquivo</b>
-<span>CSV (;) já preenchido</span>
-</button>
-<button class="choice-card" id="chooseManual" type="button">
-<div class="icon-circle small">
-<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M8 10v10"/></svg>
-</div>
-<b>Preencher manualmente</b>
-<span>Gerar matriz vazia para digitar</span>
-</button>
-</div>
-<p class="small-note center">Só quer testar? <button class="link-btn" id="loadExample" type="button">Carregar um exemplo pronto</button>.</p>
-
-<div class="data-subpanel hidden" id="dataUploadPanel">
-<label for="fileInput">Upload CSV (separado por ponto e vírgula)</label>
-<input id="fileInput" type="file" accept=".csv" />
-<p class="small-note">Apenas arquivos .csv com colunas separadas por ponto e vírgula (;), no padrão do Excel em português.</p>
-<div id="columnMapping" class="hidden" style="margin-top:14px"></div>
-</div>
-<div class="data-subpanel hidden" id="dataManualPanel">
-<div class="manual-builder-dynamic" id="manualFieldsDynamic"></div>
-</div>
-
-<div class="table-tools" id="dataTableTools" style="display:none">
-<button class="btn ghost" id="addRow">Adicionar linha</button>
-<button class="btn ghost danger" id="clearRows">Limpar</button>
-</div>
-<div class="table-wrap" id="dataTableWrap" style="display:none">
-<table id="dataTable" class="data-table" aria-label="Tabela de dados editável"></table>
-</div>
-<p class="small-note" id="rowCount">Nenhuma linha carregada.</p>
-<p class="inline-error hidden" id="dataErrorMsg"></p>
-<button class="btn ghost hidden" id="restartAnalysis" type="button">↺ Iniciar nova análise</button>
-
-<div class="step-nav">
-<button class="btn ghost" data-back="modelo" type="button">← Voltar ao modelo</button>
-<button class="btn solid big" id="runAnalysis" type="button">Iniciar análise →</button>
-</div>
-</section>
-
-<section class="step" id="step-resultados">
-<div id="emptyResults" class="empty-state">
-<b>Sem resultado ainda</b>
-<p>Volte à etapa "Dados", gere ou carregue os valores e clique em "Iniciar análise".</p>
-</div>
-<div id="results" class="results hidden">
-<div class="result-cards">
-<article title="Critério (Pimentel Gomes): CV ≤10% Ótimo · ≤20% Bom · ≤30% Moderado · >30% Alto"><span>CV experimental</span><strong id="resCv">—</strong><em id="resCvLabel">—</em></article>
-<article><span>Linhas analisadas</span><strong id="resRows">—</strong><em>Observações</em></article>
-<article><span>Melhor tratamento</span><strong id="resBest">—</strong><em id="resBestMean">—</em></article>
-</div>
-
-<section class="result-box full">
-<h3>Quadro de ANOVA · Teste F</h3>
-<div class="table-wrap"><table id="anovaTable" class="result-table"></table></div>
-</section>
-
-<div id="doseAdvisory" class="advisory hidden">
-<b>Isso parece ser uma dose numérica</b>
-<p id="doseAdvisoryText">A coluna avaliada tem valores numéricos crescentes. Considere rodar como Regressão direta para estimar a dose ótima em vez de comparar médias.</p>
-<button class="btn ghost" id="switchToRegression" type="button">Mudar para Regressão direta</button>
-</div>
-
-<section class="result-box full" id="regressionBox">
-<h3>Regressão</h3>
-<div id="regressionSummary" class="regression-summary"></div>
-<canvas id="regressionChart" height="120"></canvas>
-</section>
-
-<section class="result-box full" id="comparisonPanel">
-<h3>Comparação de médias</h3>
-<p class="small-note">Escolha o teste. Em análises com mais de um fator, só é possível comparar fatores que deram significativos no teste F.</p>
-<div class="comparison-controls">
-<label>Teste de comparação
-<select id="comparisonTestPost">
-<option value="tukey">Tukey</option>
-<option value="duncan">Duncan</option>
-<option value="dunnett">Dunnett</option>
-<option value="snk">SNK</option>
-<option value="scheffe">Scheffé</option>
-<option value="regression">Regressão</option>
-</select>
-</label>
-<label id="regressionDegreePostWrap" class="hidden">Grau da regressão
-<select id="regressionDegreePost">
-<option value="">Automático</option>
-<option value="1">Linear</option>
-<option value="2">Quadrático</option>
-<option value="3">Cúbico</option>
-</select>
-</label>
-<div id="comparisonButtons" class="comparison-buttons"></div>
-</div>
-<div id="meansResultBox" class="hidden">
-<h4 id="meansFactorLabel">Médias e grupos</h4>
-<div class="table-wrap"><table id="meansTable" class="result-table"></table></div>
-</div>
-</section>
-
-<section class="result-box full">
-<h3>Recomendações</h3>
-<ul id="recommendations" class="recommendations"></ul>
-</section>
-</div>
-<div class="step-nav">
-<button class="btn ghost" data-back="dados" type="button">← Voltar aos dados</button>
-<button class="btn solid big" id="toExportsNext" type="button">Ver exportações →</button>
-</div>
-</section>
-
-<section class="step" id="step-exports">
-<div class="export-grid">
-<button class="export-card" id="downloadPdf" type="button"><b>PDF técnico</b><span>Relatório para diretoria/laudo</span></button>
-<button class="export-card" id="downloadExcel" type="button"><b>Excel</b><span>ANOVA, médias e resumo</span></button>
-<button class="export-card" id="downloadPng" type="button"><b>PNG regressão</b><span>Imagem em alta qualidade</span></button>
-<button class="export-card" id="downloadPlotPdf" type="button"><b>PDF vetorial</b><span>Gráfico de regressão editável</span></button>
-</div>
-<p class="small-note">As exportações são geradas pelo backend. Configure a URL do Render antes de baixar.</p>
-<div class="step-nav">
-<button class="btn ghost" data-back="resultados" type="button">← Voltar aos resultados</button>
-<span></span>
-</div>
-</section>
-</div>
-</section>
-</main>
-</div>
-
-<dialog id="formatosModal" class="formatos-modal">
-<div class="section-head left formatos-modal-head">
-<div>
-<span>Formato de dados</span>
-<h2>Colunas mínimas por delineamento</h2>
-</div>
-<button class="modal-close" type="button" id="closeFormatosModal" aria-label="Fechar instruções">&times;</button>
-</div>
-<div class="format-grid">
-<article><b>DIC</b><code>tratamento, valor</code><p>Use quando não houver blocos, linhas ou colunas.</p></article>
-<article><b>DBC</b><code>bloco, tratamento, valor</code><p>Um registro por combinação bloco × tratamento.</p></article>
-<article><b>DQL</b><code>linha, coluna, tratamento, valor</code><p>Tratamentos, linhas e colunas devem ter o mesmo número de níveis.</p></article>
-<article><b>Regressão</b><code>dose, valor</code><p>Informe o fator numérico para cálculo de dose ótima.</p></article>
-</div>
-</dialog>
-
-<dialog id="metodologiaModal" class="formatos-modal">
-<div class="section-head left formatos-modal-head">
-<div>
-<span>Metodologia</span>
-<h2>Referências científicas</h2>
-</div>
-<button class="modal-close" type="button" id="closeMetodologiaModal" aria-label="Fechar metodologia">&times;</button>
-</div>
-<div class="metodologia-body">
-<p>Os cálculos de ANOVA (teste F), os delineamentos (DIC/DBC/DQL/fatorial/parcelas subdivididas) e os testes de comparação de médias seguem a formulação clássica descrita em:</p>
-<ul>
-<li><b>Pimentel Gomes, F.</b> <i>Curso de Estatística Experimental</i>. 15. ed. FEALQ/ESALQ, 2022.</li>
-<li><b>Banzatto, D. A.; Kronka, S. N.</b> <i>Experimentação Agrícola</i>. 4. ed. FUNEP, 2006.</li>
-<li><b>Steel, R. G. D.; Torrie, J. H.; Dickey, D. A.</b> <i>Principles and Procedures of Statistics</i>. 3. ed. McGraw-Hill, 1997.</li>
-<li>Artigos originais dos pós-testes: <b>Tukey (1949)</b>, <b>Duncan (1955)</b>, <b>Dunnett (1955)</b>, <b>Newman (1939)/Keuls (1952)</b> e <b>Scheffé (1953)</b>.</li>
-</ul>
-<p class="small-note">Lista completa com DOIs em <a href="https://github.com/solverestatistica-brazil/solver-estatistica/blob/main/docs/ARQUITETURA.md" target="_blank" rel="noopener noreferrer">docs/ARQUITETURA.md</a>.</p>
-</div>
-</dialog>
-
-<footer class="site-footer">
-<div class="site-footer-inner">
-<span class="footer-credit">Desenvolvido por <b>Fernando Paes Lorena</b></span>
-<div class="footer-links">
-<button class="footer-link" type="button" id="openMetodologiaModal">
-<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>
-<span>Metodologia</span>
-</button>
-<a class="footer-link" href="https://github.com/solverestatistica-brazil/solver-estatistica" target="_blank" rel="noopener noreferrer" aria-label="Ver repositorio no GitHub">
-<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M12 .5C5.73.5.5 5.73.5 12c0 5.09 3.29 9.4 7.86 10.93.57.1.78-.25.78-.55 0-.27-.01-1-.02-1.96-3.2.7-3.88-1.54-3.88-1.54-.52-1.33-1.28-1.69-1.28-1.69-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.73-1.54-2.56-.29-5.26-1.28-5.26-5.7 0-1.26.45-2.29 1.18-3.09-.12-.29-.51-1.46.11-3.04 0 0 .97-.31 3.18 1.18a11.05 11.05 0 0 1 5.8 0c2.2-1.49 3.17-1.18 3.17-1.18.63 1.58.24 2.75.12 3.04.74.8 1.18 1.83 1.18 3.09 0 4.43-2.71 5.4-5.29 5.69.42.36.78 1.08.78 2.17 0 1.57-.01 2.83-.01 3.22 0 .3.2.66.79.55A11.5 11.5 0 0 0 23.5 12C23.5 5.73 18.27.5 12 .5Z"/></svg>
-<span>GitHub</span>
-</a>
-<a class="footer-link footer-link-report" href="https://github.com/solverestatistica-brazil/solver-estatistica/issues/new" target="_blank" rel="noopener noreferrer">
-<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/></svg>
-<span>Reportar problema</span>
-</a>
-</div>
-</div>
-</footer>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
-<script src="assets/js/config.js?v=20260720"></script>
-<script src="assets/js/app.js?v=20260720"></script>
-<script>
-// [FIX chart-init-resize] v20260713b - smart polling until canvas has real dimensions
-(function(){
-  function tick(){
-    const c = document.getElementById('regressionChart');
-    if (!c){ setTimeout(tick, 400); return; }
-    if (c.width < 100){
-      window.dispatchEvent(new Event('resize'));
-      setTimeout(tick, 180);
-    } else {
-      setTimeout(tick, 1500); // still keep an eye on it
-    }
-  }
-  if (document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', tick);
-  } else {
-    tick();
-  }
-})();
-</script>
-
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-  const landing = document.getElementById('view-landing');
-  const app = document.getElementById('view-app');
-  const observer = new MutationObserver(() => {
-    if (landing && !landing.classList.contains('hidden')) landing.classList.add('hidden');
-    if (app && app.classList.contains('hidden')) app.classList.remove('hidden');
-  });
-  if (landing) observer.observe(landing, {attributes: true, attributeFilter: ['class']});
-  if (app) observer.observe(app, {attributes: true, attributeFilter: ['class']});
-  const navLand = document.getElementById('navActionsLanding');
-  const navApp = document.getElementById('navActionsApp');
-  const navObserver = new MutationObserver(() => {
-    if (navLand && !navLand.classList.contains('hidden')) navLand.classList.add('hidden');
-    if (navApp && navApp.classList.contains('hidden')) navApp.classList.remove('hidden');
-  });
-  if (navLand) navObserver.observe(navLand, {attributes: true, attributeFilter: ['class']});
-  if (navApp) navObserver.observe(navApp, {attributes: true, attributeFilter: ['class']});
-});
-</script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="assets/js/app.js"></script>
 </body>
 </html>
