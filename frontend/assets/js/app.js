@@ -53,6 +53,39 @@
     $('downloadPng').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png'));
     $('downloadPlotPdf').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf'));
     ['design', 'analysisType'].forEach((id) => $(id)?.addEventListener('change', generateManualTable));
+    $('comparisonTest').addEventListener('change', updateControlGroupVisibility);
+    $('alphaMode').addEventListener('change', updateAlphaValueState);
+    $('treatmentColumn').addEventListener('change', updateControlGroupOptions);
+    updateControlGroupVisibility();
+    updateAlphaValueState();
+  }
+
+  function updateControlGroupVisibility() {
+    const wrap = $('controlGroupWrap');
+    if (!wrap) return;
+    wrap.style.display = $('comparisonTest').value === 'dunnett' ? '' : 'none';
+  }
+
+  function updateAlphaValueState() {
+    const input = $('alphaValue');
+    if (!input) return;
+    input.disabled = $('alphaMode').value !== 'fixed';
+  }
+
+  function updateControlGroupOptions() {
+    const select = $('controlGroup');
+    if (!select) return;
+    const treatmentCol = $('treatmentColumn').value || 'tratamento';
+    const values = unique(tableToRows().map((row) => row[treatmentCol]).filter((v) => v !== undefined && v !== ''));
+    const previous = select.value;
+    select.innerHTML = '';
+    if (!values.length) {
+      select.appendChild(new Option('Gerar/carregar dados para escolher', ''));
+      return;
+    }
+    select.appendChild(new Option('Selecione a testemunha…', ''));
+    values.forEach((v) => select.appendChild(new Option(String(v), String(v))));
+    if (values.map(String).includes(previous)) select.value = previous;
   }
 
   function cleanApiBase(value) {
@@ -214,6 +247,7 @@
   function updateRowCount() {
     const count = dataTable.querySelectorAll('tbody tr').length;
     $('rowCount').textContent = `${count} linha(s) carregada(s).`;
+    updateControlGroupOptions();
   }
 
   function tableToRows() {
@@ -241,9 +275,11 @@
       factor_columns: splitColumns($('factorColumns').value),
       numeric_factor_column: $('numericFactorColumn').value.trim() || null,
       comparison_test: $('comparisonTest').value,
+      control_group: $('controlGroup').value || null,
+      alpha_mode: $('alphaMode').value,
       regression_degree: degree ? Number(degree) : null,
       goal: $('goal').value,
-      alpha: 0.05,
+      alpha: Number($('alphaValue').value) || 0.05,
       data: tableToRows()
     };
   }

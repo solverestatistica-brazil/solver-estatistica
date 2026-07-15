@@ -92,7 +92,22 @@
                   <option value="dunnett">Dunnett</option>
                   <option value="snk">SNK</option>
                   <option value="scheffe">Scheffé</option>
+                  <option value="scott_knott">Scott-Knott</option>
                 </select>
+              </label>
+              <label id="controlGroupWrap">Testemunha (só para Dunnett)
+                <select id="controlGroup">
+                  <option value="">Gerar/carregar dados para escolher</option>
+                </select>
+              </label>
+              <label>Alfa do pós-teste
+                <select id="alphaMode">
+                  <option value="auto">Automático (segue o teste F: 1% ou 5%)</option>
+                  <option value="fixed">Fixo (definido ao lado)</option>
+                </select>
+              </label>
+              <label>Alfa fixo (só se "Fixo" acima)
+                <input id="alphaValue" type="number" step="0.01" min="0.001" max="0.5" value="0.05" />
               </label>
               <label>Objetivo
                 <select id="goal">

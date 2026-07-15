@@ -10,6 +10,7 @@ from typing import Any, Dict, Optional
 
 import pandas as pd
 from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -32,14 +33,18 @@ class AnalyzePayload(BaseModel):
     control_group: Optional[str] = None
     regression_degree: Optional[int] = None
     goal: str = "max"
+    alpha_mode: str = Field(
+        "auto",
+        description=(
+            "'auto' (padrão): o alfa do pós-teste é herdado do nível de significância do "
+            "próprio teste F (1% ou 5%) para cada fonte de variação — convenção de Pimentel "
+            "Gomes. 'fixed': usa o valor de 'alpha' abaixo em toda a análise, independente do "
+            "resultado do teste F."
+        ),
+    )
     alpha: float = Field(
         0.05,
-        description=(
-            "Não é mais usado para o pós-teste de comparação de médias: o nível de "
-            "significância (1% ou 5%) agora é herdado automaticamente do teste F de cada "
-            "fonte de variação (tratamento, fator ou interação). Campo mantido só por "
-            "compatibilidade de API."
-        ),
+        description="Usado apenas quando alpha_mode='fixed'. Ignorado quando alpha_mode='auto'.",
     )
     data: list[dict[str, Any]]
 
@@ -87,7 +92,11 @@ async def analyze_upload(config: str = Form(...), file: UploadFile = File(...)) 
         payload = json.loads(config)
         df = await _read_uploaded_table(file)
         payload["data"] = df.to_dict(orient="records")
-        return analyze(payload)
+        # analyze() e' CPU-bound (pandas/statsmodels/scipy) e sincrono; chama-lo direto
+        # dentro deste endpoint async bloquearia o event loop (e todos os outros usuarios
+        # conectados ao mesmo worker) durante o calculo. run_in_threadpool despacha para
+        # uma thread separada, mantendo o event loop livre.
+        return await run_in_threadpool(analyze, payload)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:

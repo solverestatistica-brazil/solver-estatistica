@@ -194,7 +194,7 @@ h1 em{font-style:normal;font-weight:700;color:var(--brand)}
 
 /* Tile: pós-testes */
 .tile-tests{grid-column:span 2;grid-row:span 1}
-.tests-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-top:12px}
+.tests-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:12px}
 .tests-grid div{
   aspect-ratio:1;border-radius:8px;
   background:var(--canvas-elevated-2);border:1px solid var(--border);
@@ -472,7 +472,7 @@ select{
   .hero{grid-template-columns:1fr}
   .hero-copy,.tile-viz,.tile-designs,.tile-tests,.tile-export{grid-column:span 1}
   .result-cards,.format-grid,.export-grid,.form-grid,.manual-builder,.tests-grid{grid-template-columns:1fr}
-  .tests-grid{grid-template-columns:repeat(5,1fr)}
+  .tests-grid{grid-template-columns:repeat(6,1fr)}
   .sidebar{grid-template-columns:1fr 1fr}
   .workarea,.panel{padding:18px}
   .btn:not(.nav-actions .btn){width:100%}

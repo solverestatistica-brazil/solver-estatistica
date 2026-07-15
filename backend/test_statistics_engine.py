@@ -404,3 +404,83 @@ def test_smoke_dbc_com_dados_realistas():
     assert 0.5 < result["anova"]["cv"] < 30
     assert result["anova"].get("residual_is_singular") is not True
     assert str(result["means"]["best"]["treatment"]) in ("60", "90")
+
+
+# =========================================================================
+# Auditoria de 15/07/2026: Dunnett exato, Scott-Knott, alpha_mode, regressao
+# por parcimonia.
+# =========================================================================
+
+
+def test_dunnett_exato_menos_conservador_que_bonferroni_antigo():
+    """[AUDITORIA P0-01] A versao anterior usava t + Bonferroni (conservador demais). O
+    Dunnett exato (distribuicao t multivariada) deve ter diferenca critica MENOR — mais
+    poder — para o mesmo dataset e alfa. Valor antigo documentado nesta auditoria: 10.768442."""
+    res = _dbc(DBC_EXEMPLO, comparison_test="dunnett", control_group="T1")
+    comp = res["means"]["comparison"]
+    assert comp["test"] == "DUNNETT"
+    crit_diffs = [c["critical_diff"] for c in comp["comparisons"]]
+    assert all(c < 10.768442 for c in crit_diffs), "Dunnett exato deveria ser menos conservador que o Bonferroni antigo"
+    assert all(c["p_value"] is not None for c in comp["comparisons"]), "Dunnett exato deve expor p-valor ajustado"
+
+
+def test_dunnett_e_reproduzivel_entre_chamadas():
+    """A integracao numerica da t multivariada usa Monte Carlo quase-aleatorio; sem uma
+    semente fixa, duas chamadas identicas poderiam devolver p-valores levemente diferentes
+    — inaceitavel para uma ferramenta que preve ser usada como laudo."""
+    res1 = _dbc(DBC_EXEMPLO, comparison_test="dunnett", control_group="T1")
+    res2 = _dbc(DBC_EXEMPLO, comparison_test="dunnett", control_group="T1")
+    p1 = [c["p_value"] for c in res1["means"]["comparison"]["comparisons"]]
+    p2 = [c["p_value"] for c in res2["means"]["comparison"]["comparisons"]]
+    assert p1 == p2
+
+
+def test_dunnett_sem_testemunha_informada_avisa_no_texto():
+    """[AUDITORIA] Sem control_group, o app nao pode fingir que sabe qual e' a testemunha.
+    A nota precisa alertar explicitamente que a escolha foi automatica."""
+    res = _dbc(DBC_EXEMPLO, comparison_test="dunnett")
+    nota = res["means"]["comparison"]["note"]
+    assert "não informada" in nota or "nao informada" in nota.lower()
+
+
+def test_scott_knott_agrupa_sem_sobreposicao_de_letras():
+    """Scott-Knott nunca da mais de uma letra por tratamento (ao contrario do CLD de Tukey),
+    porque particiona em grupos disjuntos."""
+    res = _dbc(DBC_EXEMPLO, comparison_test="scott_knott")
+    comp = res["means"]["comparison"]
+    assert comp["test"] == "SCOTT_KNOTT"
+    for letters in comp["letters"].values():
+        assert len(letters) == 1, f"Scott-Knott nao deveria atribuir mais de uma letra: {letters!r}"
+    # T3 tem media bem destacada dos demais (72.8 vs ~58-60) -> deve ficar isolado no grupo 'a'
+    assert comp["letters"]["T3"] == "a"
+    assert len({comp["letters"][t] for t in ("T1", "T2", "T4")}) == 1
+
+
+def test_alpha_mode_fixed_ignora_significancia_do_f():
+    """[AUDITORIA P0-02] Com alpha_mode='fixed', o pos-teste deve usar o alfa informado
+    (nao o bucket 1%/5% do teste F), mesmo quando o F for significativo a 1%."""
+    res_auto = _dbc(DBC_EXEMPLO, comparison_test="tukey")
+    assert res_auto["means"]["comparison"]["alpha"] == 0.01  # F significativo a 1% -> auto usa 1%
+
+    res_fixed = _dbc(DBC_EXEMPLO, comparison_test="tukey", alpha_mode="fixed", alpha=0.05)
+    assert res_fixed["means"]["comparison"]["alpha"] == 0.05
+
+
+def test_regressao_prefere_parcimonia_a_r2_ajustado_cego():
+    """[AUDITORIA P1-04] Quando o grau com maior R² ajustado tem termo de maior ordem
+    NAO significativo, a selecao automatica deve preferir o grau mais simples (parcimonia),
+    nao o maior R² ajustado isolado."""
+    random.seed(1)
+    data = []
+    for dose in (0, 50, 100, 150, 200):
+        for _ in range(4):
+            data.append({"dose": dose, "valor": round(40 + 0.15 * dose + random.gauss(0, 1.5), 3)})
+    res = analyze({
+        "design": "DIC", "analysis_type": "regression", "goal": "max",
+        "response_column": "valor", "numeric_factor_column": "dose", "data": data,
+    })
+    reg = res["regression"]
+    grau2 = next(m for m in reg["models"] if m["degree"] == 2)
+    assert grau2["p_top_term"] > 0.05, "premissa do teste: o termo quadratico nao deveria ser significativo"
+    assert reg["recommended_degree"] == 2, "premissa do teste: R2 ajustado bruto favoreceria o grau 2"
+    assert reg["selected_degree"] == 1, "selecao automatica deveria preferir o grau parcimonioso (1), nao o maior R2 ajustado"
