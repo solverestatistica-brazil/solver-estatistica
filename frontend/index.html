@@ -3,30 +3,23 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Solver Estatística Experimental: decisões mais claras com ANOVA, comparação de médias e regressão para ensaios de campo." />
+  <meta name="description" content="Solver Estatística Experimental: ANOVA, comparação de médias e regressão para ensaios de campo." />
   <title>Solver Estatística Experimental</title>
 
-  <link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="%23F7FAF6" stroke="%23197341" stroke-width="1.6"/><polyline points="10,25 16,18 20,21 28,12" stroke="%23197341" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><polyline points="23,12 28,12 28,17" stroke="%23197341" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>' />
-  <meta name="theme-color" content="#F4F7F2" />
+  <link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="%230A0A0A" stroke="%2322C55E" stroke-width="1.6"/><polyline points="10,25 16,18 20,21 28,12" stroke="%234ADE80" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><polyline points="23,12 28,12 28,17" stroke="%234ADE80" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>' />
+  <meta name="theme-color" content="#0A0A0A" />
 
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Solver Estatística Experimental" />
   <meta property="og:title" content="Solver Estatística Experimental" />
-  <meta property="og:description" content="Decisões estatísticas mais claras com ANOVA, comparação de médias e regressão — direto no navegador." />
+  <meta property="og:description" content="ANOVA para DIC, DBC, DQL, fatorial e parcelas subdivididas — direto no navegador." />
   <meta property="og:url" content="https://www.solver-estatistica.com.br/" />
   <meta property="og:locale" content="pt_BR" />
-  <meta property="og:image" content="https://www.solver-estatistica.com.br/assets/og-solver-light.png" />
-  <meta property="og:image:width" content="1731" />
-  <meta property="og:image:height" content="909" />
-  <meta property="og:image:alt" content="Solver Estatística — decisões mais claras, do campo ao relatório." />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Solver Estatística Experimental" />
-  <meta name="twitter:description" content="Decisões estatísticas mais claras, do campo ao relatório." />
-  <meta name="twitter:image" content="https://www.solver-estatistica.com.br/assets/og-solver-light.png" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="assets/js/theme.js"></script>
   <link rel="stylesheet" href="assets/css/styles.css" />
 </head>
 <body>
@@ -35,16 +28,17 @@
   <nav class="nav">
     <a class="logo-group" href="#top" aria-label="Solver Estatística">
       <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="#F7FAF6" stroke="#197341" stroke-width="1.6"/>
-        <polyline points="10,25 16,18 20,21 28,12" stroke="#197341" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        <polyline points="23,12 28,12 28,17" stroke="#197341" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="#0A0A0A" stroke="#22C55E" stroke-width="1.6"/>
+        <polyline points="10,25 16,18 20,21 28,12" stroke="#4ADE80" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <polyline points="23,12 28,12 28,17" stroke="#4ADE80" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
       </svg>
       <span>
         <strong>SOLVER</strong>
-        <small>ANÁLISE EXPERIMENTAL</small>
+        <small>INTELLIGENCE FOR FIELD TRIALS</small>
       </span>
     </a>
     <div class="nav-actions">
+      <button class="btn ghost theme-toggle" type="button" data-theme-toggle aria-label="Ativar tema claro" aria-pressed="false"><span data-theme-icon aria-hidden="true">☀</span><span data-theme-label>Claro</span></button>
       <a class="btn ghost" href="#metodologia">Metodologia</a>
       <a class="btn ghost" href="#formatos">Formatos</a>
       <a class="btn solid" href="resultados.html">Iniciar análise →</a>
@@ -56,9 +50,9 @@
 
     <div class="tile hero-copy">
       <div>
-        <span class="badge"><i></i>Estatística para pesquisa aplicada</span>
-        <h1>Decisões estatísticas mais claras, <em>do campo ao relatório.</em></h1>
-        <p>ANOVA para DIC, DBC, DQL, fatorial e parcelas subdivididas. Comparações de médias, regressões e relatórios técnicos em uma experiência guiada e legível.</p>
+        <span class="badge"><i></i>Estatística experimental de precisão</span>
+        <h1>Ensaios de campo viram <em>decisões estatísticas</em> em minutos.</h1>
+        <p>ANOVA para DIC, DBC, DQL, fatorial e parcelas subdivididas. Comparações de médias, regressões e relatórios técnicos direto no navegador — sem instalar Assistat, R ou SAS.</p>
       </div>
       <div class="cta-row">
         <a class="btn big solid" href="resultados.html">Criar análise <span>→</span></a>
@@ -71,8 +65,8 @@
       <svg class="viz-svg" viewBox="0 0 340 130" preserveAspectRatio="none">
         <defs>
           <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#197341" stop-opacity=".24"/>
-            <stop offset="100%" stop-color="#197341" stop-opacity="0"/>
+            <stop offset="0%" stop-color="#22C55E" stop-opacity=".32"/>
+            <stop offset="100%" stop-color="#22C55E" stop-opacity="0"/>
           </linearGradient>
         </defs>
         <line class="grid-line" x1="0" y1="35" x2="340" y2="35"/>
@@ -80,12 +74,12 @@
         <line class="grid-line" x1="0" y1="105" x2="340" y2="105"/>
         <path class="area" d="M15,105 Q90,70 180,40 T325,75 L325,125 L15,125 Z"/>
         <path class="curve" d="M15,105 Q90,70 180,40 T325,75"/>
-        <circle class="dot" cx="15"  cy="106" r="3.5" fill="#197341"/>
-        <circle class="dot" cx="90"  cy="72"  r="3.5" fill="#197341"/>
-        <circle class="dot" cx="180" cy="40"  r="3.5" fill="#197341"/>
-        <circle class="dot" cx="255" cy="55"  r="3.5" fill="#197341"/>
-        <circle class="dot" cx="325" cy="75"  r="3.5" fill="#197341"/>
-        <circle class="optimum" cx="180" cy="40" r="6.5" fill="#B8612B" stroke="#FFFFFF" stroke-width="2.5"/>
+        <circle class="dot" cx="15"  cy="106" r="3.5" fill="#22C55E"/>
+        <circle class="dot" cx="90"  cy="72"  r="3.5" fill="#22C55E"/>
+        <circle class="dot" cx="180" cy="40"  r="3.5" fill="#22C55E"/>
+        <circle class="dot" cx="255" cy="55"  r="3.5" fill="#22C55E"/>
+        <circle class="dot" cx="325" cy="75"  r="3.5" fill="#22C55E"/>
+        <circle class="optimum" cx="180" cy="40" r="6.5" fill="#F5A85B" stroke="#0A0A0A" stroke-width="2.5"/>
       </svg>
       <div class="foot">
         <span class="l"><b>R²</b> 0,94</span>
