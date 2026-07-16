@@ -368,6 +368,7 @@ h1 em{font-style:normal;font-weight:700;color:var(--brand)}
 }
 .form-grid input:focus,.form-grid select:focus,.manual-builder input:focus{border-color:var(--brand)}
 .form-grid input,.form-grid select,.manual-builder input{margin-top:6px}
+.field-note{display:block;margin-top:6px;color:var(--text-d3);font:500 10.5px/1.45 var(--font-text);text-transform:none;letter-spacing:0}
 select{
   appearance:none;-webkit-appearance:none;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23A3A3A3' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");

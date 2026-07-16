@@ -94,14 +94,19 @@
     $('downloadExcel').addEventListener('click', () => downloadExport('/api/export/excel', 'solver-resultados.xlsx'));
     $('downloadPng').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png'));
     $('downloadPlotPdf').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf'));
-    ['design', 'analysisType'].forEach((id) => $(id)?.addEventListener('change', generateManualTable));
-    $('analysisType').addEventListener('change', updateFactorLevelsVisibility);
-    $('analysisType').addEventListener('change', updateSumSquaresVisibility);
+    $('design')?.addEventListener('change', generateManualTable);
+    $('analysisType')?.addEventListener('change', () => {
+      updateAnalysisConfiguration();
+      updateFactorLevelsVisibility();
+      updateSumSquaresVisibility();
+      generateManualTable();
+    });
     $('comparisonTest').addEventListener('change', updateControlGroupVisibility);
     $('alphaMode').addEventListener('change', updateAlphaValueState);
     $('treatmentColumn').addEventListener('change', updateControlGroupOptions);
     updateControlGroupVisibility();
     updateAlphaValueState();
+    updateAnalysisConfiguration();
     updateFactorLevelsVisibility();
     updateSumSquaresVisibility();
     updateExportAvailability(false, false);
@@ -114,7 +119,12 @@
   }
 
   function updateFactorLevelsVisibility() {
-    const isFactorial = ['factorial', 'split_plot'].includes($('analysisType').value);
+    const analysisType = $('analysisType').value;
+    const isFactorial = ['factorial', 'split_plot'].includes(analysisType);
+    if ($('nTreatmentsWrap')) $('nTreatmentsWrap').style.display = isFactorial ? 'none' : '';
+    if ($('nTreatmentsLabel')) {
+      $('nTreatmentsLabel').textContent = analysisType === 'regression' ? 'Níveis de dose' : 'Tratamentos';
+    }
     ['factorALevelsWrap', 'factorBLevelsWrap'].forEach((id) => {
       const wrap = $(id);
       if (wrap) wrap.style.display = isFactorial ? '' : 'none';
@@ -124,6 +134,32 @@
   function updateSumSquaresVisibility() {
     const wrap = $('sumSquaresTypeWrap');
     if (wrap) wrap.style.display = $('analysisType').value === 'factorial' ? '' : 'none';
+  }
+
+  function updateAnalysisConfiguration() {
+    const analysisType = $('analysisType').value;
+    const isFactorial = ['factorial', 'split_plot'].includes(analysisType);
+    const isRegression = analysisType === 'regression';
+    const allowed = window.SolverManualData?.allowedDesigns(analysisType) || ['DIC', 'DBC', 'DQL'];
+    const design = $('design');
+    Array.from(design.options).forEach((option) => {
+      option.disabled = !allowed.includes(option.value);
+    });
+    if (!allowed.includes(design.value)) design.value = allowed[0];
+
+    if (isFactorial && !$('factorColumns').value.trim()) $('factorColumns').value = 'fator_a,fator_b';
+    if (isRegression && !$('numericFactorColumn').value.trim()) $('numericFactorColumn').value = 'dose';
+    if ($('factorColumnsWrap')) $('factorColumnsWrap').style.display = isFactorial ? '' : 'none';
+    if ($('numericFactorColumnWrap')) $('numericFactorColumnWrap').style.display = isRegression ? '' : 'none';
+    if ($('regressionDegreeWrap')) $('regressionDegreeWrap').style.display = isRegression ? '' : 'none';
+
+    const notes = {
+      single: 'DIC, DBC e DQL disponíveis para análise simples.',
+      factorial: 'Fatorial manual disponível em DIC ou DBC, com exatamente dois fatores.',
+      split_plot: 'Parcelas subdivididas usam DBC: fator de parcela primeiro e subparcela depois.',
+      regression: 'Regressão direta manual usa DIC e uma coluna numérica de doses.'
+    };
+    if ($('designCompatibilityNote')) $('designCompatibilityNote').textContent = notes[analysisType] || '';
   }
 
   function updateAlphaValueState() {
@@ -276,81 +312,27 @@
   }
 
   function generateManualTable() {
-    const design = $('design').value;
-    const analysisType = $('analysisType').value;
-    const nTreatments = Number($('nTreatments').value || 4);
-    const nBlocks = Number($('nBlocks').value || 4);
-    const response = $('responseColumn').value || 'valor';
-    const treatment = $('treatmentColumn').value || 'tratamento';
-    const block = $('blockColumn').value || 'bloco';
-    const row = $('rowColumn').value || 'linha';
-    const col = $('columnColumn').value || 'coluna';
-    const numeric = $('numericFactorColumn').value.trim();
-    const factors = splitColumns($('factorColumns').value);
-
-    const headers = [];
-    if (design === 'DBC') headers.push(block);
-    if (design === 'DQL') headers.push(row, col);
-    if (analysisType === 'factorial' || analysisType === 'split_plot') headers.push(...factors.filter(Boolean));
-    if (analysisType === 'regression' && numeric) headers.push(numeric);
-    // Fatorial/split-plot: nao inclui a coluna de tratamento — o backend a sintetiza a
-    // partir dos fatores. Incluir uma coluna 'tratamento' vazia aqui faria a validacao de
-    // "coluna com valor ausente" disparar, mesmo com os dois fatores corretamente
-    // preenchidos (a sintese so roda quando a coluna esta AUSENTE, nao vazia).
-    if (analysisType !== 'regression' && analysisType !== 'factorial' && analysisType !== 'split_plot') headers.push(treatment);
-    if (!headers.includes(response)) headers.push(response);
-
-    const rows = [];
-    if (design === 'DQL') {
-      for (let r = 1; r <= nTreatments; r++) {
-        for (let c = 1; c <= nTreatments; c++) {
-          const treatmentIndex = ((r + c - 2) % nTreatments) + 1;
-          rows.push(Object.fromEntries(headers.map((h) => [h, ''])));
-          rows[rows.length - 1][row] = `L${r}`;
-          rows[rows.length - 1][col] = `C${c}`;
-          if (headers.includes(treatment)) rows[rows.length - 1][treatment] = `T${treatmentIndex}`;
-        }
-      }
-    } else if (analysisType === 'regression') {
-      for (let i = 0; i < nTreatments; i++) {
-        for (let rep = 1; rep <= nBlocks; rep++) {
-          const obj = Object.fromEntries(headers.map((h) => [h, '']));
-          if (numeric) obj[numeric] = i * 50;
-          obj[response] = '';
-          rows.push(obj);
-        }
-      }
-    } else if (analysisType === 'factorial' || analysisType === 'split_plot') {
-      // [FIX auditoria P1-05] A versao anterior amarrava o fator A e o fator B ao MESMO
-      // indice de tratamento (ex.: sempre F1x50, F2x100, F3x150, F4x200) — nunca gerava o
-      // produto cartesiano completo entre os niveis dos dois fatores, entao um fatorial
-      // 4x4 nunca tinha as 16 combinacoes que o delineamento exige. Agora cada fator tem seu
-      // proprio numero de niveis e o gerador cria TODAS as combinacoes, em cada bloco.
-      const aLevels = Math.max(2, Number($('factorALevels').value || 2));
-      const bLevels = Math.max(2, Number($('factorBLevels').value || 2));
-      const [factorA, factorB] = factors;
-      for (let b = 1; b <= nBlocks; b++) {
-        for (let a = 1; a <= aLevels; a++) {
-          for (let bLvl = 1; bLvl <= bLevels; bLvl++) {
-            const obj = Object.fromEntries(headers.map((h) => [h, '']));
-            if (headers.includes(block)) obj[block] = `B${b}`;
-            if (factorA && headers.includes(factorA)) obj[factorA] = `A${a}`;
-            if (factorB && headers.includes(factorB)) obj[factorB] = `S${bLvl}`;
-            rows.push(obj);
-          }
-        }
-      }
-    } else {
-      for (let b = 1; b <= nBlocks; b++) {
-        for (let t = 1; t <= nTreatments; t++) {
-          const obj = Object.fromEntries(headers.map((h) => [h, '']));
-          if (headers.includes(block)) obj[block] = `B${b}`;
-          if (headers.includes(treatment)) obj[treatment] = `T${t}`;
-          rows.push(obj);
-        }
-      }
+    try {
+      if (!window.SolverManualData) throw new Error('Gerador manual não carregado. Atualize a página e tente novamente.');
+      const generated = window.SolverManualData.buildManualTable({
+        design: $('design').value,
+        analysisType: $('analysisType').value,
+        nTreatments: Number($('nTreatments').value),
+        nBlocks: Number($('nBlocks').value),
+        response: $('responseColumn').value,
+        treatment: $('treatmentColumn').value,
+        block: $('blockColumn').value,
+        row: $('rowColumn').value,
+        column: $('columnColumn').value,
+        numeric: $('numericFactorColumn').value.trim(),
+        factors: splitColumns($('factorColumns').value),
+        aLevels: Number($('factorALevels').value),
+        bLevels: Number($('factorBLevels').value)
+      });
+      renderEditableTable(generated.headers, generated.rows);
+    } catch (error) {
+      notify(error.message || 'Não foi possível gerar a tabela manual.', 'error');
     }
-    renderEditableTable(unique(headers), rows);
   }
 
   function renderEditableTable(headers, rows) {
@@ -451,11 +433,26 @@
     };
   }
 
+  function validatePayloadBeforeRequest(payload) {
+    if (['factorial', 'split_plot'].includes(payload.analysis_type) && payload.factor_columns.length !== 2) {
+      return 'Informe exatamente dois fatores, separados por vírgula, antes de analisar.';
+    }
+    if (payload.analysis_type === 'split_plot' && payload.design !== 'DBC') {
+      return 'Parcelas subdivididas devem ser analisadas em DBC.';
+    }
+    if (payload.analysis_type === 'regression' && !payload.numeric_factor_column) {
+      return 'Informe a coluna de dose/fator numérico antes de analisar.';
+    }
+    return '';
+  }
+
   async function runAnalysis() {
     const base = cleanApiBase(apiInput.value);
     if (!base) return notify('O serviço estatístico não está configurado.', 'error');
     const payload = payloadFromUi();
     if (!payload.data.length) return notify('Insira ou carregue dados antes de analisar.', 'error');
+    const configurationError = validatePayloadBeforeRequest(payload);
+    if (configurationError) return notify(configurationError, 'error');
     const runButton = $('runAnalysis');
     try {
       runButton.disabled = true;

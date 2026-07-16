@@ -1,9 +1,11 @@
 const fs = require('fs');
 const assert = require('assert');
+const path = require('path');
 
-const html = fs.readFileSync('frontend/resultados.html', 'utf8');
-const js = fs.readFileSync('frontend/assets/js/app.js', 'utf8');
-const css = fs.readFileSync('frontend/assets/css/styles.css', 'utf8');
+const root = __dirname;
+const html = fs.readFileSync(path.join(root, 'resultados.html'), 'utf8');
+const js = fs.readFileSync(path.join(root, 'assets/js/app.js'), 'utf8');
+const css = fs.readFileSync(path.join(root, 'assets/css/styles.css'), 'utf8');
 
 for (const id of [
   'processingOverlay', 'processingTitle', 'processingMessage', 'processingProgress',

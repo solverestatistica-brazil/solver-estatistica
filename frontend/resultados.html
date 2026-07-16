@@ -14,7 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <script src="assets/js/theme.js"></script>
   <script src="assets/js/analytics.js?v=20260716-1"></script>
-  <link rel="stylesheet" href="assets/css/styles.css?v=20260716-7" />
+  <link rel="stylesheet" href="assets/css/styles.css?v=20260716-8" />
 </head>
 <body>
 <div class="page-shell">
@@ -78,6 +78,7 @@
                   <option value="DBC">DBC · Blocos casualizados</option>
                   <option value="DQL">DQL · Quadrado latino</option>
                 </select>
+                <small id="designCompatibilityNote" class="field-note"></small>
               </label>
               <label>Tipo de análise
                 <select id="analysisType">
@@ -139,13 +140,13 @@
               <label>Coluna coluna · DQL
                 <input id="columnColumn" value="coluna" />
               </label>
-              <label>Fatores fatorial/subparcelas
+              <label id="factorColumnsWrap">Fatores fatorial/subparcelas
                 <input id="factorColumns" placeholder="Ex.: hibrido,dose" />
               </label>
-              <label>Fator numérico / dose
+              <label id="numericFactorColumnWrap">Fator numérico / dose
                 <input id="numericFactorColumn" placeholder="Ex.: dose" />
               </label>
-              <label>Grau de regressão solicitado
+              <label id="regressionDegreeWrap">Grau de regressão solicitado
                 <select id="regressionDegree">
                   <option value="">Automático (parcimônia)</option>
                   <option value="1">Linear (grau 1)</option>
@@ -164,7 +165,7 @@
           <div class="tab" id="tab-dados">
             <div class="data-actions">
               <div class="manual-builder">
-                <label>Tratamentos <input id="nTreatments" type="number" min="2" value="4"></label>
+                <label id="nTreatmentsWrap"><span id="nTreatmentsLabel">Tratamentos</span> <input id="nTreatments" type="number" min="2" value="4"></label>
                 <label>Blocos / Repetições <input id="nBlocks" type="number" min="1" value="4"></label>
                 <label id="factorALevelsWrap">Níveis do fator A <input id="factorALevels" type="number" min="2" value="2"></label>
                 <label id="factorBLevelsWrap">Níveis do fator B <input id="factorBLevels" type="number" min="2" value="2"></label>
@@ -294,7 +295,8 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="assets/js/csv-parser.js"></script>
+<script src="assets/js/manual-data.js?v=20260716-1"></script>
 <script src="assets/js/config.js?v=20260716-1"></script>
-<script src="assets/js/app.js?v=20260716-5"></script>
+<script src="assets/js/app.js?v=20260716-6"></script>
 </body>
 </html>
