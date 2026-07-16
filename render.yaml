@@ -17,3 +17,5 @@ services:
         value: 10000
       - key: MAX_CONCURRENT_ANALYSES
         value: 2
+      - key: RATE_LIMIT_PER_MINUTE
+        value: 60

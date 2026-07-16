@@ -80,6 +80,8 @@ O workflow `.github/workflows/backend-tests.yml` roda a suíte com cobertura, va
 - [Política de segurança](SECURITY.md)
 - [Matriz de validação científica](docs/VALIDATION_MATRIX.md)
 - [Checklist para a versão 1.0](docs/RELEASE_CHECKLIST.md)
+- [Evidência e roteiro de validação independente](docs/VALIDACAO_INDEPENDENTE.md)
+- [Operação premium, SLO, carga e rollback](docs/OPERACAO_PREMIUM.md)
 - Os textos de Privacidade e Termos publicados no frontend são minutas e exigem revisão legal antes da versão 1.0.
 - A licença do código deve ser escolhida e publicada pelo titular do projeto antes da versão 1.0.
 

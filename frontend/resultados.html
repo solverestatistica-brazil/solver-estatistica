@@ -13,7 +13,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <script src="assets/js/theme.js"></script>
-  <link rel="stylesheet" href="assets/css/styles.css?v=20260716-2" />
+  <script src="assets/js/analytics.js?v=20260716-1"></script>
+  <link rel="stylesheet" href="assets/css/styles.css?v=20260716-9" />
 </head>
 <body>
 <div class="page-shell">
@@ -60,16 +61,21 @@
 
       <div class="workspace">
         <aside class="sidebar" aria-label="Configurações da análise">
-          <button class="side-item active" data-tab="config"><i></i>Configuração</button>
-          <button class="side-item" data-tab="dados"><i></i>Dados</button>
-          <button class="side-item" data-tab="resultados"><i></i>Resultados</button>
-          <button class="side-item" data-tab="exports"><i></i>Exportações</button>
+          <button class="side-item active" data-tab="config"><i>1</i>Configuração</button>
+          <button class="side-item" data-tab="dados"><i>2</i>Dados</button>
+          <button class="side-item" data-tab="resultados"><i>3</i>Resultados</button>
+          <button class="side-item" data-tab="exports"><i>4</i>Exportações</button>
         </aside>
 
         <section class="workarea">
 
           <!-- TAB CONFIG -->
           <div class="tab active" id="tab-config">
+            <header class="guided-header">
+              <span>Etapa 1 de 4</span>
+              <h2>Configure sua análise</h2>
+              <p>Escolha o delineamento e o tipo de análise. O Solver mostrará somente as opções necessárias.</p>
+            </header>
             <div class="form-grid">
               <label>Delineamento
                 <select id="design">
@@ -77,6 +83,7 @@
                   <option value="DBC">DBC · Blocos casualizados</option>
                   <option value="DQL">DQL · Quadrado latino</option>
                 </select>
+                <small id="designCompatibilityNote" class="field-note"></small>
               </label>
               <label>Tipo de análise
                 <select id="analysisType">
@@ -86,7 +93,14 @@
                   <option value="regression">Regressão direta</option>
                 </select>
               </label>
-              <label>Teste de médias
+              <label id="sumSquaresTypeWrap">Soma de quadrados · fatorial
+                <select id="sumSquaresType">
+                  <option value="2">Tipo II · recomendado sem interação dominante</option>
+                  <option value="3">Tipo III · desbalanceados com interação</option>
+                  <option value="1">Tipo I · sequencial, depende da ordem</option>
+                </select>
+              </label>
+              <label id="comparisonTestWrap">Teste de médias
                 <select id="comparisonTest">
                   <option value="tukey">Tukey</option>
                   <option value="duncan">Duncan</option>
@@ -101,43 +115,22 @@
                   <option value="">Gerar/carregar dados para escolher</option>
                 </select>
               </label>
-              <label>Alfa do pós-teste
+              <label id="alphaModeWrap">Alfa do pós-teste
                 <select id="alphaMode">
-                  <option value="auto">Automático (segue o teste F: 1% ou 5%)</option>
+                  <option value="auto">Automático · convenção pedagógica (segue o F)</option>
                   <option value="fixed">Fixo (definido ao lado)</option>
                 </select>
               </label>
-              <label>Alfa fixo (só se "Fixo" acima)
+              <label id="alphaValueWrap">Alfa fixo
                 <input id="alphaValue" type="number" step="0.01" min="0.001" max="0.5" value="0.05" />
               </label>
-              <label>Objetivo
+              <label id="goalWrap">Objetivo
                 <select id="goal">
                   <option value="max">Maior resposta é melhor</option>
                   <option value="min">Menor resposta é melhor</option>
                 </select>
               </label>
-              <label>Coluna resposta
-                <input id="responseColumn" value="valor" />
-              </label>
-              <label>Coluna tratamento
-                <input id="treatmentColumn" value="tratamento" />
-              </label>
-              <label>Coluna bloco
-                <input id="blockColumn" value="bloco" />
-              </label>
-              <label>Coluna linha · DQL
-                <input id="rowColumn" value="linha" />
-              </label>
-              <label>Coluna coluna · DQL
-                <input id="columnColumn" value="coluna" />
-              </label>
-              <label>Fatores fatorial/subparcelas
-                <input id="factorColumns" placeholder="Ex.: hibrido,dose" />
-              </label>
-              <label>Fator numérico / dose
-                <input id="numericFactorColumn" placeholder="Ex.: dose" />
-              </label>
-              <label>Grau de regressão solicitado
+              <label id="regressionDegreeWrap">Grau de regressão solicitado
                 <select id="regressionDegree">
                   <option value="">Automático (parcimônia)</option>
                   <option value="1">Linear (grau 1)</option>
@@ -146,37 +139,98 @@
                 </select>
               </label>
             </div>
-            <div class="hint-card">
-              <b>Regra do Solver</b>
-              <p>Sem um grau escolhido manualmente, o backend seleciona automaticamente o maior grau cujo termo de maior ordem é estatisticamente significativo (parcimônia) — não simplesmente o maior R² ajustado, que poderia indicar superajuste. A regressão só é calculada quando há um fator numérico com pelo menos 3 níveis distintos.</p>
+            <details class="advanced-settings">
+              <summary>Nomes das colunas e opções avançadas</summary>
+              <div class="form-grid">
+                <label id="responseColumnWrap">Coluna resposta
+                  <input id="responseColumn" value="valor" />
+                </label>
+                <label id="treatmentColumnWrap">Coluna tratamento
+                  <input id="treatmentColumn" value="tratamento" />
+                </label>
+                <label id="blockColumnWrap">Coluna bloco
+                  <input id="blockColumn" value="bloco" />
+                </label>
+                <label id="rowColumnWrap">Coluna linha · DQL
+                  <input id="rowColumn" value="linha" />
+                </label>
+                <label id="columnColumnWrap">Coluna coluna · DQL
+                  <input id="columnColumn" value="coluna" />
+                </label>
+                <label id="factorColumnsWrap">Nomes dos fatores
+                  <input id="factorColumns" placeholder="Ex.: hibrido,dose" />
+                </label>
+                <label id="numericFactorColumnWrap">Coluna de dose
+                  <input id="numericFactorColumn" placeholder="Ex.: dose" />
+                </label>
+              </div>
+            </details>
+            <div class="hint-card" id="analysisGuidance">
+              <b id="analysisGuidanceTitle">Como os dados serão organizados</b>
+              <p id="analysisGuidanceText"></p>
+            </div>
+            <div class="config-next">
+              <div>
+                <span>Próximo passo</span>
+                <strong id="configSummary">Defina a análise e avance para inserir os dados.</strong>
+              </div>
+              <button class="btn solid" id="goToData" type="button">Continuar para dados →</button>
             </div>
           </div>
 
           <!-- TAB DADOS -->
           <div class="tab" id="tab-dados">
-            <div class="data-actions">
+            <header class="guided-header">
+              <span>Etapa 2 de 4</span>
+              <h2>Como você deseja inserir os dados?</h2>
+              <p id="dataContextSummary">Escolha preenchimento manual ou envie uma planilha pronta.</p>
+            </header>
+            <div class="data-mode-switch" role="tablist" aria-label="Forma de inserir os dados">
+              <button id="manualMode" class="data-mode active" type="button" role="tab" aria-selected="true">Preencher manualmente</button>
+              <button id="uploadMode" class="data-mode" type="button" role="tab" aria-selected="false">Enviar CSV ou Excel</button>
+            </div>
+            <section id="manualDataPanel" class="data-entry-panel">
+              <div class="entry-panel-heading">
+                <span>Preenchimento guiado</span>
+                <h3 id="manualBuilderTitle">Defina o tamanho do experimento</h3>
+                <p id="manualBuilderDescription">Responda aos campos abaixo para gerar uma tabela pronta para preenchimento.</p>
+              </div>
               <div class="manual-builder">
-                <label>Tratamentos <input id="nTreatments" type="number" min="2" value="4"></label>
-                <label>Blocos / Repetições <input id="nBlocks" type="number" min="1" value="4"></label>
-                <label id="factorALevelsWrap">Níveis do fator A <input id="factorALevels" type="number" min="2" value="2"></label>
-                <label id="factorBLevelsWrap">Níveis do fator B <input id="factorBLevels" type="number" min="2" value="2"></label>
-                <button class="btn solid" id="generateTable">Gerar tabela manual</button>
+                <label id="nTreatmentsWrap"><span id="nTreatmentsLabel">Número de tratamentos</span> <input id="nTreatments" type="number" min="2" value="4"></label>
+                <label id="nBlocksWrap"><span id="nBlocksLabel">Número de blocos</span> <input id="nBlocks" type="number" min="1" value="4"></label>
+                <label id="factorALevelsWrap"><span id="factorALevelsLabel">Níveis do fator A</span> <input id="factorALevels" type="number" min="2" value="2"></label>
+                <label id="factorBLevelsWrap"><span id="factorBLevelsLabel">Níveis do fator B</span> <input id="factorBLevels" type="number" min="2" value="2"></label>
+                <button class="btn solid generate-table" id="generateTable" type="button">Gerar tabela para preencher →</button>
+              </div>
+            </section>
+            <section id="uploadDataPanel" class="data-entry-panel hidden">
+              <div class="entry-panel-heading">
+                <span>Importar planilha</span>
+                <h3>Envie seus dados prontos</h3>
+                <p>Use CSV, XLSX ou XLS. O cabeçalho deve corresponder às colunas configuradas.</p>
               </div>
               <div class="upload-box">
-                <label for="fileInput">Upload CSV/XLSX</label>
+                <label for="fileInput">Escolher arquivo</label>
                 <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" />
                 <button class="btn ghost" id="loadExample">Carregar exemplo</button>
               </div>
+            </section>
+            <div id="dataEntryEmpty" class="data-entry-empty">
+              <b>A tabela aparecerá aqui</b>
+              <p>Escolha uma forma de entrada acima. No modo manual, informe o tamanho do experimento e clique em gerar.</p>
             </div>
-            <div class="table-tools">
-              <button class="btn ghost" id="addRow">+ Adicionar linha</button>
-              <button class="btn ghost danger" id="clearRows">Limpar</button>
-              <button class="btn solid" id="runAnalysis">Rodar análise →</button>
+            <div id="dataWorkspace" class="hidden">
+              <div class="table-tools">
+                <button class="btn ghost" id="addRow">+ Adicionar linha</button>
+                <button class="btn ghost danger" id="clearRows">Limpar</button>
+                <button class="btn solid" id="runAnalysis">Rodar análise →</button>
+              </div>
+              <p class="mobile-table-hint">Deslize a planilha para os lados para conferir todas as colunas.</p>
+              <div class="table-wrap">
+                <table id="dataTable" class="data-table" aria-label="Tabela de dados editável"></table>
+              </div>
+              <p class="small-note" id="rowCount">Nenhuma linha carregada.</p>
             </div>
-            <div class="table-wrap">
-              <table id="dataTable" class="data-table" aria-label="Tabela de dados editável"></table>
-            </div>
-            <p class="small-note" id="rowCount">Nenhuma linha carregada.</p>
           </div>
 
           <!-- TAB RESULTADOS -->
@@ -221,6 +275,10 @@
                 <div class="table-wrap compact"><table id="assumptionsTable" class="result-table"></table></div>
                 <p id="transformationNote" class="small-note"></p>
               </section>
+              <section class="result-box" id="provenanceBox">
+                <h3>Rastreabilidade da análise</h3>
+                <div id="provenanceSummary" class="provenance-grid"></div>
+              </section>
               <section class="result-box">
                 <h3>Recomendações</h3>
                 <ul id="recommendations" class="recommendations"></ul>
@@ -231,12 +289,12 @@
           <!-- TAB EXPORTS -->
           <div class="tab" id="tab-exports">
             <div class="export-grid">
-              <button class="export-card" id="downloadPdf"><b>PDF técnico</b><span>Relatório em estilo dashboard para diretoria/laudo.</span></button>
-              <button class="export-card" id="downloadExcel"><b>Excel</b><span>ANOVA, médias e resumo em planilha completa.</span></button>
-              <button class="export-card" id="downloadPng"><b>PNG regressão</b><span>Imagem em alta resolução do gráfico.</span></button>
-              <button class="export-card" id="downloadPlotPdf"><b>PDF vetorial</b><span>Gráfico de regressão editável.</span></button>
+              <button class="export-card" id="downloadPdf" disabled><b>PDF técnico · A4</b><span>Relatório claro, em retrato, com capa e formatação acadêmica baseada na ABNT.</span></button>
+              <button class="export-card" id="downloadExcel" disabled><b>Excel</b><span>ANOVA, médias, pressupostos e rastreabilidade.</span></button>
+              <button class="export-card" id="downloadPng" disabled><b>PNG regressão</b><span>Disponível quando a análise contém regressão.</span></button>
+              <button class="export-card" id="downloadPlotPdf" disabled><b>PDF vetorial</b><span>Disponível quando a análise contém regressão.</span></button>
             </div>
-            <p class="small-note">As exportações são geradas pelo serviço estatístico usando os dados da análise atual.</p>
+            <p class="small-note" id="exportsNote">Execute uma análise para liberar as exportações correspondentes.</p>
           </div>
 
         </section>
@@ -256,10 +314,33 @@
 
 </div>
 
+<div id="processingOverlay" class="processing-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="processingTitle" aria-describedby="processingMessage">
+  <section class="processing-dialog">
+    <div class="processing-orbit" aria-hidden="true"><span></span><i></i></div>
+    <span class="processing-kicker">Solver Engine</span>
+    <h2 id="processingTitle">Processando sua análise</h2>
+    <p id="processingMessage">Validando os dados experimentais…</p>
+    <div id="processingProgress" class="processing-progress" role="progressbar" aria-label="Progresso da análise" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8">
+      <span id="processingProgressBar"></span>
+    </div>
+    <ol id="processingSteps" class="processing-steps">
+      <li data-processing-step="0"><i></i><span>Validar dados</span></li>
+      <li data-processing-step="1"><i></i><span>Montar modelo</span></li>
+      <li data-processing-step="2"><i></i><span>Calcular testes</span></li>
+      <li data-processing-step="3"><i></i><span>Preparar resultados</span></li>
+    </ol>
+    <footer class="processing-footer">
+      <span id="processingElapsed">0,0 s decorridos</span>
+      <button class="btn ghost danger" id="cancelAnalysis" type="button">Cancelar análise</button>
+    </footer>
+  </section>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="assets/js/csv-parser.js"></script>
-<script src="assets/js/config.js"></script>
-<script src="assets/js/app.js"></script>
+<script src="assets/js/manual-data.js?v=20260716-1"></script>
+<script src="assets/js/config.js?v=20260716-1"></script>
+<script src="assets/js/app.js?v=20260716-7"></script>
 </body>
 </html>

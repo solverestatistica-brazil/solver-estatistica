@@ -7,6 +7,15 @@
   let currentHeaders = ['bloco', 'tratamento', 'valor'];
   let currentResult = null;
   let regressionChart = null;
+  let currentAnalysisController = null;
+  let processingTimer = null;
+  let processingStartedAt = 0;
+  const PROCESSING_STEPS = [
+    'Validando os dados experimentais…',
+    'Montando o modelo estatístico…',
+    'Calculando ANOVA e comparações…',
+    'Organizando resultados e diagnósticos…'
+  ];
 
   // paleta sincronizada com o tema ativo
   let COLOR_BRAND = '#22C55E';
@@ -53,7 +62,7 @@
     apiInput.value = savedApi || window.SOLVER_API_BASE_URL || '';
     bindTabs();
     bindActions();
-    generateManualTable();
+    resetDataEntry();
     testApi(false);
   }
 
@@ -79,39 +88,162 @@
     $('clearRows').addEventListener('click', () => renderEditableTable(currentHeaders, []));
     $('loadExample').addEventListener('click', loadExampleData);
     $('runAnalysis').addEventListener('click', runAnalysis);
+    $('cancelAnalysis')?.addEventListener('click', () => currentAnalysisController?.abort());
     $('fileInput').addEventListener('change', handleFileUpload);
     $('downloadPdf').addEventListener('click', () => downloadExport('/api/export/pdf', 'solver-relatorio.pdf'));
     $('downloadExcel').addEventListener('click', () => downloadExport('/api/export/excel', 'solver-resultados.xlsx'));
     $('downloadPng').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png'));
     $('downloadPlotPdf').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf'));
-    ['design', 'analysisType'].forEach((id) => $(id)?.addEventListener('change', generateManualTable));
-    $('analysisType').addEventListener('change', updateFactorLevelsVisibility);
+    $('design')?.addEventListener('change', handleConfigurationChange);
+    $('analysisType')?.addEventListener('change', handleConfigurationChange);
+    $('manualMode')?.addEventListener('click', () => setDataMode('manual'));
+    $('uploadMode')?.addEventListener('click', () => setDataMode('upload'));
+    $('goToData')?.addEventListener('click', goToDataEntry);
     $('comparisonTest').addEventListener('change', updateControlGroupVisibility);
     $('alphaMode').addEventListener('change', updateAlphaValueState);
     $('treatmentColumn').addEventListener('change', updateControlGroupOptions);
     updateControlGroupVisibility();
     updateAlphaValueState();
+    updateAnalysisConfiguration();
     updateFactorLevelsVisibility();
+    updateSumSquaresVisibility();
+    updateExportAvailability(false, false);
+  }
+
+  function handleConfigurationChange() {
+    updateAnalysisConfiguration();
+    updateFactorLevelsVisibility();
+    updateSumSquaresVisibility();
+    updateControlGroupVisibility();
+    resetDataEntry();
+  }
+
+  function setDataMode(mode) {
+    const isManual = mode !== 'upload';
+    $('manualDataPanel')?.classList.toggle('hidden', !isManual);
+    $('uploadDataPanel')?.classList.toggle('hidden', isManual);
+    $('manualMode')?.classList.toggle('active', isManual);
+    $('uploadMode')?.classList.toggle('active', !isManual);
+    $('manualMode')?.setAttribute('aria-selected', String(isManual));
+    $('uploadMode')?.setAttribute('aria-selected', String(!isManual));
+  }
+
+  function goToDataEntry() {
+    updateFactorLevelsVisibility();
+    setDataMode('manual');
+    openTab('dados');
+    const firstInput = document.querySelector('#manualDataPanel label:not([style*="display: none"]) input');
+    firstInput?.focus();
   }
 
   function updateControlGroupVisibility() {
     const wrap = $('controlGroupWrap');
     if (!wrap) return;
-    wrap.style.display = $('comparisonTest').value === 'dunnett' ? '' : 'none';
+    wrap.style.display = $('analysisType').value !== 'regression' && $('comparisonTest').value === 'dunnett' ? '' : 'none';
   }
 
   function updateFactorLevelsVisibility() {
-    const isFactorial = ['factorial', 'split_plot'].includes($('analysisType').value);
+    const analysisType = $('analysisType').value;
+    const isFactorial = ['factorial', 'split_plot'].includes(analysisType);
+    const design = $('design').value;
+    if ($('nTreatmentsWrap')) $('nTreatmentsWrap').style.display = isFactorial ? 'none' : '';
+    if ($('nBlocksWrap')) $('nBlocksWrap').style.display = design === 'DQL' ? 'none' : '';
+    if ($('nTreatmentsLabel')) {
+      $('nTreatmentsLabel').textContent = analysisType === 'regression' ? 'Número de doses' : 'Número de tratamentos';
+    }
+    const blockLabels = {
+      regression: 'Repetições por dose',
+      factorial: design === 'DBC' ? 'Número de blocos' : 'Repetições por combinação',
+      split_plot: 'Número de blocos',
+      single: design === 'DBC' ? 'Número de blocos' : 'Repetições por tratamento'
+    };
+    if ($('nBlocksLabel')) $('nBlocksLabel').textContent = blockLabels[analysisType] || 'Repetições';
+    if ($('factorALevelsLabel')) $('factorALevelsLabel').textContent = analysisType === 'split_plot' ? 'Níveis do fator A · parcela' : 'Níveis do fator A';
+    if ($('factorBLevelsLabel')) $('factorBLevelsLabel').textContent = analysisType === 'split_plot' ? 'Níveis do fator B · subparcela' : 'Níveis do fator B';
     ['factorALevelsWrap', 'factorBLevelsWrap'].forEach((id) => {
       const wrap = $(id);
       if (wrap) wrap.style.display = isFactorial ? '' : 'none';
     });
+
+    const titles = {
+      single: design === 'DQL' ? 'Informe a ordem do quadrado latino' : 'Defina tratamentos e repetições',
+      factorial: 'Defina os níveis dos dois fatores',
+      split_plot: 'Defina blocos, parcelas e subparcelas',
+      regression: 'Defina as doses e repetições'
+    };
+    const descriptions = {
+      single: design === 'DQL'
+        ? 'O número de tratamentos também define o número de linhas e colunas do quadrado.'
+        : 'A tabela será montada com uma linha para cada tratamento em cada repetição ou bloco.',
+      factorial: 'O Solver criará todas as combinações entre os níveis A e B em cada repetição ou bloco.',
+      split_plot: 'Em cada bloco, o fator A representa as parcelas e o fator B representa as subparcelas.',
+      regression: 'O Solver criará doses igualmente espaçadas; você poderá editar os valores diretamente na tabela.'
+    };
+    if ($('manualBuilderTitle')) $('manualBuilderTitle').textContent = titles[analysisType] || '';
+    if ($('manualBuilderDescription')) $('manualBuilderDescription').textContent = descriptions[analysisType] || '';
+  }
+
+  function updateSumSquaresVisibility() {
+    const wrap = $('sumSquaresTypeWrap');
+    if (wrap) wrap.style.display = $('analysisType').value === 'factorial' ? '' : 'none';
+  }
+
+  function updateAnalysisConfiguration() {
+    const analysisType = $('analysisType').value;
+    const isFactorial = ['factorial', 'split_plot'].includes(analysisType);
+    const isRegression = analysisType === 'regression';
+    const allowed = window.SolverManualData?.allowedDesigns(analysisType) || ['DIC', 'DBC', 'DQL'];
+    const design = $('design');
+    Array.from(design.options).forEach((option) => {
+      option.disabled = !allowed.includes(option.value);
+    });
+    if (!allowed.includes(design.value)) design.value = allowed[0];
+    const selectedDesign = design.value;
+
+    if (isFactorial && !$('factorColumns').value.trim()) $('factorColumns').value = 'fator_a,fator_b';
+    if (isRegression && !$('numericFactorColumn').value.trim()) $('numericFactorColumn').value = 'dose';
+    if ($('comparisonTestWrap')) $('comparisonTestWrap').style.display = isRegression ? 'none' : '';
+    if ($('factorColumnsWrap')) $('factorColumnsWrap').style.display = isFactorial ? '' : 'none';
+    if ($('numericFactorColumnWrap')) $('numericFactorColumnWrap').style.display = isRegression ? '' : 'none';
+    if ($('regressionDegreeWrap')) $('regressionDegreeWrap').style.display = isRegression ? '' : 'none';
+    if ($('treatmentColumnWrap')) $('treatmentColumnWrap').style.display = analysisType === 'single' ? '' : 'none';
+    if ($('blockColumnWrap')) $('blockColumnWrap').style.display = selectedDesign === 'DBC' ? '' : 'none';
+    if ($('rowColumnWrap')) $('rowColumnWrap').style.display = selectedDesign === 'DQL' ? '' : 'none';
+    if ($('columnColumnWrap')) $('columnColumnWrap').style.display = selectedDesign === 'DQL' ? '' : 'none';
+
+    const notes = {
+      single: 'DIC, DBC e DQL disponíveis para análise simples.',
+      factorial: 'Fatorial manual disponível em DIC ou DBC, com exatamente dois fatores.',
+      split_plot: 'Parcelas subdivididas usam DBC: fator de parcela primeiro e subparcela depois.',
+      regression: 'Regressão direta manual usa DIC e uma coluna numérica de doses.'
+    };
+    if ($('designCompatibilityNote')) $('designCompatibilityNote').textContent = notes[analysisType] || '';
+
+    const analysisLabels = {
+      single: 'Fator único', factorial: 'Fatorial', split_plot: 'Parcelas subdivididas', regression: 'Regressão direta'
+    };
+    const guidance = {
+      single: selectedDesign === 'DQL'
+        ? ['Estrutura do quadrado latino', 'O número de tratamentos determinará também o número de linhas e colunas.']
+        : ['Estrutura do experimento', selectedDesign === 'DBC' ? 'Cada bloco conterá todos os tratamentos uma vez.' : 'Cada tratamento será repetido sem a formação de blocos.'],
+      factorial: ['Combinações dos fatores', `Todas as combinações entre A e B serão geradas em cada ${selectedDesign === 'DBC' ? 'bloco' : 'repetição'}.`],
+      split_plot: ['Parcelas e subparcelas', 'O fator A será tratado como parcela e o fator B como subparcela dentro de cada bloco.'],
+      regression: ['Níveis de dose', 'Informe pelo menos três doses. Sem grau fixo, o Solver seleciona o modelo significativo mais parcimonioso.']
+    };
+    const [guidanceTitle, guidanceText] = guidance[analysisType] || ['', ''];
+    if ($('analysisGuidanceTitle')) $('analysisGuidanceTitle').textContent = guidanceTitle;
+    if ($('analysisGuidanceText')) $('analysisGuidanceText').textContent = guidanceText;
+    const summary = `${selectedDesign} · ${analysisLabels[analysisType] || analysisType}`;
+    if ($('configSummary')) $('configSummary').textContent = summary;
+    if ($('dataContextSummary')) $('dataContextSummary').textContent = `${summary}. Escolha como deseja informar os dados.`;
   }
 
   function updateAlphaValueState() {
     const input = $('alphaValue');
     if (!input) return;
-    input.disabled = $('alphaMode').value !== 'fixed';
+    const isFixed = $('alphaMode').value === 'fixed';
+    input.disabled = !isFixed;
+    if ($('alphaValueWrap')) $('alphaValueWrap').style.display = isFixed ? '' : 'none';
   }
 
   function updateControlGroupOptions() {
@@ -136,16 +268,31 @@
 
   async function fetchWithTimeout(url, options = {}, timeoutMs = API_TIMEOUT_MS) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const externalSignal = options.signal;
+    let didTimeout = false;
+    const relayAbort = () => controller.abort();
+    if (externalSignal?.aborted) relayAbort();
+    else externalSignal?.addEventListener('abort', relayAbort, { once: true });
+    const timer = setTimeout(() => {
+      didTimeout = true;
+      controller.abort();
+    }, timeoutMs);
     try {
       return await fetch(url, { ...options, signal: controller.signal });
     } catch (err) {
       if (err?.name === 'AbortError') {
-        throw new Error('O serviço demorou além do limite. Tente novamente em instantes.');
+        const wrapped = new Error(
+          didTimeout
+            ? 'O serviço demorou além do limite. Tente novamente em instantes.'
+            : 'Análise cancelada pelo usuário.'
+        );
+        wrapped.code = didTimeout ? 'timeout' : 'cancelled';
+        throw wrapped;
       }
       throw err;
     } finally {
       clearTimeout(timer);
+      externalSignal?.removeEventListener('abort', relayAbort);
     }
   }
 
@@ -191,96 +338,110 @@
     setTimeout(() => div.remove(), 4200);
   }
 
+  function setProcessingStep(stepIndex, progress, message) {
+    const progressNode = $('processingProgress');
+    const progressBar = $('processingProgressBar');
+    if (progressNode) progressNode.setAttribute('aria-valuenow', String(Math.round(progress)));
+    if (progressBar) progressBar.style.width = `${progress}%`;
+    if ($('processingMessage')) $('processingMessage').textContent = message;
+    document.querySelectorAll('[data-processing-step]').forEach((node, index) => {
+      node.classList.toggle('active', index === stepIndex);
+      node.classList.toggle('completed', index < stepIndex);
+    });
+  }
+
+  function startProcessing() {
+    processingStartedAt = performance.now();
+    $('processingOverlay')?.classList.remove('hidden');
+    document.body.classList.add('is-processing');
+    document.querySelector('main')?.setAttribute('aria-busy', 'true');
+    if ($('cancelAnalysis')) $('cancelAnalysis').disabled = false;
+    setProcessingStep(0, 8, PROCESSING_STEPS[0]);
+    processingTimer = window.setInterval(() => {
+      const elapsed = performance.now() - processingStartedAt;
+      const stepIndex = Math.min(PROCESSING_STEPS.length - 1, Math.floor(elapsed / 1200));
+      const bases = [14, 38, 64, 84];
+      const withinStep = Math.min(10, ((elapsed % 1200) / 1200) * 10);
+      setProcessingStep(stepIndex, Math.min(94, bases[stepIndex] + withinStep), PROCESSING_STEPS[stepIndex]);
+      if ($('processingElapsed')) {
+        $('processingElapsed').textContent = `${(elapsed / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s decorridos`;
+      }
+    }, 180);
+  }
+
+  function completeProcessing() {
+    if (processingTimer) window.clearInterval(processingTimer);
+    processingTimer = null;
+    setProcessingStep(PROCESSING_STEPS.length - 1, 100, 'Resultados prontos. Abrindo o painel…');
+    document.querySelectorAll('[data-processing-step]').forEach((node) => {
+      node.classList.remove('active');
+      node.classList.add('completed');
+    });
+    if ($('cancelAnalysis')) $('cancelAnalysis').disabled = true;
+    return new Promise((resolve) => window.setTimeout(resolve, 320));
+  }
+
+  function stopProcessing() {
+    if (processingTimer) window.clearInterval(processingTimer);
+    processingTimer = null;
+    $('processingOverlay')?.classList.add('hidden');
+    document.body.classList.remove('is-processing');
+    document.querySelector('main')?.removeAttribute('aria-busy');
+  }
+
+  function resetDataEntry() {
+    currentResult = null;
+    currentHeaders = [];
+    dataTable.innerHTML = '';
+    $('dataWorkspace')?.classList.add('hidden');
+    $('dataEntryEmpty')?.classList.remove('hidden');
+    if ($('rowCount')) $('rowCount').textContent = 'Nenhuma linha carregada.';
+    updateControlGroupOptions();
+    updateExportAvailability(false, false);
+  }
+
   function generateManualTable() {
-    const design = $('design').value;
-    const analysisType = $('analysisType').value;
-    const nTreatments = Number($('nTreatments').value || 4);
-    const nBlocks = Number($('nBlocks').value || 4);
-    const response = $('responseColumn').value || 'valor';
-    const treatment = $('treatmentColumn').value || 'tratamento';
-    const block = $('blockColumn').value || 'bloco';
-    const row = $('rowColumn').value || 'linha';
-    const col = $('columnColumn').value || 'coluna';
-    const numeric = $('numericFactorColumn').value.trim();
-    const factors = splitColumns($('factorColumns').value);
-
-    const headers = [];
-    if (design === 'DBC') headers.push(block);
-    if (design === 'DQL') headers.push(row, col);
-    if (analysisType === 'factorial' || analysisType === 'split_plot') headers.push(...factors.filter(Boolean));
-    if (analysisType === 'regression' && numeric) headers.push(numeric);
-    // Fatorial/split-plot: nao inclui a coluna de tratamento — o backend a sintetiza a
-    // partir dos fatores. Incluir uma coluna 'tratamento' vazia aqui faria a validacao de
-    // "coluna com valor ausente" disparar, mesmo com os dois fatores corretamente
-    // preenchidos (a sintese so roda quando a coluna esta AUSENTE, nao vazia).
-    if (analysisType !== 'regression' && analysisType !== 'factorial' && analysisType !== 'split_plot') headers.push(treatment);
-    if (!headers.includes(response)) headers.push(response);
-
-    const rows = [];
-    if (design === 'DQL') {
-      for (let r = 1; r <= nTreatments; r++) {
-        for (let c = 1; c <= nTreatments; c++) {
-          const treatmentIndex = ((r + c - 2) % nTreatments) + 1;
-          rows.push(Object.fromEntries(headers.map((h) => [h, ''])));
-          rows[rows.length - 1][row] = `L${r}`;
-          rows[rows.length - 1][col] = `C${c}`;
-          if (headers.includes(treatment)) rows[rows.length - 1][treatment] = `T${treatmentIndex}`;
-        }
-      }
-    } else if (analysisType === 'regression') {
-      for (let i = 0; i < nTreatments; i++) {
-        for (let rep = 1; rep <= nBlocks; rep++) {
-          const obj = Object.fromEntries(headers.map((h) => [h, '']));
-          if (numeric) obj[numeric] = i * 50;
-          obj[response] = '';
-          rows.push(obj);
-        }
-      }
-    } else if (analysisType === 'factorial' || analysisType === 'split_plot') {
-      // [FIX auditoria P1-05] A versao anterior amarrava o fator A e o fator B ao MESMO
-      // indice de tratamento (ex.: sempre F1x50, F2x100, F3x150, F4x200) — nunca gerava o
-      // produto cartesiano completo entre os niveis dos dois fatores, entao um fatorial
-      // 4x4 nunca tinha as 16 combinacoes que o delineamento exige. Agora cada fator tem seu
-      // proprio numero de niveis e o gerador cria TODAS as combinacoes, em cada bloco.
-      const aLevels = Math.max(2, Number($('factorALevels').value || 2));
-      const bLevels = Math.max(2, Number($('factorBLevels').value || 2));
-      const [factorA, factorB] = factors;
-      for (let b = 1; b <= nBlocks; b++) {
-        for (let a = 1; a <= aLevels; a++) {
-          for (let bLvl = 1; bLvl <= bLevels; bLvl++) {
-            const obj = Object.fromEntries(headers.map((h) => [h, '']));
-            if (headers.includes(block)) obj[block] = `B${b}`;
-            if (factorA && headers.includes(factorA)) obj[factorA] = `A${a}`;
-            if (factorB && headers.includes(factorB)) obj[factorB] = `S${bLvl}`;
-            rows.push(obj);
-          }
-        }
-      }
-    } else {
-      for (let b = 1; b <= nBlocks; b++) {
-        for (let t = 1; t <= nTreatments; t++) {
-          const obj = Object.fromEntries(headers.map((h) => [h, '']));
-          if (headers.includes(block)) obj[block] = `B${b}`;
-          if (headers.includes(treatment)) obj[treatment] = `T${t}`;
-          rows.push(obj);
-        }
-      }
+    try {
+      if (!window.SolverManualData) throw new Error('Gerador manual não carregado. Atualize a página e tente novamente.');
+      const generated = window.SolverManualData.buildManualTable({
+        design: $('design').value,
+        analysisType: $('analysisType').value,
+        nTreatments: Number($('nTreatments').value),
+        nBlocks: Number($('nBlocks').value),
+        response: $('responseColumn').value,
+        treatment: $('treatmentColumn').value,
+        block: $('blockColumn').value,
+        row: $('rowColumn').value,
+        column: $('columnColumn').value,
+        numeric: $('numericFactorColumn').value.trim(),
+        factors: splitColumns($('factorColumns').value),
+        aLevels: Number($('factorALevels').value),
+        bLevels: Number($('factorBLevels').value)
+      });
+      renderEditableTable(generated.headers, generated.rows);
+    } catch (error) {
+      notify(error.message || 'Não foi possível gerar a tabela manual.', 'error');
     }
-    renderEditableTable(unique(headers), rows);
   }
 
   function renderEditableTable(headers, rows) {
+    currentResult = null;
+    updateExportAvailability(false, false);
     currentHeaders = unique(headers);
     dataTable.innerHTML = '';
+    $('dataWorkspace')?.classList.remove('hidden');
+    $('dataEntryEmpty')?.classList.add('hidden');
     const thead = document.createElement('thead');
     const trh = document.createElement('tr');
     currentHeaders.forEach((h) => {
       const th = document.createElement('th');
       th.textContent = h;
+      th.scope = 'col';
       trh.appendChild(th);
     });
     const actionTh = document.createElement('th');
     actionTh.textContent = 'Ações';
+    actionTh.scope = 'col';
     trh.appendChild(actionTh);
     thead.appendChild(trh);
     dataTable.appendChild(thead);
@@ -355,6 +516,7 @@
       comparison_test: $('comparisonTest').value,
       control_group: $('controlGroup').value || null,
       alpha_mode: $('alphaMode').value,
+      sum_squares_type: Number($('sumSquaresType').value) || 2,
       regression_degree: degree ? Number(degree) : null,
       goal: $('goal').value,
       alpha: Number($('alphaValue').value) || 0.05,
@@ -362,30 +524,56 @@
     };
   }
 
+  function validatePayloadBeforeRequest(payload) {
+    if (['factorial', 'split_plot'].includes(payload.analysis_type) && payload.factor_columns.length !== 2) {
+      return 'Informe exatamente dois fatores, separados por vírgula, antes de analisar.';
+    }
+    if (payload.analysis_type === 'split_plot' && payload.design !== 'DBC') {
+      return 'Parcelas subdivididas devem ser analisadas em DBC.';
+    }
+    if (payload.analysis_type === 'regression' && !payload.numeric_factor_column) {
+      return 'Informe a coluna de dose/fator numérico antes de analisar.';
+    }
+    return '';
+  }
+
   async function runAnalysis() {
     const base = cleanApiBase(apiInput.value);
     if (!base) return notify('O serviço estatístico não está configurado.', 'error');
     const payload = payloadFromUi();
     if (!payload.data.length) return notify('Insira ou carregue dados antes de analisar.', 'error');
+    const configurationError = validatePayloadBeforeRequest(payload);
+    if (configurationError) return notify(configurationError, 'error');
     const runButton = $('runAnalysis');
     try {
       runButton.disabled = true;
+      currentAnalysisController = new AbortController();
+      startProcessing();
       setApiStatus('Processando...', '');
       const res = await fetchWithTimeout(`${base}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: currentAnalysisController.signal
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.detail || 'Erro na análise');
+      await completeProcessing();
       currentResult = json;
       renderResults(json);
       openTab('resultados');
       setApiStatus('API online', 'ok');
     } catch (err) {
+      if (err?.code === 'cancelled') {
+        setApiStatus('API online', 'ok');
+        notify('Análise cancelada. Nenhum resultado foi alterado.', 'info');
+        return;
+      }
       setApiStatus('Erro na análise', 'err');
       notify(err.message || 'Erro ao rodar análise.', 'error');
     } finally {
+      stopProcessing();
+      currentAnalysisController = null;
       runButton.disabled = false;
     }
   }
@@ -409,6 +597,8 @@
     renderFactorComparisons(result?.factor_comparisons);
     renderInteractionBreakdown(result?.interaction_breakdown);
     renderAssumptions(result?.pressupostos, result?.transformacao_sugerida);
+    renderProvenance(result?.provenance, result?.meta);
+    updateExportAvailability(true, Boolean(result?.regression));
 
     // atualiza previews (mesmo se hidden)
     const firstF = (result?.anova?.table || []).find((r) => r.f_calc != null);
@@ -437,6 +627,7 @@
     columns.forEach((c) => {
       const th = document.createElement('th');
       th.textContent = labelFor(c);
+      th.scope = 'col';
       trh.appendChild(th);
     });
     thead.appendChild(trh);
@@ -446,6 +637,7 @@
       const tr = document.createElement('tr');
       columns.forEach((c) => {
         const td = document.createElement('td');
+        td.dataset.label = labelFor(c);
         const val = row[c];
         td.textContent = val == null ? '—' : (typeof val === 'number' ? format(val) : val);
         if (sigColumn && c === sigColumn) {
@@ -575,10 +767,12 @@
     }
     box.classList.remove('hidden');
     const selected = reg.selected_model || {};
+    const lack = selected.lack_of_fit || {};
     [
       `Modelo: grau ${reg.selected_degree}`,
       `R²: ${format(selected.r2)}`,
       `R² ajustado: ${format(selected.adj_r2)}`,
+      lack.testable ? `Falta de ajuste: F=${format(lack.f_value)} · p=${format(lack.p_value)}` : (lack.note || ''),
       selected.equation || '',
       selected.optimum ? `Ótimo: ${format(selected.optimum.x)} → ${format(selected.optimum.y)}` : ''
     ].filter(Boolean).forEach((text) => {
@@ -622,6 +816,43 @@
         }
       }
     });
+  }
+
+  function renderProvenance(provenance, meta) {
+    const box = $('provenanceSummary');
+    if (!box) return;
+    const config = provenance?.config || {};
+    const dataHash = String(provenance?.data_sha256 || '—');
+    const items = [
+      ['Motor', provenance?.engine_version || '—'],
+      ['Commit', String(provenance?.git_commit || '—').slice(0, 12)],
+      ['Gerado em UTC', provenance?.generated_at_utc || '—'],
+      ['Dados SHA-256', dataHash === '—' ? dataHash : `${dataHash.slice(0, 16)}…`],
+      ['Alfa', `${meta?.alpha_mode || config.alpha_mode || 'auto'} · ${format(meta?.alpha ?? config.alpha)}`],
+      ['Soma de quadrados', `Tipo ${meta?.sum_squares_type || config.sum_squares_type || 2}`],
+    ];
+    box.innerHTML = '';
+    items.forEach(([label, value]) => {
+      const item = document.createElement('div');
+      const key = document.createElement('span');
+      const val = document.createElement('strong');
+      key.textContent = label;
+      val.textContent = value;
+      item.append(key, val);
+      box.appendChild(item);
+    });
+  }
+
+  function updateExportAvailability(hasResult, hasRegression) {
+    ['downloadPdf', 'downloadExcel'].forEach((id) => { if ($(id)) $(id).disabled = !hasResult; });
+    ['downloadPng', 'downloadPlotPdf'].forEach((id) => { if ($(id)) $(id).disabled = !hasRegression; });
+    const note = $('exportsNote');
+    if (!note) return;
+    note.textContent = !hasResult
+      ? 'Execute uma análise para liberar as exportações correspondentes.'
+      : hasRegression
+        ? 'Todas as exportações estão disponíveis para a análise atual.'
+        : 'PDF e Excel disponíveis. Gráficos exigem uma análise de regressão.';
   }
 
   async function downloadExport(endpoint, filename) {
@@ -698,6 +929,9 @@
     $('responseColumn').value = 'valor';
     $('treatmentColumn').value = 'tratamento';
     $('blockColumn').value = 'bloco';
+    updateAnalysisConfiguration();
+    updateFactorLevelsVisibility();
+    updateSumSquaresVisibility();
     try {
       const response = await fetchWithTimeout('assets/data/dbc_exemplo.json', {}, 15000);
       if (!response.ok) throw new Error('Não foi possível carregar o exemplo oficial.');
