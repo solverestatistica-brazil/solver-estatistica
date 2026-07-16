@@ -237,7 +237,7 @@ h1 em{font-style:normal;font-weight:700;color:var(--brand)}
   letter-spacing:.08em;text-transform:uppercase;font-weight:500;
 }
 .section-head span::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--brand)}
-.section-head h2{
+.section-head h1,.section-head h2{
   font-family:var(--font-heading);
   font-size:clamp(26px,3vw,38px);
   margin:10px 0 10px;font-weight:600;letter-spacing:-.02em;color:var(--text-d1);
