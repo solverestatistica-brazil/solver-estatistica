@@ -6,12 +6,13 @@
   <meta name="description" content="Solver — dashboard de análise estatística (ANOVA, médias e regressão)." />
   <title>Análise · Solver Estatística</title>
 
-  <link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="%23F7FAF6" stroke="%23197341" stroke-width="1.6"/><polyline points="10,25 16,18 20,21 28,12" stroke="%23197341" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><polyline points="23,12 28,12 28,17" stroke="%23197341" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>' />
-  <meta name="theme-color" content="#F4F7F2" />
+  <link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="%230A0A0A" stroke="%2322C55E" stroke-width="1.6"/><polyline points="10,25 16,18 20,21 28,12" stroke="%234ADE80" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/><polyline points="23,12 28,12 28,17" stroke="%234ADE80" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>' />
+  <meta name="theme-color" content="#0A0A0A" />
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="assets/js/theme.js"></script>
   <link rel="stylesheet" href="assets/css/styles.css" />
 </head>
 <body>
@@ -20,16 +21,17 @@
   <nav class="nav">
     <a class="logo-group" href="index.html" aria-label="Solver Estatística">
       <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="#F7FAF6" stroke="#197341" stroke-width="1.6"/>
-        <polyline points="10,25 16,18 20,21 28,12" stroke="#197341" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-        <polyline points="23,12 28,12 28,17" stroke="#197341" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <rect x="1.5" y="1.5" width="37" height="37" rx="10" fill="#0A0A0A" stroke="#22C55E" stroke-width="1.6"/>
+        <polyline points="10,25 16,18 20,21 28,12" stroke="#4ADE80" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <polyline points="23,12 28,12 28,17" stroke="#4ADE80" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
       </svg>
       <span>
         <strong>SOLVER</strong>
-        <small>ANÁLISE EXPERIMENTAL</small>
+        <small>INTELLIGENCE FOR FIELD TRIALS</small>
       </span>
     </a>
     <div class="nav-actions">
+      <button class="btn ghost theme-toggle" type="button" data-theme-toggle aria-label="Ativar tema claro" aria-pressed="false"><span data-theme-icon aria-hidden="true">☀</span><span data-theme-label>Claro</span></button>
       <a class="btn ghost" href="index.html">← Voltar ao site</a>
     </div>
   </nav>
@@ -46,7 +48,7 @@
     <section class="panel app-panel" id="analisar">
       <div class="section-head">
         <span>Dashboard estatístico</span>
-        <h1>Analise seus dados com clareza, do planejamento ao relatório</h1>
+        <h1>Monte a análise sem sair do navegador</h1>
         <p>Preencha manualmente ou envie CSV/XLSX. Seus dados são processados somente para gerar a análise solicitada.</p>
       </div>
 
