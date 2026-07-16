@@ -896,14 +896,18 @@
         const text = await file.text();
         const rows = parseCsv(text);
         validateImportedRows(rows);
-        renderEditableTable(Object.keys(rows[0] || {}), rows);
+        const headers = Object.keys(rows[0] || {});
+        syncImportedColumns(headers);
+        renderEditableTable(headers, rows);
       } else if (['xlsx', 'xls'].includes(ext)) {
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
         validateImportedRows(rows);
-        renderEditableTable(Object.keys(rows[0] || {}), rows);
+        const headers = Object.keys(rows[0] || {});
+        syncImportedColumns(headers);
+        renderEditableTable(headers, rows);
       } else {
         throw new Error('Formato não suportado. Use CSV, XLS ou XLSX.');
       }
@@ -921,6 +925,31 @@
   function validateImportedRows(rows) {
     if (!Array.isArray(rows) || !rows.length) throw new Error('O arquivo não contém linhas de dados.');
     if (rows.length > MAX_DATA_ROWS) throw new Error(`O limite é ${MAX_DATA_ROWS.toLocaleString('pt-BR')} linhas por análise.`);
+  }
+
+  function normalizedHeader(value) {
+    return String(value || '').trim().toLocaleLowerCase('pt-BR')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]/g, '');
+  }
+
+  function detectHeader(headers, aliases) {
+    const accepted = new Set(aliases.map(normalizedHeader));
+    const matches = headers.filter((header) => accepted.has(normalizedHeader(header)));
+    return matches.length === 1 ? matches[0] : null;
+  }
+
+  function syncImportedColumns(headers) {
+    const mappings = [
+      ['responseColumn', ['valor', 'resposta', 'response']],
+      ['treatmentColumn', ['tratamento', 'treatment']],
+      ['blockColumn', ['bloco', 'block']],
+      ['rowColumn', ['linha', 'row']],
+      ['columnColumn', ['coluna', 'column']]
+    ];
+    mappings.forEach(([id, aliases]) => {
+      const detected = detectHeader(headers, aliases);
+      if (detected && $(id)) $(id).value = detected;
+    });
   }
 
   async function loadExampleData() {
