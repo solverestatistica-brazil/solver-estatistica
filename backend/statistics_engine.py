@@ -19,6 +19,7 @@ import base64
 import io
 import math
 import re
+import unicodedata
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -149,6 +150,27 @@ def _dedupe_keep_order(values: Iterable[str]) -> List[str]:
             output.append(value)
     return output
 
+def _normalized_column_name(value: Any) -> str:
+    """Normaliza cabeçalhos para comparação, preservando o nome original no DataFrame."""
+    text = unicodedata.normalize("NFKD", str(value or "").strip().casefold())
+    return "".join(char for char in text if not unicodedata.combining(char) and char.isalnum())
+
+def _resolve_column_name(columns: Any, requested: Any, aliases: Tuple[str, ...] = ()) -> str:
+    """Resolve nomes ignorando caixa/acentos e aliases apenas quando não há ambiguidade."""
+    requested_text = str(requested or "").strip()
+    normalized: Dict[str, List[str]] = {}
+    for column in columns:
+        normalized.setdefault(_normalized_column_name(column), []).append(str(column))
+    direct = normalized.get(_normalized_column_name(requested_text), [])
+    if len(direct) == 1:
+        return direct[0]
+    alias_keys = {_normalized_column_name(alias) for alias in aliases}
+    if _normalized_column_name(requested_text) in alias_keys:
+        candidates = [name for key in alias_keys for name in normalized.get(key, [])]
+        if len(candidates) == 1:
+            return candidates[0]
+    return requested_text
+
 def _has_blank(series: pd.Series) -> bool:
     return series.isna().any() or series.astype(str).str.strip().eq("").any()
 
@@ -193,13 +215,26 @@ def _prepare_context(payload: Dict[str, Any]) -> AnalysisContext:
     df = pd.DataFrame(data)
     df.columns = [str(c).strip() for c in df.columns]
 
-    response = str(payload.get("response_column") or "valor").strip()
-    treatment = str(payload.get("treatment_column") or "tratamento").strip()
+    response = _resolve_column_name(
+        df.columns, payload.get("response_column") or "valor", ("valor", "resposta", "response")
+    )
+    treatment = _resolve_column_name(
+        df.columns, payload.get("treatment_column") or "tratamento", ("tratamento", "treatment")
+    )
     design = (payload.get("design") or "DIC").upper()
     analysis_type = payload.get("analysis_type") or "single"
     goal = payload.get("goal") or "max"
     payload["response_column"] = response
     payload["treatment_column"] = treatment
+    payload["block_column"] = _resolve_column_name(
+        df.columns, payload.get("block_column") or "bloco", ("bloco", "block")
+    )
+    payload["row_column"] = _resolve_column_name(
+        df.columns, payload.get("row_column") or "linha", ("linha", "row")
+    )
+    payload["column_column"] = _resolve_column_name(
+        df.columns, payload.get("column_column") or "coluna", ("coluna", "column")
+    )
 
     if design not in ALLOWED_DESIGNS:
         raise ValueError(f"Delineamento inválido: {design}. Use DIC, DBC ou DQL.")
@@ -226,7 +261,10 @@ def _prepare_context(payload: Dict[str, Any]) -> AnalysisContext:
         raise ValueError("Tipo de soma de quadrados inválido. Use 1, 2 ou 3.")
     payload["sum_squares_type"] = sum_squares_type
 
-    factor_columns = _dedupe_keep_order([str(c).strip() for c in (payload.get("factor_columns") or []) if str(c).strip()])
+    factor_columns = _dedupe_keep_order([
+        _resolve_column_name(df.columns, c)
+        for c in (payload.get("factor_columns") or []) if str(c).strip()
+    ])
     payload["factor_columns"] = factor_columns
 
     required = [response]
@@ -241,7 +279,10 @@ def _prepare_context(payload: Dict[str, Any]) -> AnalysisContext:
         required.extend([payload.get("row_column") or "linha", payload.get("column_column") or "coluna"])
     if analysis_type in {"factorial", "split_plot"}:
         required.extend(factor_columns)
-    numeric_col = str(payload.get("numeric_factor_column") or payload.get("dose_column") or "").strip() or None
+    numeric_requested = str(payload.get("numeric_factor_column") or payload.get("dose_column") or "").strip()
+    numeric_col = _resolve_column_name(df.columns, numeric_requested) if numeric_requested else None
+    if numeric_col:
+        payload["numeric_factor_column"] = numeric_col
     if analysis_type == "regression" and numeric_col:
         required.append(numeric_col)
 
