@@ -17,6 +17,28 @@ EXAMPLE_CSV = ROOT / "examples" / "dbc_exemplo.csv"
 APP_JS = ROOT / "frontend" / "assets" / "js" / "app.js"
 
 
+def test_dql_accepts_title_case_headers_and_resposta_alias():
+    treatments = [
+        ["RA", "RB", "RC", "RD", "RE"],
+        ["RB", "RC", "RD", "RE", "RA"],
+        ["RC", "RD", "RE", "RA", "RB"],
+        ["RD", "RE", "RA", "RB", "RC"],
+        ["RE", "RA", "RB", "RC", "RD"],
+    ]
+    data = [
+        {"Linha": row + 1, "Coluna": column + 1, "Tratamento": treatments[row][column],
+         "Resposta": 20 + row * 2 + column + ((row * column) % 3)}
+        for row in range(5) for column in range(5)
+    ]
+    result = analyze({
+        "design": "DQL", "analysis_type": "single",
+        "response_column": "valor", "treatment_column": "tratamento",
+        "row_column": "linha", "column_column": "coluna", "data": data,
+    })
+    assert result["meta"]["n_rows"] == 25
+    assert result["meta"]["response_column"] == "Resposta"
+
+
 def _official_rows():
     return json.loads(EXAMPLE_JSON.read_text(encoding="utf-8"))
 
