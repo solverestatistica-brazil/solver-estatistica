@@ -8,18 +8,49 @@
   let currentResult = null;
   let regressionChart = null;
 
-  // paleta v2
-  const COLOR_BRAND = '#22C55E';
-  const COLOR_BRAND_HI = '#4ADE80';
-  const COLOR_ACCENT = '#F5A85B';
-  const COLOR_TEXT_D1 = '#F5F5F5';
-  const COLOR_TEXT_D2 = '#A3A3A3';
-  const COLOR_BORDER = 'rgba(255,255,255,.08)';
+  // paleta sincronizada com o tema ativo
+  let COLOR_BRAND = '#22C55E';
+  let COLOR_BRAND_HI = '#4ADE80';
+  let COLOR_ACCENT = '#F5A85B';
+  let COLOR_TEXT_D1 = '#F5F5F5';
+  let COLOR_TEXT_D2 = '#A3A3A3';
+  let COLOR_BORDER = 'rgba(255,255,255,.08)';
+  const MAX_FILE_BYTES = 5 * 1024 * 1024;
+  const MAX_DATA_ROWS = 10000;
+  const API_TIMEOUT_MS = 60000;
+
+  function cssColor(name, fallback) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  }
+
+  function syncThemeColors() {
+    COLOR_BRAND = cssColor('--brand', COLOR_BRAND);
+    COLOR_BRAND_HI = cssColor('--brand-hi', COLOR_BRAND_HI);
+    COLOR_ACCENT = cssColor('--accent', COLOR_ACCENT);
+    COLOR_TEXT_D1 = cssColor('--text-d1', COLOR_TEXT_D1);
+    COLOR_TEXT_D2 = cssColor('--text-d2', COLOR_TEXT_D2);
+    COLOR_BORDER = cssColor('--border', COLOR_BORDER);
+
+    if (regressionChart) {
+      regressionChart.data.datasets[0].backgroundColor = COLOR_BRAND;
+      regressionChart.data.datasets[0].borderColor = COLOR_BRAND;
+      regressionChart.data.datasets[1].borderColor = COLOR_BRAND_HI;
+      regressionChart.options.plugins.legend.labels.color = COLOR_TEXT_D2;
+      ['x', 'y'].forEach((axis) => {
+        regressionChart.options.scales[axis].title.color = COLOR_TEXT_D2;
+        regressionChart.options.scales[axis].ticks.color = COLOR_TEXT_D2;
+        regressionChart.options.scales[axis].grid.color = COLOR_BORDER;
+      });
+      regressionChart.update('none');
+    }
+  }
 
   function init() {
     if (!apiInput || !dataTable) return; // página não é a de resultados
-    const savedApi = localStorage.getItem('solver_api_base_url') || window.SOLVER_API_BASE_URL || '';
-    apiInput.value = savedApi;
+    syncThemeColors();
+    const allowCustomApi = window.SOLVER_ALLOW_CUSTOM_API === true;
+    const savedApi = allowCustomApi ? localStorage.getItem('solver_api_base_url') : '';
+    apiInput.value = savedApi || window.SOLVER_API_BASE_URL || '';
     bindTabs();
     bindActions();
     generateManualTable();
@@ -38,7 +69,8 @@
   }
 
   function bindActions() {
-    $('saveApi').addEventListener('click', () => {
+    $('saveApi')?.addEventListener('click', () => {
+      if (window.SOLVER_ALLOW_CUSTOM_API !== true) return;
       localStorage.setItem('solver_api_base_url', cleanApiBase(apiInput.value));
       testApi(true);
     });
@@ -102,17 +134,32 @@
     return String(value || '').trim().replace(/\/$/, '');
   }
 
+  async function fetchWithTimeout(url, options = {}, timeoutMs = API_TIMEOUT_MS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      if (err?.name === 'AbortError') {
+        throw new Error('O serviço demorou além do limite. Tente novamente em instantes.');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async function testApi(showSuccess) {
     const base = cleanApiBase(apiInput.value);
     if (!base) { setApiStatus('API não configurada', 'err'); return; }
     try {
-      const res = await fetch(`${base}/health`);
+      const res = await fetchWithTimeout(`${base}/health`, {}, 15000);
       if (!res.ok) throw new Error('status ' + res.status);
       setApiStatus('API online', 'ok');
       if (showSuccess) notify('Backend salvo e respondendo.', 'success');
     } catch (err) {
       setApiStatus('API sem resposta', 'err');
-      if (showSuccess) notify('Não consegui conectar. Verifique a URL do Render e o CORS.', 'error');
+      if (showSuccess) notify('O serviço estatístico está indisponível. Tente novamente em instantes.', 'error');
     }
   }
 
@@ -128,17 +175,17 @@
       position: 'fixed', right: '18px', bottom: '18px', zIndex: '50',
       maxWidth: '360px', padding: '12px 14px', borderRadius: '12px',
       fontFamily: "'Open Sans', sans-serif", fontSize: '12.5px', fontWeight: '600',
-      boxShadow: '0 18px 40px rgba(0,0,0,.5)', border: '1px solid ' + COLOR_BORDER,
+      boxShadow: `0 18px 40px ${cssColor('--toast-shadow', 'rgba(0,0,0,.5)')}`, border: '1px solid ' + COLOR_BORDER,
       backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
     });
     if (type === 'error') {
-      div.style.color = '#FCA5A5';
-      div.style.background = 'rgba(239,68,68,.14)';
-      div.style.borderColor = 'rgba(239,68,68,.35)';
+      div.style.color = cssColor('--danger-foreground', '#FCA5A5');
+      div.style.background = cssColor('--danger-tint', 'rgba(239,68,68,.12)');
+      div.style.borderColor = cssColor('--danger-border', 'rgba(239,68,68,.35)');
     } else {
       div.style.color = COLOR_BRAND;
-      div.style.background = 'rgba(34,197,94,.14)';
-      div.style.borderColor = 'rgba(34,197,94,.35)';
+      div.style.background = cssColor('--success-tint', 'rgba(34,197,94,.14)');
+      div.style.borderColor = cssColor('--border-brand', 'rgba(34,197,94,.35)');
     }
     document.body.appendChild(div);
     setTimeout(() => div.remove(), 4200);
@@ -317,12 +364,14 @@
 
   async function runAnalysis() {
     const base = cleanApiBase(apiInput.value);
-    if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
+    if (!base) return notify('O serviço estatístico não está configurado.', 'error');
     const payload = payloadFromUi();
     if (!payload.data.length) return notify('Insira ou carregue dados antes de analisar.', 'error');
+    const runButton = $('runAnalysis');
     try {
+      runButton.disabled = true;
       setApiStatus('Processando...', '');
-      const res = await fetch(`${base}/api/analyze`, {
+      const res = await fetchWithTimeout(`${base}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -336,6 +385,8 @@
     } catch (err) {
       setApiStatus('Erro na análise', 'err');
       notify(err.message || 'Erro ao rodar análise.', 'error');
+    } finally {
+      runButton.disabled = false;
     }
   }
 
@@ -404,9 +455,9 @@
             display: 'inline-block', padding: '3px 10px', borderRadius: '999px',
             fontFamily: "'JetBrains Mono', monospace", fontSize: '10.5px', fontWeight: '600',
           });
-          if (val === '1%') { badge.style.background = 'rgba(34,197,94,.14)'; badge.style.color = COLOR_BRAND; badge.style.border = '1px solid rgba(34,197,94,.35)'; }
-          else if (val === '5%') { badge.style.background = 'rgba(245,168,91,.14)'; badge.style.color = COLOR_ACCENT; badge.style.border = '1px solid rgba(245,168,91,.35)'; }
-          else { badge.style.background = 'rgba(255,255,255,.05)'; badge.style.color = COLOR_TEXT_D2; badge.style.border = '1px solid ' + COLOR_BORDER; }
+          if (val === '1%') { badge.style.background = cssColor('--success-tint', 'rgba(34,197,94,.14)'); badge.style.color = COLOR_BRAND; badge.style.border = '1px solid ' + cssColor('--border-brand', 'rgba(34,197,94,.35)'); }
+          else if (val === '5%') { badge.style.background = cssColor('--warning-tint', 'rgba(245,168,91,.14)'); badge.style.color = COLOR_ACCENT; badge.style.border = '1px solid ' + cssColor('--warning', 'rgba(245,168,91,.35)'); }
+          else { badge.style.background = cssColor('--neutral-tint', 'rgba(255,255,255,.05)'); badge.style.color = COLOR_TEXT_D2; badge.style.border = '1px solid ' + COLOR_BORDER; }
           td.textContent = '';
           td.appendChild(badge);
         }
@@ -575,10 +626,10 @@
 
   async function downloadExport(endpoint, filename) {
     const base = cleanApiBase(apiInput.value);
-    if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
+    if (!base) return notify('O serviço estatístico não está configurado.', 'error');
     const payload = payloadFromUi();
     try {
-      const res = await fetch(`${base}${endpoint}`, {
+      const res = await fetchWithTimeout(`${base}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -604,17 +655,23 @@
   async function handleFileUpload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_FILE_BYTES) {
+      event.target.value = '';
+      return notify('Arquivo muito grande. O limite é 5 MB.', 'error');
+    }
     const ext = file.name.split('.').pop().toLowerCase();
     try {
       if (ext === 'csv') {
         const text = await file.text();
         const rows = parseCsv(text);
+        validateImportedRows(rows);
         renderEditableTable(Object.keys(rows[0] || {}), rows);
       } else if (['xlsx', 'xls'].includes(ext)) {
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        validateImportedRows(rows);
         renderEditableTable(Object.keys(rows[0] || {}), rows);
       } else {
         throw new Error('Formato não suportado. Use CSV, XLS ou XLSX.');
@@ -626,35 +683,31 @@
   }
 
   function parseCsv(text) {
-    const sep = text.includes(';') ? ';' : ',';
-    const lines = text.trim().split(/\r?\n/).filter(Boolean);
-    const headers = lines.shift().split(sep).map((h) => h.trim());
-    return lines.map((line) => {
-      const values = line.split(sep).map((v) => v.trim());
-      const obj = {};
-      headers.forEach((h, i) => {
-        const raw = values[i] ?? '';
-        const numeric = raw.replace(',', '.');
-        obj[h] = numeric !== '' && !Number.isNaN(Number(numeric)) ? Number(numeric) : raw;
-      });
-      return obj;
-    });
+    if (!window.SolverCsv?.parse) throw new Error('O leitor de CSV não foi carregado.');
+    return window.SolverCsv.parse(text);
   }
 
-  function loadExampleData() {
+  function validateImportedRows(rows) {
+    if (!Array.isArray(rows) || !rows.length) throw new Error('O arquivo não contém linhas de dados.');
+    if (rows.length > MAX_DATA_ROWS) throw new Error(`O limite é ${MAX_DATA_ROWS.toLocaleString('pt-BR')} linhas por análise.`);
+  }
+
+  async function loadExampleData() {
     $('design').value = 'DBC';
     $('analysisType').value = 'single';
     $('responseColumn').value = 'valor';
     $('treatmentColumn').value = 'tratamento';
     $('blockColumn').value = 'bloco';
-    const rows = [
-      { bloco: 'B1', tratamento: 'T1', valor: 58.2 }, { bloco: 'B1', tratamento: 'T2', valor: 61.4 }, { bloco: 'B1', tratamento: 'T3', valor: 66.8 }, { bloco: 'B1', tratamento: 'T4', valor: 64.7 },
-      { bloco: 'B2', tratamento: 'T1', valor: 57.6 }, { bloco: 'B2', tratamento: 'T2', valor: 60.1 }, { bloco: 'B2', tratamento: 'T3', valor: 66.4 }, { bloco: 'B2', tratamento: 'T4', valor: 63.1 },
-      { bloco: 'B3', tratamento: 'T1', valor: 59.4 }, { bloco: 'B3', tratamento: 'T2', valor: 62.0 }, { bloco: 'B3', tratamento: 'T3', valor: 67.2 }, { bloco: 'B3', tratamento: 'T4', valor: 65.9 },
-      { bloco: 'B4', tratamento: 'T1', valor: 59.7 }, { bloco: 'B4', tratamento: 'T2', valor: 63.6 }, { bloco: 'B4', tratamento: 'T3', valor: 68.9 }, { bloco: 'B4', tratamento: 'T4', valor: 66.1 }
-    ];
-    renderEditableTable(['bloco', 'tratamento', 'valor'], rows);
-    notify('Exemplo DBC carregado.', 'success');
+    try {
+      const response = await fetchWithTimeout('assets/data/dbc_exemplo.json', {}, 15000);
+      if (!response.ok) throw new Error('Não foi possível carregar o exemplo oficial.');
+      const rows = await response.json();
+      validateImportedRows(rows);
+      renderEditableTable(['bloco', 'tratamento', 'valor'], rows);
+      notify('Exemplo oficial DBC carregado.', 'success');
+    } catch (err) {
+      notify(err.message || 'Erro ao carregar o exemplo.', 'error');
+    }
   }
 
   function openTab(name) {
@@ -684,5 +737,6 @@
     return map[key] || key;
   }
 
+  window.addEventListener('solver-theme-change', syncThemeColors);
   document.addEventListener('DOMContentLoaded', init);
 })();

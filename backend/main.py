@@ -4,18 +4,28 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import os
 import re
+import threading
+import uuid
 from typing import Any, Dict, Optional
 
 import pandas as pd
-from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from exporters import build_excel, build_pdf, build_regression_plot
 from statistics_engine import analyze
+
+
+logger = logging.getLogger("solver.api")
+MAX_REQUEST_BYTES = int(os.getenv("MAX_REQUEST_BYTES", str(5 * 1024 * 1024)))
+MAX_DATA_ROWS = int(os.getenv("MAX_DATA_ROWS", "10000"))
+MAX_CONCURRENT_ANALYSES = int(os.getenv("MAX_CONCURRENT_ANALYSES", "2"))
+_analysis_semaphore = threading.BoundedSemaphore(MAX_CONCURRENT_ANALYSES)
 
 
 class AnalyzePayload(BaseModel):
@@ -46,16 +56,21 @@ class AnalyzePayload(BaseModel):
         0.05,
         description="Usado apenas quando alpha_mode='fixed'. Ignorado quando alpha_mode='auto'.",
     )
-    data: list[dict[str, Any]]
+    data: list[dict[str, Any]] = Field(min_length=2, max_length=MAX_DATA_ROWS)
 
 
 app = FastAPI(
     title="Solver Estatística API",
-    version="0.1.0",
+    version="0.2.0",
     description="Backend para ANOVA, comparação de médias, regressão e exportações do Solver.",
 )
 
-origins = [o.strip() for o in os.getenv("CORS_ORIGINS", "*").split(",") if o.strip()]
+_default_origins = (
+    "https://www.solver-estatistica.com.br,"
+    "https://solver-estatistica.com.br,"
+    "https://solverestatistica-brazil.github.io"
+)
+origins = [o.strip() for o in os.getenv("CORS_ORIGINS", _default_origins).split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -63,6 +78,41 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def production_guards(request: Request, call_next):
+    """Rejeita payloads declaradamente grandes e adiciona cabeçalhos defensivos."""
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > MAX_REQUEST_BYTES:
+                return Response("Requisição muito grande.", status_code=413)
+        except ValueError:
+            return Response("Content-Length inválido.", status_code=400)
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
+
+
+def _acquire_analysis_slot() -> None:
+    if not _analysis_semaphore.acquire(blocking=False):
+        raise HTTPException(
+            status_code=503,
+            detail="O serviço está processando outras análises. Tente novamente em instantes.",
+            headers={"Retry-After": "5"},
+        )
+
+
+def _internal_error(context: str) -> HTTPException:
+    error_id = uuid.uuid4().hex[:12]
+    logger.exception("Falha interna em %s [id=%s]", context, error_id)
+    return HTTPException(
+        status_code=500,
+        detail=f"Erro interno inesperado. Informe o código {error_id} ao suporte.",
+    )
 
 
 @app.get("/")
@@ -77,12 +127,15 @@ def health() -> Dict[str, str]:
 
 @app.post("/api/analyze")
 def analyze_endpoint(payload: AnalyzePayload) -> Dict[str, Any]:
+    _acquire_analysis_slot()
     try:
         return analyze(payload.model_dump())
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Erro interno na análise: {exc}") from exc
+        raise _internal_error("analyze") from exc
+    finally:
+        _analysis_semaphore.release()
 
 
 @app.post("/api/analyze-upload")
@@ -96,15 +149,22 @@ async def analyze_upload(config: str = Form(...), file: UploadFile = File(...)) 
         # dentro deste endpoint async bloquearia o event loop (e todos os outros usuarios
         # conectados ao mesmo worker) durante o calculo. run_in_threadpool despacha para
         # uma thread separada, mantendo o event loop livre.
-        return await run_in_threadpool(analyze, payload)
+        if len(payload.get("data") or []) > MAX_DATA_ROWS:
+            raise ValueError(f"O limite é de {MAX_DATA_ROWS} linhas por análise.")
+        _acquire_analysis_slot()
+        try:
+            return await run_in_threadpool(analyze, payload)
+        finally:
+            _analysis_semaphore.release()
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Erro ao processar arquivo: {exc}") from exc
+        raise _internal_error("analyze-upload") from exc
 
 
 @app.post("/api/export/pdf")
 def export_pdf(payload: AnalyzePayload) -> Response:
+    _acquire_analysis_slot()
     try:
         content = build_pdf(payload.model_dump())
         return Response(
@@ -114,10 +174,15 @@ def export_pdf(payload: AnalyzePayload) -> Response:
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise _internal_error("export-pdf") from exc
+    finally:
+        _analysis_semaphore.release()
 
 
 @app.post("/api/export/excel")
 def export_excel(payload: AnalyzePayload) -> Response:
+    _acquire_analysis_slot()
     try:
         content = build_excel(payload.model_dump())
         return Response(
@@ -127,10 +192,15 @@ def export_excel(payload: AnalyzePayload) -> Response:
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise _internal_error("export-excel") from exc
+    finally:
+        _analysis_semaphore.release()
 
 
 @app.post("/api/export/regression-plot")
 def export_regression_plot(payload: AnalyzePayload, fmt: str = "png") -> Response:
+    _acquire_analysis_slot()
     try:
         fmt = fmt.lower()
         if fmt not in {"png", "pdf"}:
@@ -141,6 +211,10 @@ def export_regression_plot(payload: AnalyzePayload, fmt: str = "png") -> Respons
         return Response(content, media_type=media, headers={"Content-Disposition": f"attachment; filename={filename}"})
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise _internal_error("export-regression-plot") from exc
+    finally:
+        _analysis_semaphore.release()
 
 
 _BR_NUMBER_RE = re.compile(r"^-?\d{1,3}(\.\d{3})*,\d+$|^-?\d+,\d+$|^-?\d+$")
@@ -180,7 +254,9 @@ async def _read_uploaded_table(file: UploadFile) -> pd.DataFrame:
     ponto e vírgula (;), o padrão do Excel em português (BR), onde a vírgula já é o
     separador decimal. A versão anterior tentava adivinhar o separador (sep=None) e ainda
     aceitava XLS/XLSX; isso deixava a causa de um erro de formatação difícil de identificar."""
-    raw = await file.read()
+    raw = await file.read(MAX_REQUEST_BYTES + 1)
+    if len(raw) > MAX_REQUEST_BYTES:
+        raise ValueError(f"Arquivo muito grande. O limite é {MAX_REQUEST_BYTES // (1024 * 1024)} MB.")
     name = (file.filename or "").lower()
     if not name.endswith(".csv"):
         raise ValueError(

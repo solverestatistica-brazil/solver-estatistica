@@ -12,6 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script src="assets/js/theme.js"></script>
   <link rel="stylesheet" href="assets/css/styles.css" />
 </head>
 <body>
@@ -30,6 +31,7 @@
       </span>
     </a>
     <div class="nav-actions">
+      <button class="btn ghost theme-toggle" type="button" data-theme-toggle aria-label="Ativar tema claro" aria-pressed="false"><span data-theme-icon aria-hidden="true">☀</span><span data-theme-label>Claro</span></button>
       <a class="btn ghost" href="index.html">← Voltar ao site</a>
     </div>
   </nav>
@@ -46,15 +48,14 @@
     <section class="panel app-panel" id="analisar">
       <div class="section-head">
         <span>Dashboard estatístico</span>
-        <h2>Monte a análise sem sair do navegador</h2>
-        <p>Preencha manualmente ou envie CSV/XLSX. O frontend fala com o backend FastAPI hospedado no Render.</p>
+        <h1>Monte a análise sem sair do navegador</h1>
+        <p>Preencha manualmente ou envie CSV/XLSX. Seus dados são processados somente para gerar a análise solicitada.</p>
       </div>
 
       <div class="status-bar">
-        <label for="apiBase">URL do backend</label>
-        <input id="apiBase" type="url" placeholder="https://seu-backend.onrender.com" />
-        <button class="btn ghost" id="saveApi">Salvar URL</button>
-        <span id="apiStatus" class="status-pill">API não testada</span>
+        <input id="apiBase" type="hidden" />
+        <span>Serviço estatístico</span>
+        <span id="apiStatus" class="status-pill">Verificando disponibilidade</span>
       </div>
 
       <div class="workspace">
@@ -235,7 +236,7 @@
               <button class="export-card" id="downloadPng"><b>PNG regressão</b><span>Imagem em alta resolução do gráfico.</span></button>
               <button class="export-card" id="downloadPlotPdf"><b>PDF vetorial</b><span>Gráfico de regressão editável.</span></button>
             </div>
-            <p class="small-note">As exportações são geradas pelo backend. Configure a URL antes de baixar.</p>
+            <p class="small-note">As exportações são geradas pelo serviço estatístico usando os dados da análise atual.</p>
           </div>
 
         </section>
@@ -247,6 +248,8 @@
     <p>Desenvolvido por <b>Fernando Paes Lorena</b> · Solver Estatística Experimental</p>
     <nav>
       <a href="index.html">← Voltar ao site</a>
+      <a href="privacidade.html">Privacidade</a>
+      <a href="termos.html">Termos</a>
       <a href="https://github.com/solverestatistica-brazil/solver-estatistica">GitHub</a>
     </nav>
   </footer>
@@ -255,6 +258,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="assets/js/csv-parser.js"></script>
 <script src="assets/js/config.js"></script>
 <script src="assets/js/app.js"></script>
 </body>

@@ -10,4 +10,10 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.8
       - key: CORS_ORIGINS
-        value: https://solverestatistica-brazil.github.io
+        value: https://www.solver-estatistica.com.br,https://solver-estatistica.com.br,https://solverestatistica-brazil.github.io
+      - key: MAX_REQUEST_BYTES
+        value: 5242880
+      - key: MAX_DATA_ROWS
+        value: 10000
+      - key: MAX_CONCURRENT_ANALYSES
+        value: 2

@@ -3,9 +3,21 @@ name: Backend tests
 on:
   push:
     branches: ["main"]
-    paths: ["backend/**"]
+    paths:
+      - "backend/**"
+      - "examples/**"
+      - "frontend/assets/data/**"
+      - "frontend/assets/js/**"
+      - "frontend/test_csv_parser.cjs"
+      - ".github/workflows/backend-tests.yml"
   pull_request:
-    paths: ["backend/**"]
+    paths:
+      - "backend/**"
+      - "examples/**"
+      - "frontend/assets/data/**"
+      - "frontend/assets/js/**"
+      - "frontend/test_csv_parser.cjs"
+      - ".github/workflows/backend-tests.yml"
   workflow_dispatch:
 
 jobs:
@@ -27,4 +39,11 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Run test suite
-        run: pytest -v
+        run: pytest -v --cov=main --cov=statistics_engine --cov=assumptions --cov=transformations --cov-report=term-missing --cov-report=xml --cov-fail-under=75
+
+      - name: Validate frontend JavaScript syntax
+        working-directory: frontend
+        run: |
+          node --check assets/js/app.js
+          node --check assets/js/csv-parser.js
+          node test_csv_parser.cjs
