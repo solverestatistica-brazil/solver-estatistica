@@ -13,7 +13,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <script src="assets/js/theme.js"></script>
-  <link rel="stylesheet" href="assets/css/styles.css?v=20260716-2" />
+  <script src="assets/js/analytics.js?v=20260716-1"></script>
+  <link rel="stylesheet" href="assets/css/styles.css?v=20260716-3" />
 </head>
 <body>
 <div class="page-shell">
@@ -86,6 +87,13 @@
                   <option value="regression">Regressão direta</option>
                 </select>
               </label>
+              <label id="sumSquaresTypeWrap">Soma de quadrados · fatorial
+                <select id="sumSquaresType">
+                  <option value="2">Tipo II · recomendado sem interação dominante</option>
+                  <option value="3">Tipo III · desbalanceados com interação</option>
+                  <option value="1">Tipo I · sequencial, depende da ordem</option>
+                </select>
+              </label>
               <label>Teste de médias
                 <select id="comparisonTest">
                   <option value="tukey">Tukey</option>
@@ -103,7 +111,7 @@
               </label>
               <label>Alfa do pós-teste
                 <select id="alphaMode">
-                  <option value="auto">Automático (segue o teste F: 1% ou 5%)</option>
+                  <option value="auto">Automático · convenção pedagógica (segue o F)</option>
                   <option value="fixed">Fixo (definido ao lado)</option>
                 </select>
               </label>
@@ -221,6 +229,10 @@
                 <div class="table-wrap compact"><table id="assumptionsTable" class="result-table"></table></div>
                 <p id="transformationNote" class="small-note"></p>
               </section>
+              <section class="result-box" id="provenanceBox">
+                <h3>Rastreabilidade da análise</h3>
+                <div id="provenanceSummary" class="provenance-grid"></div>
+              </section>
               <section class="result-box">
                 <h3>Recomendações</h3>
                 <ul id="recommendations" class="recommendations"></ul>
@@ -231,12 +243,12 @@
           <!-- TAB EXPORTS -->
           <div class="tab" id="tab-exports">
             <div class="export-grid">
-              <button class="export-card" id="downloadPdf"><b>PDF técnico</b><span>Relatório em estilo dashboard para diretoria/laudo.</span></button>
-              <button class="export-card" id="downloadExcel"><b>Excel</b><span>ANOVA, médias e resumo em planilha completa.</span></button>
-              <button class="export-card" id="downloadPng"><b>PNG regressão</b><span>Imagem em alta resolução do gráfico.</span></button>
-              <button class="export-card" id="downloadPlotPdf"><b>PDF vetorial</b><span>Gráfico de regressão editável.</span></button>
+              <button class="export-card" id="downloadPdf" disabled><b>PDF técnico</b><span>Relatório em estilo dashboard para diretoria/laudo.</span></button>
+              <button class="export-card" id="downloadExcel" disabled><b>Excel</b><span>ANOVA, médias, pressupostos e rastreabilidade.</span></button>
+              <button class="export-card" id="downloadPng" disabled><b>PNG regressão</b><span>Disponível quando a análise contém regressão.</span></button>
+              <button class="export-card" id="downloadPlotPdf" disabled><b>PDF vetorial</b><span>Disponível quando a análise contém regressão.</span></button>
             </div>
-            <p class="small-note">As exportações são geradas pelo serviço estatístico usando os dados da análise atual.</p>
+            <p class="small-note" id="exportsNote">Execute uma análise para liberar as exportações correspondentes.</p>
           </div>
 
         </section>
@@ -260,6 +272,6 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="assets/js/csv-parser.js"></script>
 <script src="assets/js/config.js"></script>
-<script src="assets/js/app.js"></script>
+<script src="assets/js/app.js?v=20260716-3"></script>
 </body>
 </html>

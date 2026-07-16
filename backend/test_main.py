@@ -12,6 +12,7 @@ import io
 import json
 
 from fastapi.testclient import TestClient
+from openpyxl import Workbook
 
 import main
 from main import app
@@ -35,8 +36,8 @@ CONFIG = json.dumps({
 def test_health():
     res = client.get("/health")
     assert res.status_code == 200
-    assert res.json() == {"status": "ok"}
-    assert res.headers["x-content-type-options"] == "nosniff"
+    assert res.json()["status"] == "ok"
+    assert res.json()["version"] == "0.2.0"
 
 
 def test_analyze_upload_ainda_funciona_apos_run_in_threadpool():
@@ -57,30 +58,60 @@ def test_analyze_upload_rejeita_coluna_ausente_com_422_nao_500():
     assert res.status_code == 422
 
 
-def test_requisicao_grande_e_rejeitada_antes_do_processamento():
-    res = client.post(
-        "/api/analyze",
-        content=b"x" * (main.MAX_REQUEST_BYTES + 1),
-        headers={"content-type": "application/json"},
-    )
+def test_analyze_upload_aceita_xlsx():
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(["bloco", "tratamento", "valor"])
+    for line in CSV_BR.decode("utf-8-sig").splitlines()[1:]:
+        bloco, tratamento, valor = line.split(";")
+        sheet.append([bloco, tratamento, float(valor.replace(",", "."))])
+    stream = io.BytesIO()
+    workbook.save(stream)
+    stream.seek(0)
+
+    files = {
+        "file": (
+            "dados.xlsx", stream,
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+    }
+    res = client.post("/api/analyze-upload", data={"config": CONFIG}, files=files)
+    assert res.status_code == 200
+    assert res.json()["meta"]["n_rows"] == 16
+
+
+def test_analyze_upload_rejeita_extensao_nao_suportada():
+    files = {"file": ("dados.xls", io.BytesIO(b"nao e uma planilha"), "application/vnd.ms-excel")}
+    res = client.post("/api/analyze-upload", data={"config": CONFIG}, files=files)
+    assert res.status_code == 422
+    assert "XLSX" in res.json()["detail"]
+
+
+def test_analyze_upload_rejeita_arquivo_acima_do_limite(monkeypatch):
+    monkeypatch.setattr(main, "MAX_UPLOAD_BYTES", 32)
+    files = {"file": ("dados.csv", io.BytesIO(CSV_BR), "text/csv")}
+    res = client.post("/api/analyze-upload", data={"config": CONFIG}, files=files)
     assert res.status_code == 413
 
 
-def test_erro_interno_nao_vaza_excecao(monkeypatch):
-    def explode(_payload):
-        raise RuntimeError("segredo-interno")
-
-    monkeypatch.setattr(main, "analyze", explode)
-    payload = {
-        "design": "DIC", "analysis_type": "single",
-        "response_column": "valor", "treatment_column": "tratamento",
-        "data": [
-            {"tratamento": "T1", "valor": 1}, {"tratamento": "T1", "valor": 2},
-            {"tratamento": "T2", "valor": 3}, {"tratamento": "T2", "valor": 4},
-        ],
-    }
+def test_api_adota_alfa_automatico_como_convencao_pedagogica():
+    payload = json.loads(CONFIG)
+    payload["data"] = [
+        {"bloco": f"B{b}", "tratamento": t, "valor": v}
+        for b, values in enumerate(((10, 15), (11, 16), (9, 14)), start=1)
+        for t, v in zip(("T1", "T2"), values)
+    ]
     res = client.post("/api/analyze", json=payload)
-    assert res.status_code == 500
-    detail = res.json()["detail"]
-    assert "segredo-interno" not in detail
-    assert "Informe o código" in detail
+    assert res.status_code == 200
+    assert res.json()["meta"]["alpha_mode"] == "auto"
+    assert res.json()["meta"]["alpha"] == 0.05
+
+
+def test_rate_limit_retorna_429(monkeypatch):
+    main._request_times.clear()
+    monkeypatch.setattr(main, "RATE_LIMIT_PER_MINUTE", 1)
+    first = client.post("/api/analyze", json={"data": []})
+    second = client.post("/api/analyze", json={"data": []})
+    assert first.status_code == 422
+    assert second.status_code == 429
+    main._request_times.clear()

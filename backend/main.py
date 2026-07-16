@@ -8,24 +8,31 @@ import logging
 import os
 import re
 import threading
+import time
 import uuid
+from collections import defaultdict, deque
 from typing import Any, Dict, Optional
 
 import pandas as pd
 from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from exporters import build_excel, build_pdf, build_regression_plot
+from provenance import ENGINE_VERSION
 from statistics_engine import analyze
 
 
 logger = logging.getLogger("solver.api")
 MAX_REQUEST_BYTES = int(os.getenv("MAX_REQUEST_BYTES", str(5 * 1024 * 1024)))
+MAX_UPLOAD_BYTES = MAX_REQUEST_BYTES
 MAX_DATA_ROWS = int(os.getenv("MAX_DATA_ROWS", "10000"))
 MAX_CONCURRENT_ANALYSES = int(os.getenv("MAX_CONCURRENT_ANALYSES", "2"))
+RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
 _analysis_semaphore = threading.BoundedSemaphore(MAX_CONCURRENT_ANALYSES)
+_request_times: Dict[str, deque[float]] = defaultdict(deque)
 
 
 class AnalyzePayload(BaseModel):
@@ -42,6 +49,7 @@ class AnalyzePayload(BaseModel):
     comparison_test: str = "tukey"
     control_group: Optional[str] = None
     regression_degree: Optional[int] = None
+    sum_squares_type: int = Field(2, ge=1, le=3)
     goal: str = "max"
     alpha_mode: str = Field(
         "auto",
@@ -61,7 +69,7 @@ class AnalyzePayload(BaseModel):
 
 app = FastAPI(
     title="Solver Estatística API",
-    version="0.2.0",
+    version=ENGINE_VERSION,
     description="Backend para ANOVA, comparação de médias, regressão e exportações do Solver.",
 )
 
@@ -83,6 +91,7 @@ app.add_middleware(
 @app.middleware("http")
 async def production_guards(request: Request, call_next):
     """Rejeita payloads declaradamente grandes e adiciona cabeçalhos defensivos."""
+    request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:12]
     content_length = request.headers.get("content-length")
     if content_length:
         try:
@@ -90,10 +99,33 @@ async def production_guards(request: Request, call_next):
                 return Response("Requisição muito grande.", status_code=413)
         except ValueError:
             return Response("Content-Length inválido.", status_code=400)
+    if request.url.path.startswith("/api/") and request.method in {"POST", "PUT", "PATCH"}:
+        forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
+        client = forwarded or (request.client.host if request.client else "unknown")
+        now = time.monotonic()
+        bucket = _request_times[client]
+        while bucket and now - bucket[0] >= 60:
+            bucket.popleft()
+        if len(bucket) >= RATE_LIMIT_PER_MINUTE:
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Limite de requisições excedido. Aguarde um minuto e tente novamente."},
+                headers={"Retry-After": "60", "X-Request-ID": request_id},
+            )
+        bucket.append(now)
+    started = time.perf_counter()
     response = await call_next(request)
+    elapsed_ms = round((time.perf_counter() - started) * 1000, 1)
+    logger.info(
+        "request_id=%s method=%s path=%s status=%s duration_ms=%s",
+        request_id, request.method, request.url.path, response.status_code, elapsed_ms,
+    )
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["X-Request-ID"] = request_id
+    if request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
     return response
 
 
@@ -117,12 +149,12 @@ def _internal_error(context: str) -> HTTPException:
 
 @app.get("/")
 def root() -> Dict[str, str]:
-    return {"service": "Solver Estatística API", "status": "online"}
+    return {"service": "Solver Estatística API", "status": "online", "version": ENGINE_VERSION}
 
 
 @app.get("/health")
 def health() -> Dict[str, str]:
-    return {"status": "ok"}
+    return {"status": "ok", "version": ENGINE_VERSION}
 
 
 @app.post("/api/analyze")
@@ -130,6 +162,8 @@ def analyze_endpoint(payload: AnalyzePayload) -> Dict[str, Any]:
     _acquire_analysis_slot()
     try:
         return analyze(payload.model_dump())
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
@@ -156,6 +190,8 @@ async def analyze_upload(config: str = Form(...), file: UploadFile = File(...)) 
             return await run_in_threadpool(analyze, payload)
         finally:
             _analysis_semaphore.release()
+    except HTTPException:
+        raise
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
@@ -250,33 +286,37 @@ def _normalize_brazilian_decimals(df: pd.DataFrame) -> pd.DataFrame:
 
 
 async def _read_uploaded_table(file: UploadFile) -> pd.DataFrame:
-    """Lê o arquivo enviado pelo usuário. Entrada padronizada: somente CSV separado por
-    ponto e vírgula (;), o padrão do Excel em português (BR), onde a vírgula já é o
-    separador decimal. A versão anterior tentava adivinhar o separador (sep=None) e ainda
-    aceitava XLS/XLSX; isso deixava a causa de um erro de formatação difícil de identificar."""
-    raw = await file.read(MAX_REQUEST_BYTES + 1)
-    if len(raw) > MAX_REQUEST_BYTES:
-        raise ValueError(f"Arquivo muito grande. O limite é {MAX_REQUEST_BYTES // (1024 * 1024)} MB.")
+    """Lê CSV UTF-8 separado por ';' ou XLSX, aplicando limite de tamanho."""
+    raw = await file.read(MAX_UPLOAD_BYTES + 1)
+    if len(raw) > MAX_UPLOAD_BYTES:
+        limit_mb = MAX_UPLOAD_BYTES / (1024 * 1024)
+        raise HTTPException(status_code=413, detail=f"Arquivo maior que o limite de {limit_mb:g} MB.")
     name = (file.filename or "").lower()
-    if not name.endswith(".csv"):
+    if not name.endswith((".csv", ".xlsx")):
         raise ValueError(
-            "Formato não suportado. Envie um arquivo CSV separado por ponto e vírgula (;)."
+            "Formato não suportado. Envie CSV UTF-8 separado por ponto e vírgula (;) ou XLSX."
         )
-    try:
-        text = raw.decode("utf-8-sig")
-    except UnicodeDecodeError as exc:
-        raise ValueError(
-            "Não foi possível ler a codificação do arquivo. Salve o CSV como UTF-8 e tente novamente."
-        ) from exc
-    try:
-        df = pd.read_csv(io.StringIO(text), sep=";")
-    except Exception as exc:
-        raise ValueError(
-            "Não foi possível ler o CSV. Confirme que as colunas estão separadas por ponto e vírgula (;)."
-        ) from exc
-    if df.shape[1] < 2:
-        raise ValueError(
-            "O arquivo parece ter uma única coluna. Confirme que o separador usado é ponto e vírgula (;), não vírgula."
-        )
+    if name.endswith(".xlsx"):
+        try:
+            df = pd.read_excel(io.BytesIO(raw), engine="openpyxl")
+        except Exception as exc:
+            raise ValueError("Não foi possível ler o XLSX. Verifique se o arquivo não está corrompido.") from exc
+    else:
+        try:
+            text = raw.decode("utf-8-sig")
+        except UnicodeDecodeError as exc:
+            raise ValueError(
+                "Não foi possível ler a codificação do arquivo. Salve o CSV como UTF-8 e tente novamente."
+            ) from exc
+        try:
+            df = pd.read_csv(io.StringIO(text), sep=";")
+        except Exception as exc:
+            raise ValueError(
+                "Não foi possível ler o CSV. Confirme que as colunas estão separadas por ponto e vírgula (;)."
+            ) from exc
+        if df.shape[1] < 2:
+            raise ValueError(
+                "O arquivo parece ter uma única coluna. Confirme que o separador usado é ponto e vírgula (;), não vírgula."
+            )
     df.columns = [str(c).strip() for c in df.columns]
     return _normalize_brazilian_decimals(df)

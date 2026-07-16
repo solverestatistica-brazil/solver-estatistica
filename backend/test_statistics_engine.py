@@ -200,7 +200,8 @@ def test_bug_3_4_cv_muito_baixo_nao_e_otimo():
     assert _cv_label(0.0) != "\u00d3timo"
     assert _cv_label(0.1) != "\u00d3timo"
     assert "Muito baixo" in _cv_label(0.3)
-    assert _cv_label(5.0) == "\u00d3timo"
+    assert "cultura" in _cv_label(5.0).lower()
+    assert "\u00d3timo" not in _cv_label(5.0)
 
 
 def test_bug_3_3_regressao_expoe_p_top_term():
@@ -489,11 +490,96 @@ def test_scott_knott_formula_canonica_caso_da_auditoria():
 def test_alpha_mode_fixed_ignora_significancia_do_f():
     """[AUDITORIA P0-02] Com alpha_mode='fixed', o pos-teste deve usar o alfa informado
     (nao o bucket 1%/5% do teste F), mesmo quando o F for significativo a 1%."""
-    res_auto = _dbc(DBC_EXEMPLO, comparison_test="tukey")
+    res_default = _dbc(DBC_EXEMPLO, comparison_test="tukey")
+    assert res_default["means"]["comparison"]["alpha"] == 0.01
+
+    res_auto = _dbc(DBC_EXEMPLO, comparison_test="tukey", alpha_mode="auto")
     assert res_auto["means"]["comparison"]["alpha"] == 0.01  # F significativo a 1% -> auto usa 1%
 
     res_fixed = _dbc(DBC_EXEMPLO, comparison_test="tukey", alpha_mode="fixed", alpha=0.05)
     assert res_fixed["means"]["comparison"]["alpha"] == 0.05
+
+
+def test_factorial_aceita_tipos_i_ii_iii_de_soma_de_quadrados():
+    base = {
+        "design": "DBC", "analysis_type": "factorial", "goal": "max",
+        "response_column": "Valor", "treatment_column": "A", "block_column": "Bloco",
+        "factor_columns": ["A", "B"], "data": FACTORIAL,
+    }
+    for ss_type in (1, 2, 3):
+        result = analyze({**base, "sum_squares_type": ss_type})
+        assert result["anova"]["sum_squares_type"] == ss_type
+        assert result["meta"]["sum_squares_type"] == ss_type
+        assert any(row["source"] == "A" for row in result["anova"]["table"])
+        assert any(row["source"] == "A × B" for row in result["anova"]["table"])
+
+
+def test_tipo_de_soma_de_quadrados_invalido_e_rejeitado():
+    with pytest.raises(ValueError, match="soma de quadrados"):
+        analyze({
+            "design": "DBC", "analysis_type": "factorial",
+            "response_column": "Valor", "block_column": "Bloco",
+            "factor_columns": ["A", "B"], "sum_squares_type": 4,
+            "data": FACTORIAL,
+        })
+
+
+def test_regressao_replicada_expoe_teste_formal_de_falta_de_ajuste():
+    result = analyze({
+        "design": "DIC", "analysis_type": "regression", "goal": "max",
+        "response_column": "Valor", "numeric_factor_column": "Tratamento",
+        "alpha": 0.05, "data": DBC_SINGLE,
+    })
+    for model in result["regression"]["models"]:
+        lack = model["lack_of_fit"]
+        assert lack["available"] is True
+        assert lack["df_pure_error"] > 0
+        assert lack["df_lack_of_fit"] >= 0
+        assert "significant" in lack
+
+
+def test_falta_de_ajuste_respeita_alfa_definido_a_priori():
+    import numpy as np
+    from statistics_engine import _lack_of_fit_test
+
+    x = np.array([0, 0, 1, 1, 2, 2, 3, 3], dtype=float)
+    y = np.array([0.0, 0.2, 1.0, 1.2, 4.0, 4.2, 9.0, 9.2], dtype=float)
+    coefficients = np.polyfit(x, y, 1)
+    residual_ss = float(np.sum((y - np.polyval(coefficients, x)) ** 2))
+    probe = _lack_of_fit_test(x, y, 1, residual_ss, alpha=0.05)
+    assert probe["available"] is True
+    p_value = probe["p_value"]
+    strict = _lack_of_fit_test(x, y, 1, residual_ss, alpha=p_value / 2)
+    permissive = _lack_of_fit_test(x, y, 1, residual_ss, alpha=min(0.99, p_value * 2))
+    assert strict["significant"] is False
+    assert permissive["significant"] is True
+
+
+def test_scott_knott_rejeita_repeticoes_desbalanceadas():
+    unbalanced = [
+        {"tratamento": treatment, "valor": value}
+        for treatment, values in {
+            "T1": [10.0, 10.5, 11.0, 10.7],
+            "T2": [14.0, 14.5, 15.0, 14.7],
+            "T3": [18.0, 18.5, 19.0],
+        }.items()
+        for value in values
+    ]
+    with pytest.raises(ValueError, match="balanceado"):
+        analyze({
+            "design": "DIC", "analysis_type": "single", "goal": "max",
+            "response_column": "valor", "treatment_column": "tratamento",
+            "comparison_test": "scott_knott", "data": unbalanced,
+        })
+
+
+def test_resultado_inclui_proveniencia_reprodutivel():
+    result = _dbc(DBC_EXEMPLO, comparison_test="tukey")
+    provenance = result["provenance"]
+    assert provenance["engine_version"]
+    assert provenance["git_commit"]
+    assert len(provenance["data_sha256"]) == 64
+    assert len(provenance["config_sha256"]) == 64
 
 
 def test_regressao_prefere_parcimonia_a_r2_ajustado_cego():

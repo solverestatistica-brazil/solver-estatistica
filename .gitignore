@@ -10,3 +10,8 @@ node_modules/
 .coverage
 coverage.xml
 htmlcov/
+.pytest_cache/
+.test-deps/
+pip-metadata-*/
+pip-target-*/
+pip-unpack-*/

@@ -8,7 +8,7 @@ on:
       - "examples/**"
       - "frontend/assets/data/**"
       - "frontend/assets/js/**"
-      - "frontend/test_csv_parser.cjs"
+      - "frontend/test_*.cjs"
       - ".github/workflows/backend-tests.yml"
   pull_request:
     paths:
@@ -16,7 +16,7 @@ on:
       - "examples/**"
       - "frontend/assets/data/**"
       - "frontend/assets/js/**"
-      - "frontend/test_csv_parser.cjs"
+      - "frontend/test_*.cjs"
       - ".github/workflows/backend-tests.yml"
   workflow_dispatch:
 
@@ -46,4 +46,6 @@ jobs:
         run: |
           node --check assets/js/app.js
           node --check assets/js/csv-parser.js
+          node --check assets/js/analytics.js
           node test_csv_parser.cjs
+          node test_analytics_consent.cjs

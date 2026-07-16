@@ -1,7 +1,7 @@
 """
 Motor estatístico do Solver.
 
-Objetivo do MVP:
+Objetivo do motor:
 - Receber dados em formato tabular.
 - Validar o delineamento escolhido.
 - Ajustar ANOVA para DIC, DBC, DQL, fatorial e parcelas subdivididas.
@@ -36,6 +36,7 @@ from statsmodels.stats.anova import anova_lm
 
 import assumptions
 import transformations
+from provenance import build_provenance
 
 ALLOWED_DESIGNS = {"DIC", "DBC", "DQL"}
 ALLOWED_ANALYSIS_TYPES = {"single", "factorial", "split_plot", "regression"}
@@ -45,9 +46,10 @@ def _q(column: str) -> str:
     """Escapa nomes de colunas para fórmulas patsy/statsmodels."""
     return f'Q("{column}")'
 
-def _c(column: str) -> str:
+def _c(column: str, sum_contrast: bool = False) -> str:
     """Transforma uma coluna em fator categórico para a fórmula."""
-    return f'C({_q(column)})'
+    suffix = ", Sum" if sum_contrast else ""
+    return f'C({_q(column)}{suffix})'
 
 def _clean_value(value: Any) -> Any:
     """Converte NaN/inf para None para permitir serialização JSON."""
@@ -86,9 +88,10 @@ def _source_label(index_name: str, payload: Dict[str, Any]) -> str:
     }
     for factor in payload.get("factor_columns", []) or []:
         mapping[f'C({_q(factor)})'] = factor
-    if index_name in mapping:
-        return mapping[index_name]
-    label = index_name
+    normalized = index_name.replace(", Sum", "")
+    if normalized in mapping:
+        return mapping[normalized]
+    label = normalized
     label = label.replace("C(Q(\"", "").replace("\"))", "")
     label = label.replace(":", " × ")
     return label
@@ -103,19 +106,13 @@ def _significance(p_value: Optional[float]) -> str:
     return "ns"
 
 def _cv_label(cv: Optional[float]) -> str:
-    # [FIX 3.4] CV abaixo de 0,5 % é sinal de dados agregados/sinteticos,
-    # nao de precisao excelente. Distinguimos essa faixa antes de rotular como "Otimo".
     if cv is None:
         return "Indisponível"
     if cv < 0.5:
         return "Muito baixo — verifique variabilidade"
-    if cv <= 10:
-        return "Ótimo"
-    if cv <= 20:
-        return "Bom"
-    if cv <= 30:
-        return "Moderado"
-    return "Alto — revisar variabilidade"
+    if cv > 30:
+        return "Elevado — interprete no contexto da cultura e variável"
+    return "Interpretar conforme cultura, variável e protocolo"
 
 def _parse_numeric_from_text(series: pd.Series) -> pd.Series:
     """Extrai primeiro número de textos como 'Dose 120 kg/ha'."""
@@ -160,7 +157,8 @@ def _factor_key(column: str) -> str:
 
 def _anova_source(anova: Dict[str, Any], raw_source: str) -> Optional[Dict[str, Any]]:
     for row in anova.get("table", []) or []:
-        if row.get("raw_source") == raw_source:
+        candidate = str(row.get("raw_source") or "")
+        if candidate == raw_source or candidate.replace(", Sum", "") == raw_source.replace(", Sum", ""):
             return row
     return None
 
@@ -209,6 +207,24 @@ def _prepare_context(payload: Dict[str, Any]) -> AnalysisContext:
         raise ValueError(f"Tipo de análise inválido: {analysis_type}.")
     if goal not in {"max", "min"}:
         raise ValueError("Objetivo inválido. Use 'max' para maior resposta ou 'min' para menor resposta.")
+    alpha_mode = str(payload.get("alpha_mode") or "auto").lower()
+    if alpha_mode not in {"fixed", "auto"}:
+        raise ValueError("Modo de alfa inválido. Use 'fixed' ou 'auto'.")
+    payload["alpha_mode"] = alpha_mode
+    try:
+        alpha = float(payload.get("alpha", 0.05))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Alfa inválido. Informe um número entre 0 e 1.") from exc
+    if not 0 < alpha < 1:
+        raise ValueError("Alfa inválido. Informe um número entre 0 e 1.")
+    payload["alpha"] = alpha
+    try:
+        sum_squares_type = int(payload.get("sum_squares_type", 2))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Tipo de soma de quadrados inválido. Use 1, 2 ou 3.") from exc
+    if sum_squares_type not in {1, 2, 3}:
+        raise ValueError("Tipo de soma de quadrados inválido. Use 1, 2 ou 3.")
+    payload["sum_squares_type"] = sum_squares_type
 
     factor_columns = _dedupe_keep_order([str(c).strip() for c in (payload.get("factor_columns") or []) if str(c).strip()])
     payload["factor_columns"] = factor_columns
@@ -234,15 +250,26 @@ def _prepare_context(payload: Dict[str, Any]) -> AnalysisContext:
     if missing:
         raise ValueError("Colunas ausentes na base: " + ", ".join(missing))
 
+    raw_response = df[response].copy()
     df[response] = pd.to_numeric(df[response], errors="coerce")
     if df[response].isna().any():
-        bad = int(df[response].isna().sum())
-        raise ValueError(f"A coluna de resposta '{response}' contém {bad} valor(es) vazio(s) ou não numérico(s).")
+        mask = df[response].isna()
+        bad = int(mask.sum())
+        examples = [
+            f"linha {int(index) + 2}: {raw_response.loc[index]!r}"
+            for index in df.index[mask][:5]
+        ]
+        raise ValueError(
+            f"A coluna de resposta '{response}' contém {bad} valor(es) vazio(s) ou não numérico(s). "
+            f"Exemplos: {'; '.join(examples)}."
+        )
 
     categorical_required = [c for c in required if c != response and c != numeric_col]
     for column in categorical_required:
         if _has_blank(df[column]):
-            raise ValueError(f"A coluna '{column}' contém valor(es) vazio(s).")
+            mask = df[column].isna() | df[column].astype(str).str.strip().eq("")
+            rows = ", ".join(str(int(index) + 2) for index in df.index[mask][:10])
+            raise ValueError(f"A coluna '{column}' contém valor(es) vazio(s) nas linhas: {rows}.")
         df[column] = df[column].astype(str).str.strip()
 
     df = df.dropna(subset=[response]).copy()
@@ -279,7 +306,11 @@ def _validate_regression_input(df: pd.DataFrame, payload: Dict[str, Any], respon
         x = pd.to_numeric(df[numeric_col], errors="coerce")
         bad = int(x.isna().sum())
         if bad:
-            raise ValueError(f"A coluna numérica '{numeric_col}' contém {bad} valor(es) vazio(s) ou não numérico(s).")
+            rows = ", ".join(str(int(index) + 2) for index in df.index[x.isna()][:10])
+            raise ValueError(
+                f"A coluna numérica '{numeric_col}' contém {bad} valor(es) vazio(s) ou não numérico(s) "
+                f"nas linhas: {rows}."
+            )
     elif treatment in df.columns:
         x = _parse_numeric_from_text(df[treatment])
         bad = int(x.isna().sum())
@@ -354,7 +385,7 @@ def _validate_design(df: pd.DataFrame, payload: Dict[str, Any], design: str, tre
             expected = int(df[block].nunique() * expected_combinations)
             _validate_complete_grid(df, [block] + factors, expected, "Na estrutura fatorial em DBC")
         elif analysis_type == "split_plot":
-            raise ValueError("Parcelas subdivididas exigem delineamento base DBC neste MVP para validar blocos, parcelas e subparcelas.")
+            raise ValueError("Parcelas subdivididas exigem delineamento base DBC para validar blocos, parcelas e subparcelas.")
 
 def _formula_for(ctx: AnalysisContext) -> Tuple[str, List[str]]:
     p = ctx.payload
@@ -362,31 +393,34 @@ def _formula_for(ctx: AnalysisContext) -> Tuple[str, List[str]]:
     treatment = ctx.treatment
     terms: List[str] = []
     notes: List[str] = []
+    ss_type = int(p.get("sum_squares_type", 2))
+    factor_term = lambda column: _c(column, sum_contrast=ss_type == 3)
 
     if ctx.analysis_type == "regression":
         return "", notes
 
     if ctx.design == "DBC":
-        terms.append(_c(p.get("block_column") or "bloco"))
+        terms.append(factor_term(p.get("block_column") or "bloco"))
     elif ctx.design == "DQL":
-        terms.extend([_c(p.get("row_column") or "linha"), _c(p.get("column_column") or "coluna")])
+        terms.extend([factor_term(p.get("row_column") or "linha"), factor_term(p.get("column_column") or "coluna")])
 
     if ctx.analysis_type == "factorial":
         factors = p.get("factor_columns") or []
         if len(factors) < 2:
             raise ValueError("Para análise fatorial, informe pelo menos dois fatores.")
-        terms.append(" * ".join(_c(f) for f in factors[:3]))
+        terms.append(" * ".join(factor_term(f) for f in factors[:3]))
     elif ctx.analysis_type == "split_plot":
         factors = p.get("factor_columns") or []
         if len(factors) < 2:
             raise ValueError("Para parcelas subdivididas, informe fator de parcela e fator de subparcela.")
-        if ctx.design != "DBC":
-            notes.append("Parcelas subdivididas normalmente exigem blocos. O modelo foi ajustado com os fatores informados, mas recomenda-se revisar a estrutura experimental.")
         main, sub = factors[0], factors[1]
         terms.append(f"{_c(main)} * {_c(sub)}")
-        notes.append("MVP: parcelas subdivididas foram ajustadas por OLS com bloco e interação dos fatores. Para laudo final, revisar estratos de erro do experimento.")
+        notes.append(
+            "Parcelas subdivididas avaliadas com dois estratos: interação bloco × parcela "
+            "como erro (a) e resíduo da subparcela como erro (b)."
+        )
     else:
-        terms.append(_c(treatment))
+        terms.append(factor_term(treatment))
 
     formula = f"{_q(response)} ~ " + " + ".join(terms)
     return formula, notes
@@ -426,7 +460,8 @@ def _anova_split_plot(ctx: AnalysisContext) -> Dict[str, Any]:
     sub_key = _c(sub)
     formula = f"{_q(response)} ~ {block_key} * {main_key} + {sub_key} + {main_key}:{sub_key}"
     model = smf.ols(formula, data=ctx.df).fit()
-    table = anova_lm(model, typ=2)
+    ss_type = int(ctx.payload.get("sum_squares_type", 2)) if ctx.analysis_type == "factorial" else 2
+    table = anova_lm(model, typ=ss_type)
 
     errA_key = _find_interaction_row(table.index, block_key, main_key)
     ab_key = _find_interaction_row(table.index, main_key, sub_key)
@@ -528,6 +563,7 @@ def _anova_split_plot(ctx: AnalysisContext) -> Dict[str, Any]:
 
     return {
         "formula": formula,
+        "sum_squares_type": ss_type,
         "table": rows,
         "mse": ms_errB,
         "df_error": resid_r.get("df"),
@@ -548,7 +584,8 @@ def _anova(ctx: AnalysisContext) -> Dict[str, Any]:
         return {"table": [], "cv": None, "cv_label": "Indisponível", "residual_is_singular": False, "model_notes": notes}
 
     model = smf.ols(formula, data=ctx.df).fit()
-    table = anova_lm(model, typ=2)
+    ss_type = int(ctx.payload.get("sum_squares_type", 2)) if ctx.analysis_type == "factorial" else 2
+    table = anova_lm(model, typ=ss_type)
     df_resid = float(model.df_resid)
     mse = float(model.mse_resid) if model.df_resid > 0 else None
 
@@ -609,6 +646,7 @@ def _anova(ctx: AnalysisContext) -> Dict[str, Any]:
 
     return {
         "formula": formula,
+        "sum_squares_type": ss_type,
         "table": rows,
         "mse": mse,
         "df_error": df_resid,
@@ -656,11 +694,10 @@ def _means(ctx: AnalysisContext, anova: Dict[str, Any]) -> Dict[str, Any]:
 def _alpha_for_row(payload: Dict[str, Any], row: Optional[Dict[str, Any]]) -> float:
     """Alfa do pós-teste. Dois modos, escolhidos pelo usuário via payload['alpha_mode']:
 
-    - 'auto' (padrão): deriva o alfa diretamente da significância (1% ou 5%) da fonte de
-      variação no teste F — convenção clássica de Pimentel Gomes (Tukey a 1% quando o F foi
-      significativo a 1%, a 5% quando significativo a 5%).
+    - 'auto' (padrão pedagógico): deriva o alfa diretamente da significância (1% ou 5%) da fonte de
+      variação no teste F — convenção clássica ensinada em estatística experimental agronômica.
     - 'fixed': usa o alfa informado a priori em payload['alpha'], igual em toda a análise,
-      independente do p-valor observado no teste F.
+      independente do p-valor observado no teste F, para protocolos que exigem alfa pré-definido.
     """
     if str(payload.get("alpha_mode") or "auto").lower() == "fixed":
         try:
@@ -832,6 +869,11 @@ def _comparison_tests(table: pd.DataFrame, anova: Dict[str, Any], ctx: AnalysisC
     sk_letters: Optional[Dict[str, str]] = None
     control_result: Optional[str] = None
     if test_name == "scott_knott":
+        if len(set(ns.values())) != 1:
+            raise ValueError(
+                "Scott-Knott está habilitado apenas para tratamentos balanceados. "
+                "Use Tukey-Kramer em dados desbalanceados ou balanceie o experimento."
+            )
         sk_groups = _scott_knott_groups(order, means, ns, mse, df_error, alpha)
         # _scott_knott_groups ordena internamente por media ascendente (independente do
         # goal); reordena os grupos aqui pela posicao em 'order' (que ja e' melhor->pior
@@ -854,7 +896,8 @@ def _comparison_tests(table: pd.DataFrame, anova: Dict[str, Any], ctx: AnalysisC
         method_note = (
             "Scott-Knott (1974): particiona os tratamentos em grupos sem sobreposição de "
             "letras, por partição recursiva de máxima verossimilhança — ao contrário de "
-            "Tukey/Duncan/SNK/Scheffé, cada tratamento pertence a exatamente um grupo."
+            "Tukey/Duncan/SNK/Scheffé, cada tratamento pertence a exatamente um grupo. "
+            "Nesta versão, o método é restrito a tratamentos balanceados."
         )
     elif test_name == "dunnett":
         control_informado = ctx.payload.get("control_group")
@@ -927,8 +970,8 @@ def _comparison_tests(table: pd.DataFrame, anova: Dict[str, Any], ctx: AnalysisC
 def _comparison_note(test_name: str) -> str:
     notes = {
         "tukey": "Tukey-Kramer para tamanhos de amostra iguais ou desiguais.",
-        "duncan": "Duncan implementado por amplitude studentizada com nível por amplitude; validar antes de laudo oficial.",
-        "snk": "SNK implementado por amplitude studentizada por distância entre médias ordenadas; validar antes de laudo oficial.",
+        "duncan": "Duncan por amplitude studentizada com nível ajustado à amplitude ordenada.",
+        "snk": "SNK por amplitude studentizada conforme a distância entre médias ordenadas.",
         "scheffe": "Scheffé aplicado com F crítico e erro médio residual da ANOVA.",
     }
     return notes.get(test_name, "Teste de comparação de médias calculado.")
@@ -1026,7 +1069,13 @@ def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
     models: List[Dict[str, Any]] = []
 
     for degree in range(1, max_degree + 1):
-        fit = _fit_poly(reg_df["x"].to_numpy(dtype=float), reg_df["y"].to_numpy(dtype=float), degree, ctx.goal)
+        fit = _fit_poly(
+            reg_df["x"].to_numpy(dtype=float),
+            reg_df["y"].to_numpy(dtype=float),
+            degree,
+            ctx.goal,
+            float(ctx.payload.get("alpha", 0.05)),
+        )
         fit["degree"] = degree
         models.append(fit)
 
@@ -1085,7 +1134,7 @@ def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
         "plot_png_base64": plot_png,
     }
 
-def _fit_poly(x: np.ndarray, y: np.ndarray, degree: int, goal: str) -> Dict[str, Any]:
+def _fit_poly(x: np.ndarray, y: np.ndarray, degree: int, goal: str, alpha: float = 0.05) -> Dict[str, Any]:
     # Centraliza x (x - media) antes de ajustar: evita mal-condicionamento
     # numerico do polinomio em escala bruta (ex.: 120**3 = 1.728.000), que
     # gera curvas instaveis/"infinitas" mesmo com graus de liberdade validos.
@@ -1105,6 +1154,7 @@ def _fit_poly(x: np.ndarray, y: np.ndarray, degree: int, goal: str) -> Dict[str,
     coeffs = raw_coeffs # intercepto, x, x², x³...
     equation = _equation_text(coeffs)
     optimum = _poly_optimum(coeffs, float(np.min(x)), float(np.max(x)), goal)
+    lack_of_fit = _lack_of_fit_test(x, y, degree, float(model.ssr), alpha)
     return {
         "r2": float(model.rsquared),
         "adj_r2": float(model.rsquared_adj),
@@ -1115,7 +1165,58 @@ def _fit_poly(x: np.ndarray, y: np.ndarray, degree: int, goal: str) -> Dict[str,
         "coefficients": [float(v) for v in coeffs],
         "equation": equation,
         "optimum": optimum,
+        "lack_of_fit": lack_of_fit,
     }
+
+
+def _lack_of_fit_test(
+    x: np.ndarray, y: np.ndarray, degree: int, residual_ss: float, alpha: float = 0.05,
+) -> Dict[str, Any]:
+    """Decompõe o resíduo em erro puro e falta de ajuste quando há doses replicadas."""
+    frame = pd.DataFrame({"x": x, "y": y})
+    groups = frame.groupby("x", sort=True)["y"]
+    n = int(len(frame))
+    g = int(groups.ngroups)
+    df_pure = n - g
+    df_lack = g - (degree + 1)
+    pure_ss = float(sum(((values - values.mean()) ** 2).sum() for _, values in groups))
+    lack_ss = max(0.0, float(residual_ss) - pure_ss)
+    result = {
+        "available": bool(df_pure > 0 and df_lack > 0),
+        "ss_lack_of_fit": lack_ss,
+        "df_lack_of_fit": df_lack,
+        "ss_pure_error": pure_ss,
+        "df_pure_error": df_pure,
+        "f_value": None,
+        "p_value": None,
+        "significant": None,
+        "note": "",
+    }
+    if df_pure <= 0:
+        result["note"] = "Teste indisponível: não há replicações em cada dose para estimar o erro puro."
+        return result
+    if df_lack <= 0:
+        result["note"] = "Teste indisponível: não restam graus de liberdade para falta de ajuste."
+        return result
+    ms_pure = pure_ss / df_pure
+    ms_lack = lack_ss / df_lack
+    if ms_pure <= np.finfo(float).eps:
+        result["available"] = False
+        result["note"] = "Teste indeterminado: o erro puro é praticamente zero."
+        return result
+    f_value = ms_lack / ms_pure
+    p_value = float(stats.f.sf(f_value, df_lack, df_pure))
+    result.update({
+        "f_value": f_value,
+        "p_value": p_value,
+        "significant": bool(p_value <= alpha),
+        "note": (
+            f"Há evidência de falta de ajuste do modelo (p ≤ {alpha:g})."
+            if p_value <= alpha
+            else f"Não foi detectada falta de ajuste ao nível de alfa={alpha:g}."
+        ),
+    })
+    return result
 
 def _predict_poly(coefficients: Iterable[float], x: np.ndarray) -> np.ndarray:
     coeffs = list(coefficients)
@@ -1436,6 +1537,12 @@ def analyze(payload: Dict[str, Any]) -> Dict[str, Any]:
             "response_column": ctx.response,
             "treatment_column": ctx.treatment,
             "goal": ctx.goal,
+            "alpha_mode": ctx.payload.get("alpha_mode", "auto"),
+            "alpha": ctx.payload.get("alpha", 0.05),
+            "sum_squares_type": anova.get("sum_squares_type", 2),
+            "null_hypothesis": (
+                "Não há efeito da fonte de variação; as médias dos níveis comparados são iguais."
+            ),
         },
         "anova": anova,
         "means": means,
@@ -1445,6 +1552,7 @@ def analyze(payload: Dict[str, Any]) -> Dict[str, Any]:
         "recommendations": recommendations,
         "pressupostos": pressupostos,
         "transformacao_sugerida": transformacao_sugerida,
+        "provenance": build_provenance(ctx.payload),
     }
     return _clean_value(result)
 
@@ -1491,6 +1599,18 @@ def _recommendations(ctx: AnalysisContext, anova: Dict[str, Any], means: Dict[st
         if opt.get("x") is not None:
             messages.append(f"Regressão sugerida: grau {regression['selected_degree']} com R² ajustado {selected.get('adj_r2'):.3f}; ponto ótimo estimado em x={opt['x']:.3f}.")
         messages.append(regression.get("recommendation", ""))
+        lack = selected.get("lack_of_fit") or {}
+        if lack.get("available"):
+            if lack.get("significant"):
+                messages.append(
+                    f"Atenção: o teste formal detectou falta de ajuste do modelo "
+                    f"(p={float(lack['p_value']):.4f}). Não use a curva para recomendação sem revisar o modelo."
+                )
+            else:
+                messages.append(
+                    f"Falta de ajuste não detectada ao nível de alfa={float(ctx.payload.get('alpha', 0.05)):g} "
+                    f"(p={float(lack['p_value']):.4f}); mantenha a inspeção dos resíduos."
+                )
     elif ctx.analysis_type == "regression":
         messages.append("Regressão não foi calculada: são necessários ao menos 3 níveis numéricos distintos do fator, com 1 grau de liberdade residual, para evitar curvas superajustadas.")
 

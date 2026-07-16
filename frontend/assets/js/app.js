@@ -86,12 +86,15 @@
     $('downloadPlotPdf').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf'));
     ['design', 'analysisType'].forEach((id) => $(id)?.addEventListener('change', generateManualTable));
     $('analysisType').addEventListener('change', updateFactorLevelsVisibility);
+    $('analysisType').addEventListener('change', updateSumSquaresVisibility);
     $('comparisonTest').addEventListener('change', updateControlGroupVisibility);
     $('alphaMode').addEventListener('change', updateAlphaValueState);
     $('treatmentColumn').addEventListener('change', updateControlGroupOptions);
     updateControlGroupVisibility();
     updateAlphaValueState();
     updateFactorLevelsVisibility();
+    updateSumSquaresVisibility();
+    updateExportAvailability(false, false);
   }
 
   function updateControlGroupVisibility() {
@@ -106,6 +109,11 @@
       const wrap = $(id);
       if (wrap) wrap.style.display = isFactorial ? '' : 'none';
     });
+  }
+
+  function updateSumSquaresVisibility() {
+    const wrap = $('sumSquaresTypeWrap');
+    if (wrap) wrap.style.display = $('analysisType').value === 'factorial' ? '' : 'none';
   }
 
   function updateAlphaValueState() {
@@ -270,6 +278,8 @@
   }
 
   function renderEditableTable(headers, rows) {
+    currentResult = null;
+    updateExportAvailability(false, false);
     currentHeaders = unique(headers);
     dataTable.innerHTML = '';
     const thead = document.createElement('thead');
@@ -355,6 +365,7 @@
       comparison_test: $('comparisonTest').value,
       control_group: $('controlGroup').value || null,
       alpha_mode: $('alphaMode').value,
+      sum_squares_type: Number($('sumSquaresType').value) || 2,
       regression_degree: degree ? Number(degree) : null,
       goal: $('goal').value,
       alpha: Number($('alphaValue').value) || 0.05,
@@ -409,6 +420,8 @@
     renderFactorComparisons(result?.factor_comparisons);
     renderInteractionBreakdown(result?.interaction_breakdown);
     renderAssumptions(result?.pressupostos, result?.transformacao_sugerida);
+    renderProvenance(result?.provenance, result?.meta);
+    updateExportAvailability(true, Boolean(result?.regression));
 
     // atualiza previews (mesmo se hidden)
     const firstF = (result?.anova?.table || []).find((r) => r.f_calc != null);
@@ -575,10 +588,12 @@
     }
     box.classList.remove('hidden');
     const selected = reg.selected_model || {};
+    const lack = selected.lack_of_fit || {};
     [
       `Modelo: grau ${reg.selected_degree}`,
       `R²: ${format(selected.r2)}`,
       `R² ajustado: ${format(selected.adj_r2)}`,
+      lack.testable ? `Falta de ajuste: F=${format(lack.f_value)} · p=${format(lack.p_value)}` : (lack.note || ''),
       selected.equation || '',
       selected.optimum ? `Ótimo: ${format(selected.optimum.x)} → ${format(selected.optimum.y)}` : ''
     ].filter(Boolean).forEach((text) => {
@@ -622,6 +637,43 @@
         }
       }
     });
+  }
+
+  function renderProvenance(provenance, meta) {
+    const box = $('provenanceSummary');
+    if (!box) return;
+    const config = provenance?.config || {};
+    const dataHash = String(provenance?.data_sha256 || '—');
+    const items = [
+      ['Motor', provenance?.engine_version || '—'],
+      ['Commit', String(provenance?.git_commit || '—').slice(0, 12)],
+      ['Gerado em UTC', provenance?.generated_at_utc || '—'],
+      ['Dados SHA-256', dataHash === '—' ? dataHash : `${dataHash.slice(0, 16)}…`],
+      ['Alfa', `${meta?.alpha_mode || config.alpha_mode || 'auto'} · ${format(meta?.alpha ?? config.alpha)}`],
+      ['Soma de quadrados', `Tipo ${meta?.sum_squares_type || config.sum_squares_type || 2}`],
+    ];
+    box.innerHTML = '';
+    items.forEach(([label, value]) => {
+      const item = document.createElement('div');
+      const key = document.createElement('span');
+      const val = document.createElement('strong');
+      key.textContent = label;
+      val.textContent = value;
+      item.append(key, val);
+      box.appendChild(item);
+    });
+  }
+
+  function updateExportAvailability(hasResult, hasRegression) {
+    ['downloadPdf', 'downloadExcel'].forEach((id) => { if ($(id)) $(id).disabled = !hasResult; });
+    ['downloadPng', 'downloadPlotPdf'].forEach((id) => { if ($(id)) $(id).disabled = !hasRegression; });
+    const note = $('exportsNote');
+    if (!note) return;
+    note.textContent = !hasResult
+      ? 'Execute uma análise para liberar as exportações correspondentes.'
+      : hasRegression
+        ? 'Todas as exportações estão disponíveis para a análise atual.'
+        : 'PDF e Excel disponíveis. Gráficos exigem uma análise de regressão.';
   }
 
   async function downloadExport(endpoint, filename) {
