@@ -13,6 +13,7 @@ import json
 
 from fastapi.testclient import TestClient
 
+import main
 from main import app
 
 client = TestClient(app)
@@ -35,6 +36,7 @@ def test_health():
     res = client.get("/health")
     assert res.status_code == 200
     assert res.json() == {"status": "ok"}
+    assert res.headers["x-content-type-options"] == "nosniff"
 
 
 def test_analyze_upload_ainda_funciona_apos_run_in_threadpool():
@@ -53,3 +55,32 @@ def test_analyze_upload_rejeita_coluna_ausente_com_422_nao_500():
     files = {"file": ("dados.csv", io.BytesIO(csv_errado), "text/csv")}
     res = client.post("/api/analyze-upload", data={"config": CONFIG}, files=files)
     assert res.status_code == 422
+
+
+def test_requisicao_grande_e_rejeitada_antes_do_processamento():
+    res = client.post(
+        "/api/analyze",
+        content=b"x" * (main.MAX_REQUEST_BYTES + 1),
+        headers={"content-type": "application/json"},
+    )
+    assert res.status_code == 413
+
+
+def test_erro_interno_nao_vaza_excecao(monkeypatch):
+    def explode(_payload):
+        raise RuntimeError("segredo-interno")
+
+    monkeypatch.setattr(main, "analyze", explode)
+    payload = {
+        "design": "DIC", "analysis_type": "single",
+        "response_column": "valor", "treatment_column": "tratamento",
+        "data": [
+            {"tratamento": "T1", "valor": 1}, {"tratamento": "T1", "valor": 2},
+            {"tratamento": "T2", "valor": 3}, {"tratamento": "T2", "valor": 4},
+        ],
+    }
+    res = client.post("/api/analyze", json=payload)
+    assert res.status_code == 500
+    detail = res.json()["detail"]
+    assert "segredo-interno" not in detail
+    assert "Informe o código" in detail
