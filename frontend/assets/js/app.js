@@ -15,11 +15,15 @@
   const COLOR_TEXT_D1 = '#F5F5F5';
   const COLOR_TEXT_D2 = '#A3A3A3';
   const COLOR_BORDER = 'rgba(255,255,255,.08)';
+  const MAX_FILE_BYTES = 5 * 1024 * 1024;
+  const MAX_DATA_ROWS = 10000;
+  const API_TIMEOUT_MS = 60000;
 
   function init() {
     if (!apiInput || !dataTable) return; // página não é a de resultados
-    const savedApi = localStorage.getItem('solver_api_base_url') || window.SOLVER_API_BASE_URL || '';
-    apiInput.value = savedApi;
+    const allowCustomApi = window.SOLVER_ALLOW_CUSTOM_API === true;
+    const savedApi = allowCustomApi ? localStorage.getItem('solver_api_base_url') : '';
+    apiInput.value = savedApi || window.SOLVER_API_BASE_URL || '';
     bindTabs();
     bindActions();
     generateManualTable();
@@ -38,7 +42,8 @@
   }
 
   function bindActions() {
-    $('saveApi').addEventListener('click', () => {
+    $('saveApi')?.addEventListener('click', () => {
+      if (window.SOLVER_ALLOW_CUSTOM_API !== true) return;
       localStorage.setItem('solver_api_base_url', cleanApiBase(apiInput.value));
       testApi(true);
     });
@@ -102,17 +107,32 @@
     return String(value || '').trim().replace(/\/$/, '');
   }
 
+  async function fetchWithTimeout(url, options = {}, timeoutMs = API_TIMEOUT_MS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      if (err?.name === 'AbortError') {
+        throw new Error('O serviço demorou além do limite. Tente novamente em instantes.');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
   async function testApi(showSuccess) {
     const base = cleanApiBase(apiInput.value);
     if (!base) { setApiStatus('API não configurada', 'err'); return; }
     try {
-      const res = await fetch(`${base}/health`);
+      const res = await fetchWithTimeout(`${base}/health`, {}, 15000);
       if (!res.ok) throw new Error('status ' + res.status);
       setApiStatus('API online', 'ok');
       if (showSuccess) notify('Backend salvo e respondendo.', 'success');
     } catch (err) {
       setApiStatus('API sem resposta', 'err');
-      if (showSuccess) notify('Não consegui conectar. Verifique a URL do Render e o CORS.', 'error');
+      if (showSuccess) notify('O serviço estatístico está indisponível. Tente novamente em instantes.', 'error');
     }
   }
 
@@ -317,12 +337,14 @@
 
   async function runAnalysis() {
     const base = cleanApiBase(apiInput.value);
-    if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
+    if (!base) return notify('O serviço estatístico não está configurado.', 'error');
     const payload = payloadFromUi();
     if (!payload.data.length) return notify('Insira ou carregue dados antes de analisar.', 'error');
+    const runButton = $('runAnalysis');
     try {
+      runButton.disabled = true;
       setApiStatus('Processando...', '');
-      const res = await fetch(`${base}/api/analyze`, {
+      const res = await fetchWithTimeout(`${base}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -336,6 +358,8 @@
     } catch (err) {
       setApiStatus('Erro na análise', 'err');
       notify(err.message || 'Erro ao rodar análise.', 'error');
+    } finally {
+      runButton.disabled = false;
     }
   }
 
@@ -575,10 +599,10 @@
 
   async function downloadExport(endpoint, filename) {
     const base = cleanApiBase(apiInput.value);
-    if (!base) return notify('Configure primeiro a URL do backend no Render.', 'error');
+    if (!base) return notify('O serviço estatístico não está configurado.', 'error');
     const payload = payloadFromUi();
     try {
-      const res = await fetch(`${base}${endpoint}`, {
+      const res = await fetchWithTimeout(`${base}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -604,17 +628,23 @@
   async function handleFileUpload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
+    if (file.size > MAX_FILE_BYTES) {
+      event.target.value = '';
+      return notify('Arquivo muito grande. O limite é 5 MB.', 'error');
+    }
     const ext = file.name.split('.').pop().toLowerCase();
     try {
       if (ext === 'csv') {
         const text = await file.text();
         const rows = parseCsv(text);
+        validateImportedRows(rows);
         renderEditableTable(Object.keys(rows[0] || {}), rows);
       } else if (['xlsx', 'xls'].includes(ext)) {
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
         const sheet = workbook.Sheets[workbook.SheetNames[0]];
         const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        validateImportedRows(rows);
         renderEditableTable(Object.keys(rows[0] || {}), rows);
       } else {
         throw new Error('Formato não suportado. Use CSV, XLS ou XLSX.');
@@ -626,35 +656,31 @@
   }
 
   function parseCsv(text) {
-    const sep = text.includes(';') ? ';' : ',';
-    const lines = text.trim().split(/\r?\n/).filter(Boolean);
-    const headers = lines.shift().split(sep).map((h) => h.trim());
-    return lines.map((line) => {
-      const values = line.split(sep).map((v) => v.trim());
-      const obj = {};
-      headers.forEach((h, i) => {
-        const raw = values[i] ?? '';
-        const numeric = raw.replace(',', '.');
-        obj[h] = numeric !== '' && !Number.isNaN(Number(numeric)) ? Number(numeric) : raw;
-      });
-      return obj;
-    });
+    if (!window.SolverCsv?.parse) throw new Error('O leitor de CSV não foi carregado.');
+    return window.SolverCsv.parse(text);
   }
 
-  function loadExampleData() {
+  function validateImportedRows(rows) {
+    if (!Array.isArray(rows) || !rows.length) throw new Error('O arquivo não contém linhas de dados.');
+    if (rows.length > MAX_DATA_ROWS) throw new Error(`O limite é ${MAX_DATA_ROWS.toLocaleString('pt-BR')} linhas por análise.`);
+  }
+
+  async function loadExampleData() {
     $('design').value = 'DBC';
     $('analysisType').value = 'single';
     $('responseColumn').value = 'valor';
     $('treatmentColumn').value = 'tratamento';
     $('blockColumn').value = 'bloco';
-    const rows = [
-      { bloco: 'B1', tratamento: 'T1', valor: 58.2 }, { bloco: 'B1', tratamento: 'T2', valor: 61.4 }, { bloco: 'B1', tratamento: 'T3', valor: 66.8 }, { bloco: 'B1', tratamento: 'T4', valor: 64.7 },
-      { bloco: 'B2', tratamento: 'T1', valor: 57.6 }, { bloco: 'B2', tratamento: 'T2', valor: 60.1 }, { bloco: 'B2', tratamento: 'T3', valor: 66.4 }, { bloco: 'B2', tratamento: 'T4', valor: 63.1 },
-      { bloco: 'B3', tratamento: 'T1', valor: 59.4 }, { bloco: 'B3', tratamento: 'T2', valor: 62.0 }, { bloco: 'B3', tratamento: 'T3', valor: 67.2 }, { bloco: 'B3', tratamento: 'T4', valor: 65.9 },
-      { bloco: 'B4', tratamento: 'T1', valor: 59.7 }, { bloco: 'B4', tratamento: 'T2', valor: 63.6 }, { bloco: 'B4', tratamento: 'T3', valor: 68.9 }, { bloco: 'B4', tratamento: 'T4', valor: 66.1 }
-    ];
-    renderEditableTable(['bloco', 'tratamento', 'valor'], rows);
-    notify('Exemplo DBC carregado.', 'success');
+    try {
+      const response = await fetchWithTimeout('assets/data/dbc_exemplo.json', {}, 15000);
+      if (!response.ok) throw new Error('Não foi possível carregar o exemplo oficial.');
+      const rows = await response.json();
+      validateImportedRows(rows);
+      renderEditableTable(['bloco', 'tratamento', 'valor'], rows);
+      notify('Exemplo oficial DBC carregado.', 'success');
+    } catch (err) {
+      notify(err.message || 'Erro ao carregar o exemplo.', 'error');
+    }
   }
 
   function openTab(name) {
