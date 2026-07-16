@@ -9,7 +9,7 @@ Projeto inicial para um site de estatística experimental com:
 - Testes de médias: Tukey, Duncan, Dunnett, SNK e Scheffé.
 - Upload CSV/XLSX, entrada manual, dashboard visual e exportações PDF/Excel/PNG/PDF.
 
-> Importante: este é um MVP técnico. Antes de usar como laudo oficial, valide as rotinas estatísticas e os modelos com o responsável técnico.
+> Importante: este é um candidato técnico à versão 1.0. Antes de uso como laudo oficial, conclua a [matriz de validação científica](docs/VALIDATION_MATRIX.md) e a [checklist de release](docs/RELEASE_CHECKLIST.md) com o responsável técnico.
 
 ## Estrutura
 
@@ -66,7 +66,22 @@ pip install -r requirements-dev.txt
 pytest -v
 ```
 
-O workflow `.github/workflows/backend-tests.yml` roda essa suíte automaticamente em push/PR que tocam `backend/`.
+O workflow `.github/workflows/backend-tests.yml` roda a suíte com cobertura, valida a sintaxe do frontend e também dispara quando o exemplo oficial ou seu carregamento são alterados.
+
+## Limites operacionais
+
+- até 5 MB por requisição/arquivo;
+- até 10.000 linhas por análise;
+- até 2 análises pesadas simultâneas por instância, configurável por ambiente;
+- endpoint de produção fixo no frontend, evitando envio acidental a um destino arbitrário.
+
+## Segurança, privacidade e release
+
+- [Política de segurança](SECURITY.md)
+- [Matriz de validação científica](docs/VALIDATION_MATRIX.md)
+- [Checklist para a versão 1.0](docs/RELEASE_CHECKLIST.md)
+- Os textos de Privacidade e Termos publicados no frontend são minutas e exigem revisão legal antes da versão 1.0.
+- A licença do código deve ser escolhida e publicada pelo titular do projeto antes da versão 1.0.
 
 ## Deploy rápido
 
