@@ -7,6 +7,15 @@
   let currentHeaders = ['bloco', 'tratamento', 'valor'];
   let currentResult = null;
   let regressionChart = null;
+  let currentAnalysisController = null;
+  let processingTimer = null;
+  let processingStartedAt = 0;
+  const PROCESSING_STEPS = [
+    'Validando os dados experimentais…',
+    'Montando o modelo estatístico…',
+    'Calculando ANOVA e comparações…',
+    'Organizando resultados e diagnósticos…'
+  ];
 
   // paleta sincronizada com o tema ativo
   let COLOR_BRAND = '#22C55E';
@@ -79,6 +88,7 @@
     $('clearRows').addEventListener('click', () => renderEditableTable(currentHeaders, []));
     $('loadExample').addEventListener('click', loadExampleData);
     $('runAnalysis').addEventListener('click', runAnalysis);
+    $('cancelAnalysis')?.addEventListener('click', () => currentAnalysisController?.abort());
     $('fileInput').addEventListener('change', handleFileUpload);
     $('downloadPdf').addEventListener('click', () => downloadExport('/api/export/pdf', 'solver-relatorio.pdf'));
     $('downloadExcel').addEventListener('click', () => downloadExport('/api/export/excel', 'solver-resultados.xlsx'));
@@ -144,16 +154,31 @@
 
   async function fetchWithTimeout(url, options = {}, timeoutMs = API_TIMEOUT_MS) {
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    const externalSignal = options.signal;
+    let didTimeout = false;
+    const relayAbort = () => controller.abort();
+    if (externalSignal?.aborted) relayAbort();
+    else externalSignal?.addEventListener('abort', relayAbort, { once: true });
+    const timer = setTimeout(() => {
+      didTimeout = true;
+      controller.abort();
+    }, timeoutMs);
     try {
       return await fetch(url, { ...options, signal: controller.signal });
     } catch (err) {
       if (err?.name === 'AbortError') {
-        throw new Error('O serviço demorou além do limite. Tente novamente em instantes.');
+        const wrapped = new Error(
+          didTimeout
+            ? 'O serviço demorou além do limite. Tente novamente em instantes.'
+            : 'Análise cancelada pelo usuário.'
+        );
+        wrapped.code = didTimeout ? 'timeout' : 'cancelled';
+        throw wrapped;
       }
       throw err;
     } finally {
       clearTimeout(timer);
+      externalSignal?.removeEventListener('abort', relayAbort);
     }
   }
 
@@ -197,6 +222,57 @@
     }
     document.body.appendChild(div);
     setTimeout(() => div.remove(), 4200);
+  }
+
+  function setProcessingStep(stepIndex, progress, message) {
+    const progressNode = $('processingProgress');
+    const progressBar = $('processingProgressBar');
+    if (progressNode) progressNode.setAttribute('aria-valuenow', String(Math.round(progress)));
+    if (progressBar) progressBar.style.width = `${progress}%`;
+    if ($('processingMessage')) $('processingMessage').textContent = message;
+    document.querySelectorAll('[data-processing-step]').forEach((node, index) => {
+      node.classList.toggle('active', index === stepIndex);
+      node.classList.toggle('completed', index < stepIndex);
+    });
+  }
+
+  function startProcessing() {
+    processingStartedAt = performance.now();
+    $('processingOverlay')?.classList.remove('hidden');
+    document.body.classList.add('is-processing');
+    document.querySelector('main')?.setAttribute('aria-busy', 'true');
+    if ($('cancelAnalysis')) $('cancelAnalysis').disabled = false;
+    setProcessingStep(0, 8, PROCESSING_STEPS[0]);
+    processingTimer = window.setInterval(() => {
+      const elapsed = performance.now() - processingStartedAt;
+      const stepIndex = Math.min(PROCESSING_STEPS.length - 1, Math.floor(elapsed / 1200));
+      const bases = [14, 38, 64, 84];
+      const withinStep = Math.min(10, ((elapsed % 1200) / 1200) * 10);
+      setProcessingStep(stepIndex, Math.min(94, bases[stepIndex] + withinStep), PROCESSING_STEPS[stepIndex]);
+      if ($('processingElapsed')) {
+        $('processingElapsed').textContent = `${(elapsed / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s decorridos`;
+      }
+    }, 180);
+  }
+
+  function completeProcessing() {
+    if (processingTimer) window.clearInterval(processingTimer);
+    processingTimer = null;
+    setProcessingStep(PROCESSING_STEPS.length - 1, 100, 'Resultados prontos. Abrindo o painel…');
+    document.querySelectorAll('[data-processing-step]').forEach((node) => {
+      node.classList.remove('active');
+      node.classList.add('completed');
+    });
+    if ($('cancelAnalysis')) $('cancelAnalysis').disabled = true;
+    return new Promise((resolve) => window.setTimeout(resolve, 320));
+  }
+
+  function stopProcessing() {
+    if (processingTimer) window.clearInterval(processingTimer);
+    processingTimer = null;
+    $('processingOverlay')?.classList.add('hidden');
+    document.body.classList.remove('is-processing');
+    document.querySelector('main')?.removeAttribute('aria-busy');
   }
 
   function generateManualTable() {
@@ -381,22 +457,33 @@
     const runButton = $('runAnalysis');
     try {
       runButton.disabled = true;
+      currentAnalysisController = new AbortController();
+      startProcessing();
       setApiStatus('Processando...', '');
       const res = await fetchWithTimeout(`${base}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: currentAnalysisController.signal
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.detail || 'Erro na análise');
+      await completeProcessing();
       currentResult = json;
       renderResults(json);
       openTab('resultados');
       setApiStatus('API online', 'ok');
     } catch (err) {
+      if (err?.code === 'cancelled') {
+        setApiStatus('API online', 'ok');
+        notify('Análise cancelada. Nenhum resultado foi alterado.', 'info');
+        return;
+      }
       setApiStatus('Erro na análise', 'err');
       notify(err.message || 'Erro ao rodar análise.', 'error');
     } finally {
+      stopProcessing();
+      currentAnalysisController = null;
       runButton.disabled = false;
     }
   }

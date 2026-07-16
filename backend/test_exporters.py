@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 
+import pytest
 from openpyxl import load_workbook
 from pypdf import PdfReader
 
@@ -21,12 +22,29 @@ def test_pdf_contem_resultados_e_proveniencia():
     pdf = build_pdf(PAYLOAD)
     assert pdf.startswith(b"%PDF")
     assert len(pdf) > 10_000
-    text = "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(pdf)).pages)
+    reader = PdfReader(io.BytesIO(pdf))
+    assert len(reader.pages) >= 2, "o relatório deve ter capa e ao menos uma página de resultados"
+    first_page = reader.pages[0]
+    width = float(first_page.mediabox.width)
+    height = float(first_page.mediabox.height)
+    assert height > width
+    assert width == pytest.approx(595.28, abs=1.0)
+    assert height == pytest.approx(841.89, abs=1.0)
+
+    cover_text = first_page.extract_text() or ""
+    assert "RELATÓRIO ESTATÍSTICO" in cover_text
+    assert "Fernando Paes Lorena" in cover_text
+    assert "Página" not in cover_text
+
+    body_text = "\n".join(page.extract_text() or "" for page in reader.pages[1:])
+    assert "Página 1" in body_text
+    assert reader.metadata.title == "Relatório Solver Estatística"
+    text = cover_text + "\n" + body_text
     for expected in (
         "ANOVA", "Comparações detalhadas", "Pressupostos", "Configuração e rastreabilidade",
             "SHA-256 dos dados", "Soma de quadrados",
     ):
-        assert expected in text
+        assert expected.upper() in text.upper()
 
 
 def test_excel_contem_planilhas_tecnicas_e_dados_de_entrada():

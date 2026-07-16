@@ -883,7 +883,7 @@ def _comparison_tests(table: pd.DataFrame, anova: Dict[str, Any], ctx: AnalysisC
         sk_groups.sort(key=lambda grp: min(position[g] for g in grp))
         sk_letters = {}
         for idx, group in enumerate(sk_groups):
-            letter = chr(ord("a") + idx)
+            letter = _letter_label(idx)
             for g in group:
                 sk_letters[g] = letter
         for i, g1 in enumerate(order):
@@ -976,6 +976,19 @@ def _comparison_note(test_name: str) -> str:
     }
     return notes.get(test_name, "Teste de comparação de médias calculado.")
 
+
+def _letter_label(index: int) -> str:
+    """Converte 0, 1, ..., 25, 26 em a, b, ..., z, aa de forma estável."""
+    if index < 0:
+        raise ValueError("O índice da letra deve ser não negativo.")
+    label = ""
+    value = index + 1
+    while value:
+        value, remainder = divmod(value - 1, 26)
+        label = chr(ord("a") + remainder) + label
+    return label
+
+
 def _assign_letters(order: List[str], nonsig_pairs: set[Tuple[str, str]]) -> Dict[str, str]:
     """Gera letras compactas (CLD) via enumeração de cliques maximais (Bron-Kerbosch).
     A versão anterior era gulosa/sequencial e falha no caso clássico de não transitividade
@@ -990,6 +1003,7 @@ def _assign_letters(order: List[str], nonsig_pairs: set[Tuple[str, str]]) -> Dic
     def non_significant(a: str, b: str) -> bool:
         return tuple(sorted((a, b))) in nonsig_pairs
 
+    position = {g: i for i, g in enumerate(order)}
     graph: Dict[str, set] = {g: {h for h in order if h != g and non_significant(g, h)} for g in order}
 
     cliques: List[set] = []
@@ -999,7 +1013,8 @@ def _assign_letters(order: List[str], nonsig_pairs: set[Tuple[str, str]]) -> Dic
             if r:
                 cliques.append(set(r))
             return
-        for v in list(p):
+        # A ordem explícita elimina variações entre processos causadas pela iteração de sets.
+        for v in sorted(p, key=position.__getitem__):
             bron_kerbosch(r | {v}, p & graph[v], x & graph[v])
             p = p - {v}
             x = x | {v}
@@ -1015,15 +1030,18 @@ def _assign_letters(order: List[str], nonsig_pairs: set[Tuple[str, str]]) -> Dic
 
     cliques = [c for i, c in enumerate(cliques) if not any(c < other for j, other in enumerate(cliques) if i != j)]
 
-    position = {g: i for i, g in enumerate(order)}
-    cliques.sort(key=lambda c: min(position[g] for g in c))
+    cliques.sort(key=lambda c: tuple(sorted(position[g] for g in c)))
 
-    letters: Dict[str, str] = {g: "" for g in order}
+    tokens: Dict[str, List[str]] = {g: [] for g in order}
     for idx, clique in enumerate(cliques):
-        letter = chr(ord("a") + idx)
+        letter = _letter_label(idx)
         for g in clique:
-            letters[g] += letter
-    return letters
+            tokens[g].append(letter)
+
+    # Até 26 cliques mantém a notação acadêmica tradicional (a, ab, bc). Acima disso,
+    # separa rótulos multicaractere para evitar ambiguidade entre, por exemplo, a+aa e aaa.
+    separator = " " if len(cliques) > 26 else ""
+    return {group: separator.join(group_tokens) for group, group_tokens in tokens.items()}
 
 def _regression(ctx: AnalysisContext) -> Optional[Dict[str, Any]]:
     p = ctx.payload
@@ -1303,7 +1321,7 @@ def _pairwise_letters(
         sk_groups.sort(key=lambda grp: min(position[g] for g in grp))
         letters_sk: Dict[str, str] = {}
         for idx, group in enumerate(sk_groups):
-            letter = chr(ord("a") + idx)
+            letter = _letter_label(idx)
             for g in group:
                 letters_sk[g] = letter
         for i, g1 in enumerate(levels):

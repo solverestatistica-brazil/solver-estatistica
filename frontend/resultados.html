@@ -14,7 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <script src="assets/js/theme.js"></script>
   <script src="assets/js/analytics.js?v=20260716-1"></script>
-  <link rel="stylesheet" href="assets/css/styles.css?v=20260716-3" />
+  <link rel="stylesheet" href="assets/css/styles.css?v=20260716-4" />
 </head>
 <body>
 <div class="page-shell">
@@ -243,7 +243,7 @@
           <!-- TAB EXPORTS -->
           <div class="tab" id="tab-exports">
             <div class="export-grid">
-              <button class="export-card" id="downloadPdf" disabled><b>PDF técnico</b><span>Relatório em estilo dashboard para diretoria/laudo.</span></button>
+              <button class="export-card" id="downloadPdf" disabled><b>PDF técnico · A4</b><span>Relatório claro, em retrato, com capa e formatação acadêmica baseada na ABNT.</span></button>
               <button class="export-card" id="downloadExcel" disabled><b>Excel</b><span>ANOVA, médias, pressupostos e rastreabilidade.</span></button>
               <button class="export-card" id="downloadPng" disabled><b>PNG regressão</b><span>Disponível quando a análise contém regressão.</span></button>
               <button class="export-card" id="downloadPlotPdf" disabled><b>PDF vetorial</b><span>Disponível quando a análise contém regressão.</span></button>
@@ -268,10 +268,32 @@
 
 </div>
 
+<div id="processingOverlay" class="processing-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="processingTitle" aria-describedby="processingMessage">
+  <section class="processing-dialog">
+    <div class="processing-orbit" aria-hidden="true"><span></span><i></i></div>
+    <span class="processing-kicker">Solver Engine</span>
+    <h2 id="processingTitle">Processando sua análise</h2>
+    <p id="processingMessage">Validando os dados experimentais…</p>
+    <div id="processingProgress" class="processing-progress" role="progressbar" aria-label="Progresso da análise" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8">
+      <span id="processingProgressBar"></span>
+    </div>
+    <ol id="processingSteps" class="processing-steps">
+      <li data-processing-step="0"><i></i><span>Validar dados</span></li>
+      <li data-processing-step="1"><i></i><span>Montar modelo</span></li>
+      <li data-processing-step="2"><i></i><span>Calcular testes</span></li>
+      <li data-processing-step="3"><i></i><span>Preparar resultados</span></li>
+    </ol>
+    <footer class="processing-footer">
+      <span id="processingElapsed">0,0 s decorridos</span>
+      <button class="btn ghost danger" id="cancelAnalysis" type="button">Cancelar análise</button>
+    </footer>
+  </section>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="assets/js/csv-parser.js"></script>
 <script src="assets/js/config.js"></script>
-<script src="assets/js/app.js?v=20260716-3"></script>
+<script src="assets/js/app.js?v=20260716-4"></script>
 </body>
 </html>

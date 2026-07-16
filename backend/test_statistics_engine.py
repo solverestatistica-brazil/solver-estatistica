@@ -457,6 +457,40 @@ def test_dunnett_nao_usa_letras_compactas():
         assert comp["letters"][t] in {"sig", "ns"}
 
 
+def test_letras_compactas_representam_nao_transitividade_com_ab():
+    """A~B e B~C, mas A!=C: o tratamento intermediário deve receber 'ab'."""
+    from statistics_engine import _assign_letters
+
+    letters = _assign_letters(
+        ["A", "B", "C"],
+        {("A", "B"), ("B", "C")},
+    )
+
+    assert letters == {"A": "a", "B": "ab", "C": "b"}
+
+
+def test_letras_compactas_equivalem_a_todas_as_decisoes_pareadas():
+    """Compartilhar letra deve ser equivalente, par a par, a não diferir no pós-teste."""
+    from statistics_engine import _assign_letters
+
+    order = ["A", "B", "C", "D"]
+    nonsig = {("A", "B"), ("B", "C"), ("B", "D"), ("C", "D")}
+    letters = _assign_letters(order, nonsig)
+
+    for i, first in enumerate(order):
+        for second in order[i + 1:]:
+            shares_letter = bool(set(letters[first]) & set(letters[second]))
+            assert shares_letter is (tuple(sorted((first, second))) in nonsig)
+    assert letters["B"] == "ab"
+    assert letters == _assign_letters(order, nonsig), "o CLD precisa ser determinístico"
+
+
+def test_rotulos_de_grupo_continuam_depois_de_z():
+    from statistics_engine import _letter_label
+
+    assert [_letter_label(i) for i in (0, 25, 26, 27, 51, 52)] == ["a", "z", "aa", "ab", "az", "ba"]
+
+
 def test_scott_knott_agrupa_sem_sobreposicao_de_letras():
     """Scott-Knott nunca da mais de uma letra por tratamento (ao contrario do CLD de Tukey),
     porque particiona em grupos disjuntos."""
