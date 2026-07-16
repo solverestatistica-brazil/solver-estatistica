@@ -53,3 +53,4 @@ jobs:
           node test_processing_ui.cjs
           node test_mobile_ui.cjs
           node test_manual_data.cjs
+          node test_guided_data_flow.cjs

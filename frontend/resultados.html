@@ -14,7 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <script src="assets/js/theme.js"></script>
   <script src="assets/js/analytics.js?v=20260716-1"></script>
-  <link rel="stylesheet" href="assets/css/styles.css?v=20260716-8" />
+  <link rel="stylesheet" href="assets/css/styles.css?v=20260716-9" />
 </head>
 <body>
 <div class="page-shell">
@@ -61,16 +61,21 @@
 
       <div class="workspace">
         <aside class="sidebar" aria-label="Configurações da análise">
-          <button class="side-item active" data-tab="config"><i></i>Configuração</button>
-          <button class="side-item" data-tab="dados"><i></i>Dados</button>
-          <button class="side-item" data-tab="resultados"><i></i>Resultados</button>
-          <button class="side-item" data-tab="exports"><i></i>Exportações</button>
+          <button class="side-item active" data-tab="config"><i>1</i>Configuração</button>
+          <button class="side-item" data-tab="dados"><i>2</i>Dados</button>
+          <button class="side-item" data-tab="resultados"><i>3</i>Resultados</button>
+          <button class="side-item" data-tab="exports"><i>4</i>Exportações</button>
         </aside>
 
         <section class="workarea">
 
           <!-- TAB CONFIG -->
           <div class="tab active" id="tab-config">
+            <header class="guided-header">
+              <span>Etapa 1 de 4</span>
+              <h2>Configure sua análise</h2>
+              <p>Escolha o delineamento e o tipo de análise. O Solver mostrará somente as opções necessárias.</p>
+            </header>
             <div class="form-grid">
               <label>Delineamento
                 <select id="design">
@@ -95,7 +100,7 @@
                   <option value="1">Tipo I · sequencial, depende da ordem</option>
                 </select>
               </label>
-              <label>Teste de médias
+              <label id="comparisonTestWrap">Teste de médias
                 <select id="comparisonTest">
                   <option value="tukey">Tukey</option>
                   <option value="duncan">Duncan</option>
@@ -110,41 +115,20 @@
                   <option value="">Gerar/carregar dados para escolher</option>
                 </select>
               </label>
-              <label>Alfa do pós-teste
+              <label id="alphaModeWrap">Alfa do pós-teste
                 <select id="alphaMode">
                   <option value="auto">Automático · convenção pedagógica (segue o F)</option>
                   <option value="fixed">Fixo (definido ao lado)</option>
                 </select>
               </label>
-              <label>Alfa fixo (só se "Fixo" acima)
+              <label id="alphaValueWrap">Alfa fixo
                 <input id="alphaValue" type="number" step="0.01" min="0.001" max="0.5" value="0.05" />
               </label>
-              <label>Objetivo
+              <label id="goalWrap">Objetivo
                 <select id="goal">
                   <option value="max">Maior resposta é melhor</option>
                   <option value="min">Menor resposta é melhor</option>
                 </select>
-              </label>
-              <label>Coluna resposta
-                <input id="responseColumn" value="valor" />
-              </label>
-              <label>Coluna tratamento
-                <input id="treatmentColumn" value="tratamento" />
-              </label>
-              <label>Coluna bloco
-                <input id="blockColumn" value="bloco" />
-              </label>
-              <label>Coluna linha · DQL
-                <input id="rowColumn" value="linha" />
-              </label>
-              <label>Coluna coluna · DQL
-                <input id="columnColumn" value="coluna" />
-              </label>
-              <label id="factorColumnsWrap">Fatores fatorial/subparcelas
-                <input id="factorColumns" placeholder="Ex.: hibrido,dose" />
-              </label>
-              <label id="numericFactorColumnWrap">Fator numérico / dose
-                <input id="numericFactorColumn" placeholder="Ex.: dose" />
               </label>
               <label id="regressionDegreeWrap">Grau de regressão solicitado
                 <select id="regressionDegree">
@@ -155,38 +139,98 @@
                 </select>
               </label>
             </div>
-            <div class="hint-card">
-              <b>Regra do Solver</b>
-              <p>Sem um grau escolhido manualmente, o backend seleciona automaticamente o maior grau cujo termo de maior ordem é estatisticamente significativo (parcimônia) — não simplesmente o maior R² ajustado, que poderia indicar superajuste. A regressão só é calculada quando há um fator numérico com pelo menos 3 níveis distintos.</p>
+            <details class="advanced-settings">
+              <summary>Nomes das colunas e opções avançadas</summary>
+              <div class="form-grid">
+                <label id="responseColumnWrap">Coluna resposta
+                  <input id="responseColumn" value="valor" />
+                </label>
+                <label id="treatmentColumnWrap">Coluna tratamento
+                  <input id="treatmentColumn" value="tratamento" />
+                </label>
+                <label id="blockColumnWrap">Coluna bloco
+                  <input id="blockColumn" value="bloco" />
+                </label>
+                <label id="rowColumnWrap">Coluna linha · DQL
+                  <input id="rowColumn" value="linha" />
+                </label>
+                <label id="columnColumnWrap">Coluna coluna · DQL
+                  <input id="columnColumn" value="coluna" />
+                </label>
+                <label id="factorColumnsWrap">Nomes dos fatores
+                  <input id="factorColumns" placeholder="Ex.: hibrido,dose" />
+                </label>
+                <label id="numericFactorColumnWrap">Coluna de dose
+                  <input id="numericFactorColumn" placeholder="Ex.: dose" />
+                </label>
+              </div>
+            </details>
+            <div class="hint-card" id="analysisGuidance">
+              <b id="analysisGuidanceTitle">Como os dados serão organizados</b>
+              <p id="analysisGuidanceText"></p>
+            </div>
+            <div class="config-next">
+              <div>
+                <span>Próximo passo</span>
+                <strong id="configSummary">Defina a análise e avance para inserir os dados.</strong>
+              </div>
+              <button class="btn solid" id="goToData" type="button">Continuar para dados →</button>
             </div>
           </div>
 
           <!-- TAB DADOS -->
           <div class="tab" id="tab-dados">
-            <div class="data-actions">
+            <header class="guided-header">
+              <span>Etapa 2 de 4</span>
+              <h2>Como você deseja inserir os dados?</h2>
+              <p id="dataContextSummary">Escolha preenchimento manual ou envie uma planilha pronta.</p>
+            </header>
+            <div class="data-mode-switch" role="tablist" aria-label="Forma de inserir os dados">
+              <button id="manualMode" class="data-mode active" type="button" role="tab" aria-selected="true">Preencher manualmente</button>
+              <button id="uploadMode" class="data-mode" type="button" role="tab" aria-selected="false">Enviar CSV ou Excel</button>
+            </div>
+            <section id="manualDataPanel" class="data-entry-panel">
+              <div class="entry-panel-heading">
+                <span>Preenchimento guiado</span>
+                <h3 id="manualBuilderTitle">Defina o tamanho do experimento</h3>
+                <p id="manualBuilderDescription">Responda aos campos abaixo para gerar uma tabela pronta para preenchimento.</p>
+              </div>
               <div class="manual-builder">
-                <label id="nTreatmentsWrap"><span id="nTreatmentsLabel">Tratamentos</span> <input id="nTreatments" type="number" min="2" value="4"></label>
-                <label>Blocos / Repetições <input id="nBlocks" type="number" min="1" value="4"></label>
-                <label id="factorALevelsWrap">Níveis do fator A <input id="factorALevels" type="number" min="2" value="2"></label>
-                <label id="factorBLevelsWrap">Níveis do fator B <input id="factorBLevels" type="number" min="2" value="2"></label>
-                <button class="btn solid" id="generateTable">Gerar tabela manual</button>
+                <label id="nTreatmentsWrap"><span id="nTreatmentsLabel">Número de tratamentos</span> <input id="nTreatments" type="number" min="2" value="4"></label>
+                <label id="nBlocksWrap"><span id="nBlocksLabel">Número de blocos</span> <input id="nBlocks" type="number" min="1" value="4"></label>
+                <label id="factorALevelsWrap"><span id="factorALevelsLabel">Níveis do fator A</span> <input id="factorALevels" type="number" min="2" value="2"></label>
+                <label id="factorBLevelsWrap"><span id="factorBLevelsLabel">Níveis do fator B</span> <input id="factorBLevels" type="number" min="2" value="2"></label>
+                <button class="btn solid generate-table" id="generateTable" type="button">Gerar tabela para preencher →</button>
+              </div>
+            </section>
+            <section id="uploadDataPanel" class="data-entry-panel hidden">
+              <div class="entry-panel-heading">
+                <span>Importar planilha</span>
+                <h3>Envie seus dados prontos</h3>
+                <p>Use CSV, XLSX ou XLS. O cabeçalho deve corresponder às colunas configuradas.</p>
               </div>
               <div class="upload-box">
-                <label for="fileInput">Upload CSV/XLSX</label>
+                <label for="fileInput">Escolher arquivo</label>
                 <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" />
                 <button class="btn ghost" id="loadExample">Carregar exemplo</button>
               </div>
+            </section>
+            <div id="dataEntryEmpty" class="data-entry-empty">
+              <b>A tabela aparecerá aqui</b>
+              <p>Escolha uma forma de entrada acima. No modo manual, informe o tamanho do experimento e clique em gerar.</p>
             </div>
-            <div class="table-tools">
-              <button class="btn ghost" id="addRow">+ Adicionar linha</button>
-              <button class="btn ghost danger" id="clearRows">Limpar</button>
-              <button class="btn solid" id="runAnalysis">Rodar análise →</button>
+            <div id="dataWorkspace" class="hidden">
+              <div class="table-tools">
+                <button class="btn ghost" id="addRow">+ Adicionar linha</button>
+                <button class="btn ghost danger" id="clearRows">Limpar</button>
+                <button class="btn solid" id="runAnalysis">Rodar análise →</button>
+              </div>
+              <p class="mobile-table-hint">Deslize a planilha para os lados para conferir todas as colunas.</p>
+              <div class="table-wrap">
+                <table id="dataTable" class="data-table" aria-label="Tabela de dados editável"></table>
+              </div>
+              <p class="small-note" id="rowCount">Nenhuma linha carregada.</p>
             </div>
-            <p class="mobile-table-hint">Deslize a planilha para os lados para conferir todas as colunas.</p>
-            <div class="table-wrap">
-              <table id="dataTable" class="data-table" aria-label="Tabela de dados editável"></table>
-            </div>
-            <p class="small-note" id="rowCount">Nenhuma linha carregada.</p>
           </div>
 
           <!-- TAB RESULTADOS -->
@@ -297,6 +341,6 @@
 <script src="assets/js/csv-parser.js"></script>
 <script src="assets/js/manual-data.js?v=20260716-1"></script>
 <script src="assets/js/config.js?v=20260716-1"></script>
-<script src="assets/js/app.js?v=20260716-6"></script>
+<script src="assets/js/app.js?v=20260716-7"></script>
 </body>
 </html>

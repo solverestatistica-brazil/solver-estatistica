@@ -62,7 +62,7 @@
     apiInput.value = savedApi || window.SOLVER_API_BASE_URL || '';
     bindTabs();
     bindActions();
-    generateManualTable();
+    resetDataEntry();
     testApi(false);
   }
 
@@ -94,13 +94,11 @@
     $('downloadExcel').addEventListener('click', () => downloadExport('/api/export/excel', 'solver-resultados.xlsx'));
     $('downloadPng').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png'));
     $('downloadPlotPdf').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf'));
-    $('design')?.addEventListener('change', generateManualTable);
-    $('analysisType')?.addEventListener('change', () => {
-      updateAnalysisConfiguration();
-      updateFactorLevelsVisibility();
-      updateSumSquaresVisibility();
-      generateManualTable();
-    });
+    $('design')?.addEventListener('change', handleConfigurationChange);
+    $('analysisType')?.addEventListener('change', handleConfigurationChange);
+    $('manualMode')?.addEventListener('click', () => setDataMode('manual'));
+    $('uploadMode')?.addEventListener('click', () => setDataMode('upload'));
+    $('goToData')?.addEventListener('click', goToDataEntry);
     $('comparisonTest').addEventListener('change', updateControlGroupVisibility);
     $('alphaMode').addEventListener('change', updateAlphaValueState);
     $('treatmentColumn').addEventListener('change', updateControlGroupOptions);
@@ -112,23 +110,77 @@
     updateExportAvailability(false, false);
   }
 
+  function handleConfigurationChange() {
+    updateAnalysisConfiguration();
+    updateFactorLevelsVisibility();
+    updateSumSquaresVisibility();
+    updateControlGroupVisibility();
+    resetDataEntry();
+  }
+
+  function setDataMode(mode) {
+    const isManual = mode !== 'upload';
+    $('manualDataPanel')?.classList.toggle('hidden', !isManual);
+    $('uploadDataPanel')?.classList.toggle('hidden', isManual);
+    $('manualMode')?.classList.toggle('active', isManual);
+    $('uploadMode')?.classList.toggle('active', !isManual);
+    $('manualMode')?.setAttribute('aria-selected', String(isManual));
+    $('uploadMode')?.setAttribute('aria-selected', String(!isManual));
+  }
+
+  function goToDataEntry() {
+    updateFactorLevelsVisibility();
+    setDataMode('manual');
+    openTab('dados');
+    const firstInput = document.querySelector('#manualDataPanel label:not([style*="display: none"]) input');
+    firstInput?.focus();
+  }
+
   function updateControlGroupVisibility() {
     const wrap = $('controlGroupWrap');
     if (!wrap) return;
-    wrap.style.display = $('comparisonTest').value === 'dunnett' ? '' : 'none';
+    wrap.style.display = $('analysisType').value !== 'regression' && $('comparisonTest').value === 'dunnett' ? '' : 'none';
   }
 
   function updateFactorLevelsVisibility() {
     const analysisType = $('analysisType').value;
     const isFactorial = ['factorial', 'split_plot'].includes(analysisType);
+    const design = $('design').value;
     if ($('nTreatmentsWrap')) $('nTreatmentsWrap').style.display = isFactorial ? 'none' : '';
+    if ($('nBlocksWrap')) $('nBlocksWrap').style.display = design === 'DQL' ? 'none' : '';
     if ($('nTreatmentsLabel')) {
-      $('nTreatmentsLabel').textContent = analysisType === 'regression' ? 'Níveis de dose' : 'Tratamentos';
+      $('nTreatmentsLabel').textContent = analysisType === 'regression' ? 'Número de doses' : 'Número de tratamentos';
     }
+    const blockLabels = {
+      regression: 'Repetições por dose',
+      factorial: design === 'DBC' ? 'Número de blocos' : 'Repetições por combinação',
+      split_plot: 'Número de blocos',
+      single: design === 'DBC' ? 'Número de blocos' : 'Repetições por tratamento'
+    };
+    if ($('nBlocksLabel')) $('nBlocksLabel').textContent = blockLabels[analysisType] || 'Repetições';
+    if ($('factorALevelsLabel')) $('factorALevelsLabel').textContent = analysisType === 'split_plot' ? 'Níveis do fator A · parcela' : 'Níveis do fator A';
+    if ($('factorBLevelsLabel')) $('factorBLevelsLabel').textContent = analysisType === 'split_plot' ? 'Níveis do fator B · subparcela' : 'Níveis do fator B';
     ['factorALevelsWrap', 'factorBLevelsWrap'].forEach((id) => {
       const wrap = $(id);
       if (wrap) wrap.style.display = isFactorial ? '' : 'none';
     });
+
+    const titles = {
+      single: design === 'DQL' ? 'Informe a ordem do quadrado latino' : 'Defina tratamentos e repetições',
+      factorial: 'Defina os níveis dos dois fatores',
+      split_plot: 'Defina blocos, parcelas e subparcelas',
+      regression: 'Defina as doses e repetições'
+    };
+    const descriptions = {
+      single: design === 'DQL'
+        ? 'O número de tratamentos também define o número de linhas e colunas do quadrado.'
+        : 'A tabela será montada com uma linha para cada tratamento em cada repetição ou bloco.',
+      factorial: 'O Solver criará todas as combinações entre os níveis A e B em cada repetição ou bloco.',
+      split_plot: 'Em cada bloco, o fator A representa as parcelas e o fator B representa as subparcelas.',
+      regression: 'O Solver criará doses igualmente espaçadas; você poderá editar os valores diretamente na tabela.'
+    };
+    if ($('manualBuilderTitle')) $('manualBuilderTitle').textContent = titles[analysisType] || '';
+    if ($('manualBuilderDescription')) $('manualBuilderDescription').textContent = descriptions[analysisType] || '';
   }
 
   function updateSumSquaresVisibility() {
@@ -146,12 +198,18 @@
       option.disabled = !allowed.includes(option.value);
     });
     if (!allowed.includes(design.value)) design.value = allowed[0];
+    const selectedDesign = design.value;
 
     if (isFactorial && !$('factorColumns').value.trim()) $('factorColumns').value = 'fator_a,fator_b';
     if (isRegression && !$('numericFactorColumn').value.trim()) $('numericFactorColumn').value = 'dose';
+    if ($('comparisonTestWrap')) $('comparisonTestWrap').style.display = isRegression ? 'none' : '';
     if ($('factorColumnsWrap')) $('factorColumnsWrap').style.display = isFactorial ? '' : 'none';
     if ($('numericFactorColumnWrap')) $('numericFactorColumnWrap').style.display = isRegression ? '' : 'none';
     if ($('regressionDegreeWrap')) $('regressionDegreeWrap').style.display = isRegression ? '' : 'none';
+    if ($('treatmentColumnWrap')) $('treatmentColumnWrap').style.display = analysisType === 'single' ? '' : 'none';
+    if ($('blockColumnWrap')) $('blockColumnWrap').style.display = selectedDesign === 'DBC' ? '' : 'none';
+    if ($('rowColumnWrap')) $('rowColumnWrap').style.display = selectedDesign === 'DQL' ? '' : 'none';
+    if ($('columnColumnWrap')) $('columnColumnWrap').style.display = selectedDesign === 'DQL' ? '' : 'none';
 
     const notes = {
       single: 'DIC, DBC e DQL disponíveis para análise simples.',
@@ -160,12 +218,32 @@
       regression: 'Regressão direta manual usa DIC e uma coluna numérica de doses.'
     };
     if ($('designCompatibilityNote')) $('designCompatibilityNote').textContent = notes[analysisType] || '';
+
+    const analysisLabels = {
+      single: 'Fator único', factorial: 'Fatorial', split_plot: 'Parcelas subdivididas', regression: 'Regressão direta'
+    };
+    const guidance = {
+      single: selectedDesign === 'DQL'
+        ? ['Estrutura do quadrado latino', 'O número de tratamentos determinará também o número de linhas e colunas.']
+        : ['Estrutura do experimento', selectedDesign === 'DBC' ? 'Cada bloco conterá todos os tratamentos uma vez.' : 'Cada tratamento será repetido sem a formação de blocos.'],
+      factorial: ['Combinações dos fatores', `Todas as combinações entre A e B serão geradas em cada ${selectedDesign === 'DBC' ? 'bloco' : 'repetição'}.`],
+      split_plot: ['Parcelas e subparcelas', 'O fator A será tratado como parcela e o fator B como subparcela dentro de cada bloco.'],
+      regression: ['Níveis de dose', 'Informe pelo menos três doses. Sem grau fixo, o Solver seleciona o modelo significativo mais parcimonioso.']
+    };
+    const [guidanceTitle, guidanceText] = guidance[analysisType] || ['', ''];
+    if ($('analysisGuidanceTitle')) $('analysisGuidanceTitle').textContent = guidanceTitle;
+    if ($('analysisGuidanceText')) $('analysisGuidanceText').textContent = guidanceText;
+    const summary = `${selectedDesign} · ${analysisLabels[analysisType] || analysisType}`;
+    if ($('configSummary')) $('configSummary').textContent = summary;
+    if ($('dataContextSummary')) $('dataContextSummary').textContent = `${summary}. Escolha como deseja informar os dados.`;
   }
 
   function updateAlphaValueState() {
     const input = $('alphaValue');
     if (!input) return;
-    input.disabled = $('alphaMode').value !== 'fixed';
+    const isFixed = $('alphaMode').value === 'fixed';
+    input.disabled = !isFixed;
+    if ($('alphaValueWrap')) $('alphaValueWrap').style.display = isFixed ? '' : 'none';
   }
 
   function updateControlGroupOptions() {
@@ -311,6 +389,17 @@
     document.querySelector('main')?.removeAttribute('aria-busy');
   }
 
+  function resetDataEntry() {
+    currentResult = null;
+    currentHeaders = [];
+    dataTable.innerHTML = '';
+    $('dataWorkspace')?.classList.add('hidden');
+    $('dataEntryEmpty')?.classList.remove('hidden');
+    if ($('rowCount')) $('rowCount').textContent = 'Nenhuma linha carregada.';
+    updateControlGroupOptions();
+    updateExportAvailability(false, false);
+  }
+
   function generateManualTable() {
     try {
       if (!window.SolverManualData) throw new Error('Gerador manual não carregado. Atualize a página e tente novamente.');
@@ -340,6 +429,8 @@
     updateExportAvailability(false, false);
     currentHeaders = unique(headers);
     dataTable.innerHTML = '';
+    $('dataWorkspace')?.classList.remove('hidden');
+    $('dataEntryEmpty')?.classList.add('hidden');
     const thead = document.createElement('thead');
     const trh = document.createElement('tr');
     currentHeaders.forEach((h) => {
@@ -838,6 +929,9 @@
     $('responseColumn').value = 'valor';
     $('treatmentColumn').value = 'tratamento';
     $('blockColumn').value = 'bloco';
+    updateAnalysisConfiguration();
+    updateFactorLevelsVisibility();
+    updateSumSquaresVisibility();
     try {
       const response = await fetchWithTimeout('assets/data/dbc_exemplo.json', {}, 15000);
       if (!response.ok) throw new Error('Não foi possível carregar o exemplo oficial.');
