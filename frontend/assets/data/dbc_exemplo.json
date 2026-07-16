@@ -1,0 +1,18 @@
+[
+  {"bloco":"B1","tratamento":"T1","valor":52.4},
+  {"bloco":"B1","tratamento":"T2","valor":54.6},
+  {"bloco":"B1","tratamento":"T3","valor":60.9},
+  {"bloco":"B1","tratamento":"T4","valor":58.0},
+  {"bloco":"B2","tratamento":"T1","valor":56.6},
+  {"bloco":"B2","tratamento":"T2","valor":57.3},
+  {"bloco":"B2","tratamento":"T3","valor":72.0},
+  {"bloco":"B2","tratamento":"T4","valor":54.5},
+  {"bloco":"B3","tratamento":"T1","valor":59.6},
+  {"bloco":"B3","tratamento":"T2","valor":59.0},
+  {"bloco":"B3","tratamento":"T3","valor":80.9},
+  {"bloco":"B3","tratamento":"T4","valor":59.7},
+  {"bloco":"B4","tratamento":"T1","valor":61.6},
+  {"bloco":"B4","tratamento":"T2","valor":59.6},
+  {"bloco":"B4","tratamento":"T3","valor":77.5},
+  {"bloco":"B4","tratamento":"T4","valor":67.6}
+]
