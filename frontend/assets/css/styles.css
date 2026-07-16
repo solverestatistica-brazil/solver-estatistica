@@ -362,7 +362,7 @@ h1 em{font-style:normal;font-weight:700;color:var(--brand)}
   color:var(--text-d2);text-transform:uppercase;letter-spacing:.04em;
 }
 .form-grid input,.form-grid select,.manual-builder input,.status-bar input{
-  width:100%;border:1px solid var(--border);background:var(--canvas);color:var(--text-d1);
+  width:100%;border:1px solid var(--border);background-color:var(--canvas);color:var(--text-d1);
   border-radius:var(--radius-sm);padding:10px 12px;outline:none;
   font-family:var(--font-text);font-size:13.5px;transition:.15s;
 }
@@ -371,7 +371,7 @@ h1 em{font-style:normal;font-weight:700;color:var(--brand)}
 select{
   appearance:none;-webkit-appearance:none;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23A3A3A3' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
-  background-repeat:no-repeat;background-position:right 12px center;padding-right:32px;
+  background-repeat:no-repeat;background-position:right 12px center;background-size:12px 12px;padding-right:32px;
 }
 :root[data-theme="light"] select{
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2352635A' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
