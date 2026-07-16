@@ -1,4 +1,4 @@
-/* Solver Frontend — v2 (dark bento). Preserva contratos do backend. */
+/* Solver Frontend — v3 (light bento). Preserva contratos do backend. */
 (() => {
   const $ = (id) => document.getElementById(id);
   const apiInput = $('apiBase');
@@ -8,13 +8,13 @@
   let currentResult = null;
   let regressionChart = null;
 
-  // paleta v2
-  const COLOR_BRAND = '#22C55E';
-  const COLOR_BRAND_HI = '#4ADE80';
-  const COLOR_ACCENT = '#F5A85B';
-  const COLOR_TEXT_D1 = '#F5F5F5';
-  const COLOR_TEXT_D2 = '#A3A3A3';
-  const COLOR_BORDER = 'rgba(255,255,255,.08)';
+  // paleta v3
+  const COLOR_BRAND = '#197341';
+  const COLOR_BRAND_HI = '#218A4E';
+  const COLOR_ACCENT = '#A6531D';
+  const COLOR_TEXT_D1 = '#102017';
+  const COLOR_TEXT_D2 = '#52635A';
+  const COLOR_BORDER = 'rgba(15,31,20,.11)';
   const MAX_FILE_BYTES = 5 * 1024 * 1024;
   const MAX_DATA_ROWS = 10000;
   const API_TIMEOUT_MS = 60000;
@@ -148,17 +148,17 @@
       position: 'fixed', right: '18px', bottom: '18px', zIndex: '50',
       maxWidth: '360px', padding: '12px 14px', borderRadius: '12px',
       fontFamily: "'Open Sans', sans-serif", fontSize: '12.5px', fontWeight: '600',
-      boxShadow: '0 18px 40px rgba(0,0,0,.5)', border: '1px solid ' + COLOR_BORDER,
+      boxShadow: '0 18px 40px rgba(34,64,45,.18)', border: '1px solid ' + COLOR_BORDER,
       backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
     });
     if (type === 'error') {
-      div.style.color = '#FCA5A5';
-      div.style.background = 'rgba(239,68,68,.14)';
-      div.style.borderColor = 'rgba(239,68,68,.35)';
+      div.style.color = '#B42318';
+      div.style.background = '#FFF4F2';
+      div.style.borderColor = 'rgba(180,35,24,.25)';
     } else {
       div.style.color = COLOR_BRAND;
-      div.style.background = 'rgba(34,197,94,.14)';
-      div.style.borderColor = 'rgba(34,197,94,.35)';
+      div.style.background = '#EFF8F1';
+      div.style.borderColor = 'rgba(25,115,65,.30)';
     }
     document.body.appendChild(div);
     setTimeout(() => div.remove(), 4200);
@@ -428,9 +428,9 @@
             display: 'inline-block', padding: '3px 10px', borderRadius: '999px',
             fontFamily: "'JetBrains Mono', monospace", fontSize: '10.5px', fontWeight: '600',
           });
-          if (val === '1%') { badge.style.background = 'rgba(34,197,94,.14)'; badge.style.color = COLOR_BRAND; badge.style.border = '1px solid rgba(34,197,94,.35)'; }
-          else if (val === '5%') { badge.style.background = 'rgba(245,168,91,.14)'; badge.style.color = COLOR_ACCENT; badge.style.border = '1px solid rgba(245,168,91,.35)'; }
-          else { badge.style.background = 'rgba(255,255,255,.05)'; badge.style.color = COLOR_TEXT_D2; badge.style.border = '1px solid ' + COLOR_BORDER; }
+          if (val === '1%') { badge.style.background = 'rgba(25,115,65,.10)'; badge.style.color = COLOR_BRAND; badge.style.border = '1px solid rgba(25,115,65,.30)'; }
+          else if (val === '5%') { badge.style.background = 'rgba(166,83,29,.11)'; badge.style.color = COLOR_ACCENT; badge.style.border = '1px solid rgba(166,83,29,.28)'; }
+          else { badge.style.background = 'rgba(15,31,20,.05)'; badge.style.color = COLOR_TEXT_D2; badge.style.border = '1px solid ' + COLOR_BORDER; }
           td.textContent = '';
           td.appendChild(badge);
         }
