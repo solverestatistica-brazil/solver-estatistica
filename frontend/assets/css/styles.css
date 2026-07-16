@@ -402,6 +402,7 @@ select{
 .upload-box input[type=file]::file-selector-button:hover{border-color:var(--brand);color:var(--brand)}
 
 .table-tools{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.mobile-table-hint{display:none}
 
 /* ============ TABLES ============ */
 .table-wrap{
@@ -608,6 +609,61 @@ body.is-processing{overflow:hidden}
   .btn:not(.nav-actions .btn){width:100%}
   .upload-box{align-items:flex-start;flex-direction:column}
   .nav-actions .btn.ghost:not(.theme-toggle){display:none}
+
+  /* Controles confortáveis ao toque e sem zoom automático no iOS. */
+  .btn,.side-item{min-height:44px}
+  .form-grid input,.form-grid select,.manual-builder input,.status-bar input{font-size:16px}
+  .upload-box input[type=file]{width:100%;max-width:100%;font-size:14px}
+  .workarea{padding:14px}
+  .result-box{padding:14px}
+  .processing-dialog{width:100%;max-width:100%;min-width:0;max-height:calc(100dvh - 24px);overflow-y:auto}
+  .processing-dialog h2{font-size:22px;line-height:1.2;overflow-wrap:anywhere}
+  .processing-steps,.processing-steps li,.processing-steps li span{min-width:0}
+  .processing-steps li span{overflow-wrap:anywhere}
+  .footer nav{width:100%;justify-content:space-between;gap:10px}
+
+  /* A entrada continua em formato de planilha; a primeira coluna permanece visível. */
+  .mobile-table-hint{
+    display:flex;align-items:center;gap:7px;margin:0 0 9px;color:var(--text-d3);
+    font:600 10.5px var(--font-mono);letter-spacing:.02em;
+  }
+  .mobile-table-hint::before{content:"↔";color:var(--brand);font-size:15px}
+  #tab-dados > .table-wrap{-webkit-overflow-scrolling:touch;scrollbar-color:var(--brand) var(--canvas)}
+  .data-table{width:max-content;min-width:100%}
+  .data-table th:first-child{position:sticky;left:0;z-index:3;background:var(--canvas-elevated-2)}
+  .data-table td:first-child{position:sticky;left:0;z-index:1;background:var(--canvas)}
+
+  /* Resultados largos viram cartões somente no celular; o desktop segue tabular. */
+  .result-box .table-wrap{overflow:visible;border:0;background:transparent;border-radius:0}
+  .result-box .table-wrap.compact{max-height:none}
+  .result-table{display:block;width:100%;font-size:13px!important}
+  .result-table thead{
+    position:absolute!important;width:1px!important;height:1px!important;padding:0!important;
+    margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;
+    white-space:nowrap!important;border:0!important;
+  }
+  .result-table tbody{display:block;width:100%}
+  .result-table tbody tr{
+    display:block;width:100%;margin:0 0 12px;overflow:hidden;
+    border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--canvas);
+  }
+  .result-table tbody tr:last-child{margin-bottom:0}
+  .result-table tbody td,.result-table tbody td:last-child{
+    display:grid;grid-template-columns:minmax(94px,38%) minmax(0,1fr);align-items:start;gap:12px;
+    width:100%;padding:10px 12px!important;border-bottom:1px solid var(--border);
+    color:var(--text-d1);font:500 12.5px/1.5 var(--font-text);text-align:right;
+    overflow-wrap:anywhere;word-break:normal;
+  }
+  .result-table tbody td::before{
+    content:attr(data-label);color:var(--text-d3);font:700 9.5px/1.5 var(--font-heading);
+    letter-spacing:.05em;text-transform:uppercase;text-align:left;
+  }
+  .result-table tbody td:last-child{border-bottom:0}
+  .result-table tbody td > span{justify-self:end}
+  .result-table tbody td[data-label="Mensagem"]{
+    grid-template-columns:1fr;gap:6px;text-align:left;line-height:1.6;
+  }
+  #regressionChart{max-width:100%;min-height:220px}
 }
 
 @media (prefers-reduced-motion:reduce){

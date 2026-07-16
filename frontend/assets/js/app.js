@@ -363,10 +363,12 @@
     currentHeaders.forEach((h) => {
       const th = document.createElement('th');
       th.textContent = h;
+      th.scope = 'col';
       trh.appendChild(th);
     });
     const actionTh = document.createElement('th');
     actionTh.textContent = 'Ações';
+    actionTh.scope = 'col';
     trh.appendChild(actionTh);
     thead.appendChild(trh);
     dataTable.appendChild(thead);
@@ -537,6 +539,7 @@
     columns.forEach((c) => {
       const th = document.createElement('th');
       th.textContent = labelFor(c);
+      th.scope = 'col';
       trh.appendChild(th);
     });
     thead.appendChild(trh);
@@ -546,6 +549,7 @@
       const tr = document.createElement('tr');
       columns.forEach((c) => {
         const td = document.createElement('td');
+        td.dataset.label = labelFor(c);
         const val = row[c];
         td.textContent = val == null ? '—' : (typeof val === 'number' ? format(val) : val);
         if (sigColumn && c === sigColumn) {
