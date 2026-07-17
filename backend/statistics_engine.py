@@ -261,10 +261,28 @@ def _prepare_context(payload: Dict[str, Any]) -> AnalysisContext:
         raise ValueError("Tipo de soma de quadrados inválido. Use 1, 2 ou 3.")
     payload["sum_squares_type"] = sum_squares_type
 
+    requested_factors = [c for c in (payload.get("factor_columns") or []) if str(c).strip()]
     factor_columns = _dedupe_keep_order([
-        _resolve_column_name(df.columns, c)
-        for c in (payload.get("factor_columns") or []) if str(c).strip()
+        _resolve_column_name(
+            df.columns,
+            column,
+            (("fator_a", "factor_a", "a") if index == 0 else
+             ("fator_b", "factor_b", "b") if index == 1 else ()),
+        )
+        for index, column in enumerate(requested_factors)
     ])
+    if analysis_type in {"factorial", "split_plot"} and len(factor_columns) == 2:
+        if not all(column in df.columns for column in factor_columns):
+            reserved = {
+                response,
+                treatment,
+                payload.get("block_column") or "bloco",
+                payload.get("row_column") or "linha",
+                payload.get("column_column") or "coluna",
+            }
+            candidates = [column for column in df.columns if column not in reserved]
+            if len(candidates) == 2:
+                factor_columns = candidates
     payload["factor_columns"] = factor_columns
 
     required = [response]
