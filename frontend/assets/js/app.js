@@ -556,6 +556,7 @@
       regression_degree: degree ? Number(degree) : null,
       goal: $('goal').value,
       alpha: Number($('alphaValue').value) || 0.05,
+      author_name: $('authorName')?.value.trim() || null,
       data: tableToRows()
     };
   }

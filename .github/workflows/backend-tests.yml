@@ -60,3 +60,4 @@ jobs:
           node test_column_mapping.cjs
           node test_contextual_examples.cjs
           node test_safe_interpretation.cjs
+          node test_author_name.cjs

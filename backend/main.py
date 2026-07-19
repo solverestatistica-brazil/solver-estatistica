@@ -51,6 +51,7 @@ class AnalyzePayload(BaseModel):
     regression_degree: Optional[int] = None
     sum_squares_type: int = Field(2, ge=1, le=3)
     goal: str = "max"
+    author_name: Optional[str] = Field(default=None, max_length=80, description="Nome exibido na capa do laudo em PDF. Vazio = laudo sem nome pessoal.")
     alpha_mode: str = Field(
         "auto",
         description=(

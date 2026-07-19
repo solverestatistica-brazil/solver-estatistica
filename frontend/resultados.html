@@ -319,6 +319,12 @@
 
           <!-- TAB EXPORTS -->
           <div class="tab" id="tab-exports" role="tabpanel" aria-labelledby="tab-exports-btn" tabindex="-1">
+            <div class="author-field">
+              <label for="authorName">Nome que assina o laudo (aparece na capa do PDF)
+                <input id="authorName" type="text" maxlength="80" placeholder="Ex.: Maria Souza — Eng. Agrônoma" autocomplete="name" />
+              </label>
+              <p class="small-note">Deixe em branco para gerar o laudo sem nome pessoal.</p>
+            </div>
             <div class="export-grid">
               <button class="export-card" id="downloadPdf" disabled><b>PDF técnico · A4</b><span>Relatório claro, em retrato, com capa e formatação acadêmica baseada na ABNT.</span></button>
               <button class="export-card" id="downloadExcel" disabled><b>Excel</b><span>ANOVA, médias, pressupostos e rastreabilidade.</span></button>
