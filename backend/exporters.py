@@ -369,6 +369,8 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     """Gera relatório claro em A4 retrato, com capa e margens acadêmicas."""
     result = analyze(payload)
     provenance = result.get("provenance") or build_provenance(payload)
+    _NEUTRAL_AUTHOR = "Relatório gerado pelo Solver Estatística"
+    _author_display = (str(payload.get("author_name") or "").strip()[:80]) or _NEUTRAL_AUTHOR
     buffer = io.BytesIO()
     page_size = A4
     doc = BaseDocTemplate(
@@ -380,7 +382,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         topMargin=3.0 * cm,
         bottomMargin=2.0 * cm,
         title="Relatório Solver Estatística",
-        author="Fernando Paes Lorena",
+        author=_author_display,
         subject="Relatório de análise estatística experimental",
     )
     doc.engine_version = provenance.get("engine_version", "—")
@@ -444,7 +446,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
 
     story: List[Any] = [
         Spacer(1, 4.5 * cm),
-        Paragraph("Fernando Paes Lorena", cover_author),
+        Paragraph(escape(_author_display), cover_author),
         Spacer(1, 4.0 * cm),
         Paragraph("RELATÓRIO ESTATÍSTICO", cover_title),
         Paragraph(

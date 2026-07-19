@@ -33,7 +33,8 @@ def test_pdf_contem_resultados_e_proveniencia():
 
     cover_text = first_page.extract_text() or ""
     assert "RELATÓRIO ESTATÍSTICO" in cover_text
-    assert "Fernando Paes Lorena" in cover_text
+    assert "Relatório gerado pelo Solver Estatística" in cover_text
+    assert "Fernando Paes Lorena" not in cover_text
     assert "Página" not in cover_text
 
     body_text = "\n".join(page.extract_text() or "" for page in reader.pages[1:])
@@ -45,6 +46,24 @@ def test_pdf_contem_resultados_e_proveniencia():
             "SHA-256 dos dados", "Soma de quadrados",
     ):
         assert expected.upper() in text.upper()
+
+
+def test_pdf_usa_nome_do_autor_informado():
+    payload = {**PAYLOAD, "author_name": "Maria Souza"}
+    pdf = build_pdf(payload)
+    reader = PdfReader(io.BytesIO(pdf))
+    cover_text = reader.pages[0].extract_text() or ""
+    assert "Maria Souza" in cover_text
+    assert reader.metadata.author == "Maria Souza"
+    assert "Relatório gerado pelo Solver Estatística" not in cover_text
+
+
+def test_pdf_sem_nome_nao_vaza_nome_pessoal_padrao():
+    pdf = build_pdf(PAYLOAD)
+    reader = PdfReader(io.BytesIO(pdf))
+    cover_text = reader.pages[0].extract_text() or ""
+    assert "Fernando Paes Lorena" not in cover_text
+    assert reader.metadata.author == "Relatório gerado pelo Solver Estatística"
 
 
 def test_excel_contem_planilhas_tecnicas_e_dados_de_entrada():
