@@ -39,4 +39,11 @@ assert.match(css, /\.data-mode-switch/, 'a escolha de entrada precisa de apresen
 assert.match(css, /\.data-entry-empty/, 'a interface precisa explicar onde a tabela aparecerá');
 assert.match(css, /\.advanced-settings/, 'opções técnicas precisam ficar recolhidas');
 
+// Gating acessível do fluxo guiado (P1): abas Resultados/Exportações bloqueadas até haver resultado.
+assert.match(html, /id="tab-resultados-btn"[^>]*aria-disabled="true"/, 'aba Resultados deve iniciar desabilitada');
+assert.match(html, /id="tab-exports-btn"[^>]*aria-disabled="true"/, 'aba Exportações deve iniciar desabilitada');
+assert.match(js, /function updateStepAvailability\(\)/, 'updateStepAvailability ausente');
+assert.match(js, /getAttribute\('aria-disabled'\) === 'true'/, 'cliques em abas bloqueadas devem ser barrados');
+assert.match(js, /openTab\('resultados'\)/, 'a análise concluída deve abrir a aba de resultados');
+
 console.log('Fluxo guiado: configuração contextual, avanço, manual e upload aprovados');

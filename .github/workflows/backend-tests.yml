@@ -54,3 +54,9 @@ jobs:
           node test_mobile_ui.cjs
           node test_manual_data.cjs
           node test_guided_data_flow.cjs
+          node test_data_loss_guard.cjs
+          node test_prevalidation.cjs
+          node test_a11y.cjs
+          node test_column_mapping.cjs
+          node test_contextual_examples.cjs
+          node test_safe_interpretation.cjs

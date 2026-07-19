@@ -14,7 +14,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700;800&family=Open+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   <script src="assets/js/theme.js"></script>
   <script src="assets/js/analytics.js?v=20260716-1"></script>
-  <link rel="stylesheet" href="assets/css/styles.css?v=20260716-9" />
+  <link rel="stylesheet" href="assets/css/styles.css?v=20260719" />
 </head>
 <body>
 <div class="page-shell">
@@ -59,18 +59,36 @@
         <span id="apiStatus" class="status-pill">Verificando disponibilidade</span>
       </div>
 
+      <div id="liveRegion" class="sr-only" role="status" aria-live="polite"></div>
+
+      <div id="validationPanel" class="validation-panel hidden" role="alert" aria-live="assertive">
+        <div class="validation-head">
+          <b>Corrija estes pontos antes de analisar</b>
+          <button type="button" id="dismissValidation" class="btn ghost" aria-label="Fechar avisos de validação">Fechar</button>
+        </div>
+        <ul id="validationList" class="validation-list"></ul>
+      </div>
+
+      <div id="draftBanner" class="draft-banner hidden" role="region" aria-label="Rascunho salvo">
+        <span>Encontramos dados não analisados da sua sessão anterior neste navegador.</span>
+        <span class="draft-actions">
+          <button type="button" id="restoreDraft" class="btn solid">Restaurar rascunho</button>
+          <button type="button" id="discardDraft" class="btn ghost">Descartar</button>
+        </span>
+      </div>
+
       <div class="workspace">
-        <aside class="sidebar" aria-label="Configurações da análise">
-          <button class="side-item active" data-tab="config"><i>1</i>Configuração</button>
-          <button class="side-item" data-tab="dados"><i>2</i>Dados</button>
-          <button class="side-item" data-tab="resultados"><i>3</i>Resultados</button>
-          <button class="side-item" data-tab="exports"><i>4</i>Exportações</button>
+        <aside class="sidebar" role="tablist" aria-label="Etapas da análise">
+          <button class="side-item active" data-tab="config" role="tab" id="tab-config-btn" aria-controls="tab-config" aria-selected="true"><i>1</i>Configuração</button>
+          <button class="side-item" data-tab="dados" role="tab" id="tab-dados-btn" aria-controls="tab-dados" aria-selected="false"><i>2</i>Dados</button>
+          <button class="side-item" data-tab="resultados" role="tab" id="tab-resultados-btn" aria-controls="tab-resultados" aria-selected="false" aria-disabled="true"><i>3</i>Resultados</button>
+          <button class="side-item" data-tab="exports" role="tab" id="tab-exports-btn" aria-controls="tab-exports" aria-selected="false" aria-disabled="true"><i>4</i>Exportações</button>
         </aside>
 
         <section class="workarea">
 
           <!-- TAB CONFIG -->
-          <div class="tab active" id="tab-config">
+          <div class="tab active" id="tab-config" role="tabpanel" aria-labelledby="tab-config-btn" tabindex="-1">
             <header class="guided-header">
               <span>Etapa 1 de 4</span>
               <h2>Configure sua análise</h2>
@@ -179,7 +197,7 @@
           </div>
 
           <!-- TAB DADOS -->
-          <div class="tab" id="tab-dados">
+          <div class="tab" id="tab-dados" role="tabpanel" aria-labelledby="tab-dados-btn" tabindex="-1">
             <header class="guided-header">
               <span>Etapa 2 de 4</span>
               <h2>Como você deseja inserir os dados?</h2>
@@ -214,6 +232,14 @@
                 <input id="fileInput" type="file" accept=".csv,.xlsx,.xls" />
                 <button class="btn ghost" id="loadExample">Carregar exemplo</button>
               </div>
+              <div id="mappingPanel" class="mapping-panel hidden">
+                <div class="entry-panel-heading">
+                  <span>Conferência de colunas</span>
+                  <h3>Confirme o papel de cada coluna</h3>
+                  <p>Detectamos as colunas automaticamente. Ajuste apenas se algo estiver incorreto — nenhum passo é obrigatório.</p>
+                </div>
+                <div id="mappingFields" class="mapping-fields"></div>
+              </div>
             </section>
             <div id="dataEntryEmpty" class="data-entry-empty">
               <b>A tabela aparecerá aqui</b>
@@ -234,24 +260,27 @@
           </div>
 
           <!-- TAB RESULTADOS -->
-          <div class="tab" id="tab-resultados">
+          <div class="tab" id="tab-resultados" role="tabpanel" aria-labelledby="tab-resultados-btn" tabindex="-1">
             <div id="emptyResults" class="empty-state">
               <b>Sem resultado ainda</b>
               <p>Volte à aba "Dados", gere ou carregue os valores e clique em "Rodar análise".</p>
             </div>
             <div id="results" class="results hidden">
+              <div id="interpretationCaveat" class="caveat-banner hidden" role="note"></div>
               <div class="result-cards">
-                <article><span>CV experimental</span><strong id="resCv">—</strong><em id="resCvLabel">—</em></article>
+                <article><span><abbr title="Coeficiente de variação: mede a dispersão relativa do experimento. Valores mais altos indicam maior variabilidade e menor precisão.">CV experimental</abbr></span><strong id="resCv">—</strong><em id="resCvLabel">—</em></article>
                 <article><span>Linhas analisadas</span><strong id="resRows">—</strong><em>Observações</em></article>
                 <article><span>Melhor tratamento</span><strong id="resBest">—</strong><em id="resBestMean">—</em></article>
               </div>
               <div class="grid-two">
                 <section class="result-box">
                   <h3>Quadro de ANOVA · Teste F</h3>
+                  <p class="small-note tip-note">A coluna <abbr title="Probabilidade de observar um efeito tão ou mais extremo caso não houvesse diferença real. Valores baixos (ex.: abaixo de 0,05) indicam evidência estatística, não prova de causa.">p</abbr> e a coluna de significância indicam evidência estatística, não a magnitude prática do efeito.</p>
                   <div class="table-wrap compact"><table id="anovaTable" class="result-table"></table></div>
                 </section>
                 <section class="result-box">
                   <h3>Médias e grupos</h3>
+                  <p class="small-note tip-note">Tratamentos que compartilham a mesma letra não diferem estatisticamente pelo teste de médias escolhido.</p>
                   <div class="table-wrap compact"><table id="meansTable" class="result-table"></table></div>
                   <p class="small-note" id="comparisonNote"></p>
                 </section>
@@ -259,7 +288,8 @@
               <section class="result-box" id="regressionBox">
                 <h3>Regressão</h3>
                 <div id="regressionSummary" class="regression-summary"></div>
-                <canvas id="regressionChart" height="120"></canvas>
+                <canvas id="regressionChart" height="120" role="img" aria-label="Gráfico da curva de regressão ajustada aos dados"></canvas>
+                <p id="regressionAlt" class="sr-only"></p>
               </section>
               <section class="result-box hidden" id="factorComparisonsBox">
                 <h3>Comparações por fator</h3>
@@ -282,12 +312,13 @@
               <section class="result-box">
                 <h3>Recomendações</h3>
                 <ul id="recommendations" class="recommendations"></ul>
+                <p class="small-note" id="interpretationDisclaimer">Interpretação estatística não implica causalidade; considere o delineamento, o tamanho amostral e os pressupostos antes de concluir.</p>
               </section>
             </div>
           </div>
 
           <!-- TAB EXPORTS -->
-          <div class="tab" id="tab-exports">
+          <div class="tab" id="tab-exports" role="tabpanel" aria-labelledby="tab-exports-btn" tabindex="-1">
             <div class="export-grid">
               <button class="export-card" id="downloadPdf" disabled><b>PDF técnico · A4</b><span>Relatório claro, em retrato, com capa e formatação acadêmica baseada na ABNT.</span></button>
               <button class="export-card" id="downloadExcel" disabled><b>Excel</b><span>ANOVA, médias, pressupostos e rastreabilidade.</span></button>
@@ -341,6 +372,6 @@
 <script src="assets/js/csv-parser.js"></script>
 <script src="assets/js/manual-data.js?v=20260716-1"></script>
 <script src="assets/js/config.js?v=20260716-1"></script>
-<script src="assets/js/app.js?v=20260716-7"></script>
+<script src="assets/js/app.js?v=20260719"></script>
 </body>
 </html>
