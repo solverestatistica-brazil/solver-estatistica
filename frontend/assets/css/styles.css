@@ -708,6 +708,7 @@ body.is-processing{overflow:hidden}
   background:color-mix(in srgb,var(--canvas-elevated) 94%,transparent);
   border:1px solid var(--border-brand);border-radius:var(--radius-md);
   box-shadow:0 18px 60px rgba(0,0,0,.36);backdrop-filter:blur(16px);
+  max-height:calc(100dvh - 24px);overflow:auto;
 }
 .consent-banner strong{display:block;color:var(--text-d1);font:700 14px var(--font-heading);margin-bottom:4px}
 .consent-banner p{margin:0;max-width:690px;color:var(--text-d2);font-size:12.5px;line-height:1.55}

@@ -669,6 +669,7 @@
         td.dataset.label = labelFor(c);
         const val = row[c];
         td.textContent = val == null ? '—' : (typeof val === 'number' ? format(val) : val);
+        if (c === 'p_value' && val != null) td.textContent = formatPValue(val);
         if (sigColumn && c === sigColumn) {
           const badge = document.createElement('span');
           badge.textContent = val || 'ns';
@@ -1307,6 +1308,11 @@
     const el = $('interpretationCaveat');
     if (!el) return;
     const veredito = String(pressupostos?.veredito || '').toLowerCase();
+    if (pressupostos && veredito === 'atencao') {
+      el.textContent = 'Nota metodol\u00f3gica: h\u00e1 um diagn\u00f3stico com poder limitado ou resultado inconclusivo. A an\u00e1lise n\u00e3o foi invalidada; interprete-a com o tamanho amostral e a raz\u00e3o entre vari\u00e2ncias.';
+      el.classList.remove('hidden');
+      return;
+    }
     const ok = /(ok|atendid|adequad|satisfeit|v[aá]lid)/.test(veredito);
     if (pressupostos && veredito && !ok) {
       el.textContent = 'Atenção: um ou mais pressupostos da ANOVA não foram plenamente atendidos. '
@@ -1336,6 +1342,13 @@
   function format(v) {
     if (v == null || Number.isNaN(Number(v))) return '—';
     return Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 4 });
+  }
+
+  function formatPValue(v) {
+    if (v == null || Number.isNaN(Number(v))) return format(v);
+    const p = Number(v);
+    if (p < 0.0001) return '< 0,0001';
+    return `= ${p.toLocaleString('pt-BR', { maximumFractionDigits: 4 })}`;
   }
 
   function labelFor(key) {

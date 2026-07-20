@@ -59,7 +59,7 @@ def _clean_value(value: Any) -> Any:
     if isinstance(value, (np.floating, float)):
         if math.isnan(float(value)) or math.isinf(float(value)):
             return None
-        return round(float(value), 6)
+        return float(value)
     if isinstance(value, (np.integer, int)):
         return int(value)
     if isinstance(value, dict):
@@ -1592,7 +1592,10 @@ def analyze(payload: Dict[str, Any]) -> Dict[str, Any]:
     ctx = _prepare_context(payload)
     anova = _anova(ctx)
     means = _means(ctx, anova)
-    regression = _regression(ctx) if ctx.analysis_type in {"regression", "single", "factorial"} else None
+    # Direct regression is an explicit flow. Reducing DBC/factorial data to y ~ dose
+    # would ignore blocks and other factors, potentially biasing the optimum.
+    # Covariate-adjusted regression must be implemented as explicit ANCOVA.
+    regression = _regression(ctx) if ctx.analysis_type == "regression" else None
     factor_comparisons = _factor_comparisons(ctx, anova)
     interaction_breakdown = _interaction_breakdown(ctx, anova)
     recommendations = _recommendations(ctx, anova, means, regression)

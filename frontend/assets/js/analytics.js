@@ -43,7 +43,7 @@
     const banner = document.createElement('section');
     banner.id = 'analyticsConsent';
     banner.className = 'consent-banner';
-    banner.setAttribute('role', 'dialog');
+    banner.setAttribute('role', 'region');
     banner.setAttribute('aria-label', 'Preferências de métricas');
     banner.innerHTML = `
       <div>
