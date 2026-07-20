@@ -343,6 +343,8 @@
   function notify(message, type = 'info') {
     const div = document.createElement('div');
     div.textContent = message;
+    div.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    div.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
     Object.assign(div.style, {
       position: 'fixed', right: '18px', bottom: '18px', zIndex: '50',
       maxWidth: '360px', padding: '12px 14px', borderRadius: '12px',

@@ -10,6 +10,18 @@ async function preparePage(page) {
   await page.route(`${apiBase}/health`, (route) => route.fulfill({ json: { status: 'ok' } }));
 }
 
+async function openFilledDic(page) {
+  await page.goto('/resultados.html');
+  await expect(page.locator('#apiStatus')).toHaveText('API online');
+  await page.locator('#goToData').click();
+  await page.locator('#generateTable').click();
+  await expect(page.locator('#dataTable tbody tr')).toHaveCount(16);
+  const values = page.locator('#dataTable input[data-column="valor"]');
+  for (let index = 0; index < await values.count(); index += 1) {
+    await values.nth(index).fill(String(10 + (index % 4)));
+  }
+}
+
 const analysisResult = {
   anova: {
     cv: 8.4,
@@ -43,16 +55,35 @@ test('tema claro preserva identidade e layout mobile nao transborda', async ({ p
   expect(widths.document).toBeLessThanOrEqual(widths.viewport);
 });
 
+test('upload CSV detecta colunas e oferece mapeamento sem bloquear o usuario', async ({ page }) => {
+  await preparePage(page);
+  await page.goto('/resultados.html');
+  await page.locator('#goToData').click();
+  await page.locator('#uploadMode').click();
+
+  await page.locator('#fileInput').setInputFiles({
+    name: 'ensaio.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from('Tratamento;Resposta\nT1;10\nT2;12\nT1;11\nT2;13\n'),
+  });
+
+  await expect(page.locator('#mappingPanel')).toBeVisible();
+  await expect(page.getByLabel('Coluna para Resposta')).toHaveValue('Resposta');
+  await expect(page.getByLabel('Coluna para Tratamento')).toHaveValue('Tratamento');
+  await expect(page.locator('#dataTable tbody tr')).toHaveCount(4);
+});
+
 test('fluxo DIC valida dados, analisa e libera exportacoes', async ({ page }) => {
   await preparePage(page);
   await page.route(`${apiBase}/api/analyze`, (route) => route.fulfill({ json: analysisResult }));
+  await page.route(`${apiBase}/api/export/pdf`, (route) => route.fulfill({
+    contentType: 'application/pdf',
+    body: '%PDF-1.4 test document',
+  }));
   await page.goto('/resultados.html');
 
-  await expect(page.locator('#apiStatus')).toHaveText('API online');
   await page.locator('#goToData').click();
   await page.locator('#generateTable').click();
-  await expect(page.locator('#dataTable tbody tr')).toHaveCount(16);
-
   await page.locator('#runAnalysis').click();
   await expect(page.locator('#validationPanel')).toBeVisible();
 
@@ -67,4 +98,43 @@ test('fluxo DIC valida dados, analisa e libera exportacoes', async ({ page }) =>
   await expect(page.locator('#anovaTable')).toContainText('< 0,0001');
   await expect(page.locator('#downloadPdf')).toBeEnabled();
   await expect(page.locator('#downloadExcel')).toBeEnabled();
+  await page.locator('#tab-exports-btn').click();
+  await expect(page.locator('#downloadPdf')).toBeVisible();
+
+  const exportRequest = page.waitForRequest((request) => request.url() === `${apiBase}/api/export/pdf` && request.method() === 'POST');
+  await page.locator('#downloadPdf').click();
+  await exportRequest;
+});
+
+test('falha da API e comunicada de forma acessivel', async ({ page }) => {
+  await preparePage(page);
+  await page.route(`${apiBase}/api/analyze`, (route) => route.fulfill({
+    status: 503,
+    contentType: 'application/json',
+    body: JSON.stringify({ detail: 'Servico indisponivel para teste.' }),
+  }));
+  await openFilledDic(page);
+  await page.locator('#runAnalysis').click();
+  await expect(page.locator('[role="alert"]').filter({ hasText: 'Servico indisponivel para teste.' })).toBeVisible();
+  await expect(page.locator('#apiStatus')).toHaveText('Erro na análise');
+});
+
+test('cancelamento interrompe uma analise pendente sem alterar resultados', async ({ page }) => {
+  await preparePage(page);
+  let releaseResponse;
+  const responseGate = new Promise((resolve) => { releaseResponse = resolve; });
+  await page.route(`${apiBase}/api/analyze`, async (route) => {
+    await responseGate;
+    try { await route.fulfill({ json: analysisResult }); } catch (_) { }
+  });
+  await openFilledDic(page);
+
+  await page.locator('#runAnalysis').click();
+  await expect(page.locator('#processingOverlay')).toBeVisible();
+  await page.locator('#cancelAnalysis').click();
+  releaseResponse();
+
+  await expect(page.locator('#processingOverlay')).toBeHidden();
+  await expect(page.locator('body > [role="status"]').filter({ hasText: 'Análise cancelada. Nenhum resultado foi alterado.' })).toBeVisible();
+  await expect(page.locator('#results')).toBeHidden();
 });
