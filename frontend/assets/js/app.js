@@ -32,6 +32,7 @@
   const MAX_FILE_BYTES = 5 * 1024 * 1024;
   const MAX_DATA_ROWS = 10000;
   const API_TIMEOUT_MS = 60000;
+  const API_HEALTH_TIMEOUT_MS = 45000;
 
   function cssColor(name, fallback) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -325,11 +326,16 @@
     const base = cleanApiBase(apiInput.value);
     if (!base) { setApiStatus('API não configurada', 'err'); return; }
     try {
-      const res = await fetchWithTimeout(`${base}/health`, {}, 15000);
+      const res = await fetchWithTimeout(`${base}/health`, {}, API_HEALTH_TIMEOUT_MS);
       if (!res.ok) throw new Error('status ' + res.status);
       setApiStatus('API online', 'ok');
       if (showSuccess) notify('Backend salvo e respondendo.', 'success');
     } catch (err) {
+      if (err?.code === 'timeout') {
+        setApiStatus('API iniciando', '');
+        if (showSuccess) notify('O servico esta iniciando. Aguarde e tente novamente em instantes.', 'info');
+        return;
+      }
       setApiStatus('API sem resposta', 'err');
       if (showSuccess) notify('O serviço estatístico está indisponível. Tente novamente em instantes.', 'error');
     }
@@ -343,6 +349,8 @@
   function notify(message, type = 'info') {
     const div = document.createElement('div');
     div.textContent = message;
+    div.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    div.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
     Object.assign(div.style, {
       position: 'fixed', right: '18px', bottom: '18px', zIndex: '50',
       maxWidth: '360px', padding: '12px 14px', borderRadius: '12px',
@@ -669,6 +677,7 @@
         td.dataset.label = labelFor(c);
         const val = row[c];
         td.textContent = val == null ? '—' : (typeof val === 'number' ? format(val) : val);
+        if (c === 'p_value' && val != null) td.textContent = formatPValue(val);
         if (sigColumn && c === sigColumn) {
           const badge = document.createElement('span');
           badge.textContent = val || 'ns';
@@ -1307,6 +1316,11 @@
     const el = $('interpretationCaveat');
     if (!el) return;
     const veredito = String(pressupostos?.veredito || '').toLowerCase();
+    if (pressupostos && veredito === 'atencao') {
+      el.textContent = 'Nota metodol\u00f3gica: h\u00e1 um diagn\u00f3stico com poder limitado ou resultado inconclusivo. A an\u00e1lise n\u00e3o foi invalidada; interprete-a com o tamanho amostral e a raz\u00e3o entre vari\u00e2ncias.';
+      el.classList.remove('hidden');
+      return;
+    }
     const ok = /(ok|atendid|adequad|satisfeit|v[aá]lid)/.test(veredito);
     if (pressupostos && veredito && !ok) {
       el.textContent = 'Atenção: um ou mais pressupostos da ANOVA não foram plenamente atendidos. '
@@ -1336,6 +1350,13 @@
   function format(v) {
     if (v == null || Number.isNaN(Number(v))) return '—';
     return Number(v).toLocaleString('pt-BR', { maximumFractionDigits: 4 });
+  }
+
+  function formatPValue(v) {
+    if (v == null || Number.isNaN(Number(v))) return format(v);
+    const p = Number(v);
+    if (p < 0.0001) return '< 0,0001';
+    return `= ${p.toLocaleString('pt-BR', { maximumFractionDigits: 4 })}`;
   }
 
   function labelFor(key) {

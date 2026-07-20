@@ -12,7 +12,7 @@ assert.match(html, /nenhum passo é obrigatório/, 'copy deixando claro que é n
 
 assert.match(js, /function renderColumnMapping\(headers\)/, 'renderColumnMapping ausente');
 // Defaults vêm da auto-detecção existente.
-assert.match(js, /syncImportedColumns\(headers\);\n\s*renderEditableTable\(headers, rows\);\n\s*renderColumnMapping\(headers\);/,
+assert.match(js, /syncImportedColumns\(headers\);\r?\n\s*renderEditableTable\(headers, rows\);\r?\n\s*renderColumnMapping\(headers\);/,
   'upload deve auto-detectar e depois oferecer o mapeamento');
 // Overrides escrevem de volta nos campos de configuração (preserva contrato do backend).
 assert.match(js, /if \(\$\(id\)\) \$\(id\)\.value = val;/, 'override de coluna deve atualizar o campo de config');

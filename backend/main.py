@@ -31,6 +31,10 @@ MAX_UPLOAD_BYTES = MAX_REQUEST_BYTES
 MAX_DATA_ROWS = int(os.getenv("MAX_DATA_ROWS", "10000"))
 MAX_CONCURRENT_ANALYSES = int(os.getenv("MAX_CONCURRENT_ANALYSES", "2"))
 RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
+# Em producao, habilite apenas quando o proxy reverso substituir X-Forwarded-For
+# pelo IP real do cliente. Sem essa garantia, o cabecalho e forjavel e permitiria
+# contornar o limite de requisicoes.
+TRUST_PROXY_HEADERS = os.getenv("TRUST_PROXY_HEADERS", "false").lower() in {"1", "true", "yes"}
 _analysis_semaphore = threading.BoundedSemaphore(MAX_CONCURRENT_ANALYSES)
 _request_times: Dict[str, deque[float]] = defaultdict(deque)
 
@@ -63,6 +67,8 @@ class AnalyzePayload(BaseModel):
     )
     alpha: float = Field(
         0.05,
+        gt=0,
+        lt=1,
         description="Usado apenas quando alpha_mode='fixed'. Ignorado quando alpha_mode='auto'.",
     )
     data: list[dict[str, Any]] = Field(min_length=2, max_length=MAX_DATA_ROWS)
@@ -102,7 +108,11 @@ async def production_guards(request: Request, call_next):
             return Response("Content-Length inválido.", status_code=400)
     if request.url.path.startswith("/api/") and request.method in {"POST", "PUT", "PATCH"}:
         forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
-        client = forwarded or (request.client.host if request.client else "unknown")
+        client = (
+            forwarded
+            if TRUST_PROXY_HEADERS and forwarded
+            else (request.client.host if request.client else "unknown")
+        )
         now = time.monotonic()
         bucket = _request_times[client]
         while bucket and now - bucket[0] >= 60:

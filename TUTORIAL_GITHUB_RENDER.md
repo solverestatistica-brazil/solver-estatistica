@@ -137,71 +137,35 @@ Opção recomendada pela interface:
 | `PYTHON_VERSION` | `3.12.8` |
 | `CORS_ORIGINS` | `https://SEU_USUARIO.github.io` |
 
-Se quiser liberar temporariamente para teste, use:
+Mantenha `CORS_ORIGINS` restrito aos dominios do frontend. Para um dominio adicional de teste, acrescente a URL exata separada por virgula; nunca use `*` em producao.
+
+A API deste projeto usa o dominio publico configurado:
 
 ```txt
-CORS_ORIGINS=*
-```
-
-Depois do deploy, o Render fornecerá uma URL parecida com:
-
-```txt
-https://solver-estatistica-api.onrender.com
+https://api.solver-estatistica.com.br
 ```
 
 Teste:
 
 ```txt
-https://solver-estatistica-api.onrender.com/health
+https://api.solver-estatistica.com.br/health
 ```
 
 ## 7. Conectar o frontend ao backend
 
-Você tem duas opções.
-
-### Opção A — Configurar pelo próprio site
-
-1. Abra o GitHub Pages.
-2. No campo **URL do backend Render**, cole:
-
-```txt
-https://solver-estatistica-api.onrender.com
-```
-
-3. Clique em **Salvar URL**.
-
-Essa opção salva no navegador via `localStorage`.
-
-### Opção B — Configurar fixo no código
-
-Edite:
+A URL publica da API de producao esta definida em:
 
 ```txt
 frontend/assets/js/config.js
 ```
 
-Troque:
+O valor atual e:
 
 ```js
-window.SOLVER_API_BASE_URL = "";
+window.SOLVER_API_BASE_URL = "https://api.solver-estatistica.com.br";
 ```
 
-por:
-
-```js
-window.SOLVER_API_BASE_URL = "https://solver-estatistica-api.onrender.com";
-```
-
-Depois envie para o GitHub:
-
-```bash
-git add frontend/assets/js/config.js
-git commit -m "Configura URL da API no frontend"
-git push
-```
-
-O GitHub Actions publicará novamente o frontend.
-
+Para outro ambiente, altere essa URL no codigo e mantenha `CORS_ORIGINS` limitado ao dominio desse frontend. O usuario final nao deve informar livremente uma URL de API em producao.
 ## 8. Usar o sistema
 
 1. Abra o site no GitHub Pages.

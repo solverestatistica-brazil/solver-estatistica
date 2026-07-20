@@ -16,3 +16,7 @@ pip-metadata-*/
 pip-target-*/
 pip-unpack-*/
 tmp/
+
+playwright-report/
+test-results/
+blob-report/

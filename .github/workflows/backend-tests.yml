@@ -1,4 +1,4 @@
-name: Backend tests
+name: Backend and frontend quality
 
 on:
   push:
@@ -6,17 +6,13 @@ on:
     paths:
       - "backend/**"
       - "examples/**"
-      - "frontend/assets/data/**"
-      - "frontend/assets/js/**"
-      - "frontend/test_*.cjs"
+      - "frontend/**"
       - ".github/workflows/backend-tests.yml"
   pull_request:
     paths:
       - "backend/**"
       - "examples/**"
-      - "frontend/assets/data/**"
-      - "frontend/assets/js/**"
-      - "frontend/test_*.cjs"
+      - "frontend/**"
       - ".github/workflows/backend-tests.yml"
   workflow_dispatch:
 
@@ -41,7 +37,7 @@ jobs:
       - name: Run test suite
         run: pytest -v --cov=main --cov=statistics_engine --cov=assumptions --cov=transformations --cov-report=term-missing --cov-report=xml --cov-fail-under=75
 
-      - name: Validate frontend JavaScript syntax
+      - name: Validate frontend JavaScript syntax and contracts
         working-directory: frontend
         run: |
           node --check assets/js/app.js
@@ -61,3 +57,43 @@ jobs:
           node test_contextual_examples.cjs
           node test_safe_interpretation.cjs
           node test_author_name.cjs
+          node test_api_health_timeout.cjs
+
+  frontend-e2e:
+    runs-on: ubuntu-latest
+    needs: pytest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install test dependencies
+        run: |
+          corepack enable
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+
+      - name: Run end-to-end tests
+        run: pnpm test:e2e
+
+      - name: Upload E2E diagnostics on failure
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-diagnostics
+          path: |
+            frontend/test-results
+            frontend/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
