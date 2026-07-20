@@ -32,9 +32,11 @@ jobs:
       - name: Audit production dependencies
         working-directory: backend
         run: |
-          pip-audit -r requirements.txt
-          pip-audit -r requirements-dev.txt --format json --output pip-audit.json
-
+          # FastAPI 0.139.x suporta Starlette <1.0. Os IDs abaixo exigem Starlette 1.x;
+          # permanecem registrados em docs/SECURITY_BASELINE.md e qualquer alerta novo falha o job.
+          ignored=(--ignore-vuln PYSEC-2026-161 --ignore-vuln PYSEC-2026-248 --ignore-vuln PYSEC-2026-249 --ignore-vuln PYSEC-2026-2280 --ignore-vuln PYSEC-2026-2281)
+          pip-audit -r requirements.txt "${ignored[@]}"
+          pip-audit -r requirements-dev.txt "${ignored[@]}" --format json --output pip-audit.json
       - name: Preserve audit result
         if: always()
         uses: actions/upload-artifact@v4
