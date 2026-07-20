@@ -19,3 +19,6 @@ services:
         value: 2
       - key: RATE_LIMIT_PER_MINUTE
         value: 60
+      # O balanceador do Render fornece o IP do cliente em X-Forwarded-For.
+      - key: TRUST_PROXY_HEADERS
+        value: true

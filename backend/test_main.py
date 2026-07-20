@@ -107,6 +107,17 @@ def test_api_adota_alfa_automatico_como_convencao_pedagogica():
     assert res.json()["meta"]["alpha"] == 0.05
 
 
+def test_api_rejeita_alfa_fora_do_intervalo_aberto_unitario():
+    payload = json.loads(CONFIG)
+    payload["alpha"] = 1
+    payload["data"] = [
+        {"bloco": "B1", "tratamento": "T1", "valor": 10},
+        {"bloco": "B1", "tratamento": "T2", "valor": 12},
+    ]
+    res = client.post("/api/analyze", json=payload)
+    assert res.status_code == 422
+    assert "alpha" in res.text
+
 def test_rate_limit_retorna_429(monkeypatch):
     main._request_times.clear()
     monkeypatch.setattr(main, "RATE_LIMIT_PER_MINUTE", 1)
@@ -114,4 +125,26 @@ def test_rate_limit_retorna_429(monkeypatch):
     second = client.post("/api/analyze", json={"data": []})
     assert first.status_code == 422
     assert second.status_code == 429
+    main._request_times.clear()
+
+
+def test_rate_limit_ignora_x_forwarded_for_sem_proxy_confiavel(monkeypatch):
+    main._request_times.clear()
+    monkeypatch.setattr(main, "RATE_LIMIT_PER_MINUTE", 1)
+    monkeypatch.setattr(main, "TRUST_PROXY_HEADERS", False)
+    first = client.post("/api/analyze", json={"data": []}, headers={"X-Forwarded-For": "198.51.100.10"})
+    second = client.post("/api/analyze", json={"data": []}, headers={"X-Forwarded-For": "198.51.100.20"})
+    assert first.status_code == 422
+    assert second.status_code == 429
+    main._request_times.clear()
+
+
+def test_rate_limit_usa_x_forwarded_for_com_proxy_confiavel(monkeypatch):
+    main._request_times.clear()
+    monkeypatch.setattr(main, "RATE_LIMIT_PER_MINUTE", 1)
+    monkeypatch.setattr(main, "TRUST_PROXY_HEADERS", True)
+    first = client.post("/api/analyze", json={"data": []}, headers={"X-Forwarded-For": "198.51.100.10"})
+    second = client.post("/api/analyze", json={"data": []}, headers={"X-Forwarded-For": "198.51.100.20"})
+    assert first.status_code == 422
+    assert second.status_code == 422
     main._request_times.clear()

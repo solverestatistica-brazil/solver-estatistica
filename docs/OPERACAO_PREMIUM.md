@@ -21,6 +21,9 @@ automaticamente.
 4. Acompanhar respostas 429, 503 e 5xx separadamente.
 5. Registrar incidente, causa, impacto, duração, correção e ação preventiva.
 
+## Proxy e limite por cliente
+
+No Render, `TRUST_PROXY_HEADERS=true` permite que o limite por minuto use o IP encaminhado pelo balanceador. Em hospedagem direta ou atras de proxy nao administrado, mantenha essa variavel ausente ou com valor `false`, pois o cabecalho pode ser forjado pelo cliente.
 ## Carga e capacidade
 
 O limite padrão é de duas análises pesadas simultâneas e 60 requisições de escrita por IP/minuto.
