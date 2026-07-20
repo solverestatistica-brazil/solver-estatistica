@@ -1,0 +1,25 @@
+name: Production health monitor
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check public API health
+        env:
+          API_URL: https://api.solver-estatistica.com.br
+        run: |
+          set -euo pipefail
+          started=$(date +%s)
+          response="$(curl --fail --silent --show-error --max-time 60 --retry 1 --retry-all-errors "$API_URL/health")"
+          elapsed=$(( $(date +%s) - started ))
+          echo "health_response=$response"
+          echo "latency_seconds=$elapsed"
+          test "$(echo "$response" | jq -r '.status')" = "ok"
