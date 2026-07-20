@@ -32,6 +32,7 @@
   const MAX_FILE_BYTES = 5 * 1024 * 1024;
   const MAX_DATA_ROWS = 10000;
   const API_TIMEOUT_MS = 60000;
+  const API_HEALTH_TIMEOUT_MS = 45000;
 
   function cssColor(name, fallback) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -325,11 +326,16 @@
     const base = cleanApiBase(apiInput.value);
     if (!base) { setApiStatus('API não configurada', 'err'); return; }
     try {
-      const res = await fetchWithTimeout(`${base}/health`, {}, 15000);
+      const res = await fetchWithTimeout(`${base}/health`, {}, API_HEALTH_TIMEOUT_MS);
       if (!res.ok) throw new Error('status ' + res.status);
       setApiStatus('API online', 'ok');
       if (showSuccess) notify('Backend salvo e respondendo.', 'success');
     } catch (err) {
+      if (err?.code === 'timeout') {
+        setApiStatus('API iniciando', '');
+        if (showSuccess) notify('O servico esta iniciando. Aguarde e tente novamente em instantes.', 'info');
+        return;
+      }
       setApiStatus('API sem resposta', 'err');
       if (showSuccess) notify('O serviço estatístico está indisponível. Tente novamente em instantes.', 'error');
     }
