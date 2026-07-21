@@ -24,6 +24,7 @@ n insuficiente, variancia zero), devolvemos status="indeterminado" — jamais um
 from __future__ import annotations
 
 import math
+import re
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -44,6 +45,40 @@ OK = "ok"
 VIOLADO = "violado"
 ATENCAO = "atencao"
 INDETERMINADO = "indeterminado"
+
+_DISPLAY_WORDS = {
+    "atencao": "atenção", "nao": "não", "sao": "são", "residuos": "resíduos",
+    "compativeis": "compatíveis", "distribuicao": "distribuição", "variancias": "variâncias",
+    "variancia": "variância", "repeticoes": "repetições", "diferenca": "diferença",
+    "razao": "razão", "heterocedasticas": "heterocedásticas", "construcao": "construção",
+    "ausencia": "ausência", "testaveis": "testáveis", "valida": "válida",
+    "transformacao": "transformação", "proprios": "próprios", "proprio": "próprio",
+    "producao": "produção", "numero": "número", "germinacao": "germinação",
+    "heterogenea": "heterogênea", "homogenea": "homogênea", "interacao": "interação",
+    "logaritmica": "logarítmica", "conclusoes": "conclusões", "parametrico": "paramétrico",
+    "correlacao": "correlação", "autocorrelacao": "autocorrelação", "posicao": "posição",
+    "funcao": "função", "simulacao": "simulação", "deteccao": "detecção",
+    "excecao": "exceção", "criterio": "critério", "observacao": "observação",
+    "variacao": "variação", "adocao": "adoção",
+}
+_DISPLAY_PATTERN = re.compile(r"\b(" + "|".join(map(re.escape, _DISPLAY_WORDS)) + r")\b", re.IGNORECASE)
+
+
+def _pt_br(text: Optional[str]) -> Optional[str]:
+    """Aplica acentuação aos textos apresentados ao usuário, sem alterar estados internos."""
+    if not isinstance(text, str):
+        return text
+
+    def replace(match: re.Match[str]) -> str:
+        original = match.group(0)
+        corrected = _DISPLAY_WORDS[original.lower()]
+        if original.isupper():
+            return corrected.upper()
+        if original[:1].isupper():
+            return corrected[:1].upper() + corrected[1:]
+        return corrected
+
+    return _DISPLAY_PATTERN.sub(replace, text)
 
 
 def _round(v: Optional[float], nd: int = 4) -> Optional[float]:
@@ -585,12 +620,18 @@ def verificar_pressupostos(
         veredito = OK
         resumo = "Todos os pressupostos testaveis foram atendidos. A ANOVA e valida."
 
+    for item in testes.values():
+        for field in ("teste", "mensagem", "nota"):
+            if field in item:
+                item[field] = _pt_br(item[field])
+    sugestao = _sugerir_transformacao(testes)
+
     return {
         "veredito": veredito,
-        "resumo": resumo,
+        "resumo": _pt_br(resumo),
         "alpha": alpha,
         "testes": testes,
-        "sugestao_transformacao": _sugerir_transformacao(testes),
+        "sugestao_transformacao": _pt_br(sugestao),
     }
 
 

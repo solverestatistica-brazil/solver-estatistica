@@ -35,8 +35,10 @@ def test_pdf_contem_resultados_e_proveniencia():
     assert "RELATÓRIO" in cover_text
     assert "ESTATÍSTICO" in cover_text
     assert "Delineamento Blocos Casualizados (DBC)" in cover_text
-    assert "PREPARADO PARA" in cover_text
-    assert "Relatório gerado pelo Solver Estatística" in cover_text
+    assert "PREPARADO PARA" not in cover_text
+    assert "LAUDO TÉCNICO" not in cover_text
+    assert "HORÁRIO DE BRASÍLIA" not in cover_text
+    assert "Relatório gerado pelo Solver Estatística" not in cover_text
     assert "Fernando Paes Lorena" not in cover_text
     assert "Página" not in cover_text
 
@@ -49,6 +51,11 @@ def test_pdf_contem_resultados_e_proveniencia():
     assert "Alfa adotado" in body_text
     assert "(Fixo)" in body_text
     assert "Delineamento Blocos Casualizados (DBC)" in text
+    assert "ATENÇÃO" in body_text
+    assert "Heterogeneidade não detectada" in body_text
+    assert "diferença de" in body_text
+    assert "variâncias" in body_text
+    assert "ATENCAO" not in body_text
     for accented_term in ("Relatório", "Brasília", "variação", "observações", "revisão"):
         assert accented_term in text
     assert reader.metadata.title == "Relatório Solver Estatística"
@@ -64,7 +71,7 @@ def test_pdf_usa_nome_do_autor_informado():
     pdf = build_pdf(payload)
     reader = PdfReader(io.BytesIO(pdf))
     cover_text = reader.pages[0].extract_text() or ""
-    assert "Maria Souza" in cover_text
+    assert "Maria Souza" not in cover_text
     assert reader.metadata.author == "Maria Souza"
     assert "Relatório gerado pelo Solver Estatística" not in cover_text
 
