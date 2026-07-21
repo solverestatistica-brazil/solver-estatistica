@@ -83,7 +83,7 @@ O workflow `.github/workflows/backend-tests.yml` roda a suíte com cobertura, va
 - [Evidência e roteiro de validação independente](docs/VALIDACAO_INDEPENDENTE.md)
 - [Operação premium, SLO, carga e rollback](docs/OPERACAO_PREMIUM.md)
 - Os textos de Privacidade e Termos publicados no frontend são minutas e exigem revisão legal antes da versão 1.0.
-- A licença do código deve ser escolhida e publicada pelo titular do projeto antes da versão 1.0.
+- O codigo esta licenciado sob MIT; consulte [LICENSE](LICENSE).
 
 ## Deploy rápido
 

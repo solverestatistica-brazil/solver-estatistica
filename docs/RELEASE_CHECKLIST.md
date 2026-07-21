@@ -23,12 +23,12 @@
 - [ ] Monitoramento de disponibilidade, latência e erros configurado.
 - [ ] Plano sem cold start ou mensagem operacional compatível com a latência real.
 - [ ] Política de retenção confirmada com o provedor de infraestrutura.
-- [ ] Canal privado para segurança e privacidade disponível.
+- [x] Canal privado para seguranca e privacidade publicado: solver.estatistica@gmail.com.
 
 ## Legal
 
 - [ ] Responsável legal revisou Privacidade e Termos.
-- [ ] Licença do código escolhida e publicada pelo titular do projeto.
+- [x] Licenca MIT publicada no repositorio.
 - [ ] Identificação e canal LGPD publicados.
 
 ## Publicação
