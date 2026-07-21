@@ -32,18 +32,26 @@ def test_pdf_contem_resultados_e_proveniencia():
     assert height == pytest.approx(841.89, abs=1.0)
 
     cover_text = first_page.extract_text() or ""
-    assert "RELATÓRIO ESTATÍSTICO" in cover_text
+    assert "RELATÓRIO" in cover_text
+    assert "ESTATÍSTICO" in cover_text
+    assert "Delineamento Blocos Casualizados (DBC)" in cover_text
+    assert "PREPARADO PARA" in cover_text
     assert "Relatório gerado pelo Solver Estatística" in cover_text
     assert "Fernando Paes Lorena" not in cover_text
     assert "Página" not in cover_text
 
     body_text = "\n".join(page.extract_text() or "" for page in reader.pages[1:])
+    text = cover_text + "\n" + body_text
     assert "Página 1" in body_text
     assert "Gerado em Brasília" in body_text
     assert "BRT" in body_text
     assert "Gerado em UTC" not in body_text
+    assert "Alfa adotado" in body_text
+    assert "(Fixo)" in body_text
+    assert "Delineamento Blocos Casualizados (DBC)" in text
+    for accented_term in ("Relatório", "Brasília", "variação", "observações", "revisão"):
+        assert accented_term in text
     assert reader.metadata.title == "Relatório Solver Estatística"
-    text = cover_text + "\n" + body_text
     for expected in (
         "ANOVA", "Comparações detalhadas", "Pressupostos", "Configuração e rastreabilidade",
             "SHA-256 dos dados", "Soma de quadrados",
