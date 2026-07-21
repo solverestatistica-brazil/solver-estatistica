@@ -314,6 +314,10 @@
                 <ul id="recommendations" class="recommendations"></ul>
                 <p class="small-note" id="interpretationDisclaimer">Interpretação estatística não implica causalidade; considere o delineamento, o tamanho amostral e os pressupostos antes de concluir.</p>
               </section>
+              <div class="results-actions">
+                <button class="btn solid" id="goToExports" type="button">Avançar para exportações <span aria-hidden="true">→</span></button>
+                <p>Revise os resultados e gere o formato que precisar.</p>
+              </div>
             </div>
           </div>
 
@@ -332,6 +336,7 @@
               <button class="export-card" id="downloadPlotPdf" disabled><b>PDF vetorial</b><span>Disponível quando a análise contém regressão.</span></button>
             </div>
             <p class="small-note" id="exportsNote">Execute uma análise para liberar as exportações correspondentes.</p>
+            <p class="export-status" id="exportStatus" role="status" aria-live="polite"></p>
           </div>
 
         </section>

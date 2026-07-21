@@ -39,6 +39,9 @@ def test_pdf_contem_resultados_e_proveniencia():
 
     body_text = "\n".join(page.extract_text() or "" for page in reader.pages[1:])
     assert "Página 1" in body_text
+    assert "Gerado em Brasília" in body_text
+    assert "BRT" in body_text
+    assert "Gerado em UTC" not in body_text
     assert reader.metadata.title == "Relatório Solver Estatística"
     text = cover_text + "\n" + body_text
     for expected in (
@@ -83,5 +86,8 @@ def test_excel_contem_planilhas_tecnicas_e_dados_de_entrada():
     }
     assert len(metadata["SHA-256 dos dados"]) == 64
     assert metadata["Versão do motor"]
+    assert "Gerado em Brasília" in metadata
+    assert "BRT" in metadata["Gerado em Brasília"]
+    assert "Gerado em UTC" not in metadata
     assert workbook["ANOVA"].auto_filter.ref
     assert workbook["Resumo"].sheet_view.showGridLines is False

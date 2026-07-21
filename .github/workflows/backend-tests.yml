@@ -58,6 +58,7 @@ jobs:
           node test_safe_interpretation.cjs
           node test_author_name.cjs
           node test_api_health_timeout.cjs
+          node test_export_feedback.cjs
 
   frontend-e2e:
     runs-on: ubuntu-latest

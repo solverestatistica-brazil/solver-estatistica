@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import io
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
+from zoneinfo import ZoneInfo
 from xml.sax.saxutils import escape
 
 import matplotlib
@@ -83,6 +84,23 @@ DESIGN_LABELS = {
     "DBC": "Blocos Casualizados (DBC)",
     "DQL": "Quadrado Latino (DQL)",
 }
+BRASILIA_TZ = ZoneInfo("America/Sao_Paulo")
+
+def _brasilia_now() -> datetime:
+    return datetime.now(BRASILIA_TZ)
+
+def _format_brasilia_timestamp(value: Any) -> str:
+    """Normaliza timestamps de proveniência para a apresentação local."""
+    if not value:
+        return "—"
+    try:
+        instant = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if instant.tzinfo is None:
+            instant = instant.replace(tzinfo=timezone.utc)
+        return instant.astimezone(BRASILIA_TZ).strftime("%d/%m/%Y às %H:%M BRT")
+    except (TypeError, ValueError):
+        return str(value)
+
 TYPE_LABELS = {
     "single": "fator único",
     "factorial": "fatorial",
@@ -175,7 +193,7 @@ def _draw_content_header_footer(canvas_obj, doc) -> None:
     canvas_obj.drawRightString(
         width - 2.0 * cm,
         height - 1.42 * cm,
-        datetime.now().strftime("Gerado em %d/%m/%Y às %H:%M"),
+        getattr(doc, "generated_at_brasilia_display", _format_brasilia_timestamp(_brasilia_now())),
     )
     canvas_obj.setStrokeColor(BORDER)
     canvas_obj.setLineWidth(0.6)
@@ -387,6 +405,9 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     )
     doc.engine_version = provenance.get("engine_version", "—")
     doc.commit_short = str(provenance.get("git_commit", "—"))[:12]
+    doc.generated_at_brasilia_display = _format_brasilia_timestamp(
+        provenance.get("generated_at_brasilia") or provenance.get("generated_at_utc")
+    )
     cover_frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="cover-frame", showBoundary=0)
     content_frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="content-frame", showBoundary=0)
     doc.addPageTemplates([
@@ -434,6 +455,10 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     cover_subtitle = ParagraphStyle(
         "CoverSubtitle", parent=cover_author, fontSize=11, textColor=TEXT_D2,
     )
+    cover_badge = ParagraphStyle(
+        "CoverBadge", parent=cover_author, fontName="Helvetica-Bold", fontSize=8.5,
+        leading=11, textColor=BRAND_DEEP,
+    )
 
     meta = result.get("meta", {})
     design_label = DESIGN_LABELS.get(meta.get("design"), meta.get("design") or "—")
@@ -453,8 +478,20 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
             f"{escape(str(design_label))}<br/>{escape(str(type_label).title())}",
             cover_subtitle,
         ),
-        Spacer(1, 6.2 * cm),
-        Paragraph(f"Brasil<br/>{datetime.now().year}", cover_author),
+        Spacer(1, 0.55 * cm),
+        Table([[
+            Paragraph("LAUDO TÉCNICO · RASTREÁVEL · HORÁRIO DE BRASÍLIA", cover_badge)
+        ]], colWidths=[doc.width], style=TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), BRAND_DIM),
+            ("BOX", (0, 0), (-1, -1), 0.8, BORDER_BRAND),
+            ("ROUNDEDCORNERS", [8, 8, 8, 8]),
+            ("TOPPADDING", (0, 0), (-1, -1), 8),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+            ("LEFTPADDING", (0, 0), (-1, -1), 12),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 12),
+        ])),
+        Spacer(1, 5.0 * cm),
+        Paragraph(f"Brasil<br/>{_brasilia_now().year}", cover_author),
         NextPageTemplate("content"),
         PageBreak(),
         Paragraph(
@@ -629,7 +666,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     trace_rows.extend([
         ["Versão do motor", provenance.get("engine_version")],
         ["Commit", provenance.get("git_commit")],
-        ["Gerado em UTC", provenance.get("generated_at_utc")],
+        ["Gerado em Brasília", _format_brasilia_timestamp(provenance.get("generated_at_brasilia") or provenance.get("generated_at_utc"))],
         ["SHA-256 dos dados", provenance.get("data_sha256")],
         ["SHA-256 da configuração", provenance.get("config_sha256")],
     ])
@@ -727,7 +764,7 @@ def build_excel(payload: Dict[str, Any]) -> bytes:
         metadata_rows = [
             {"campo": "Versão do motor", "valor": provenance.get("engine_version")},
             {"campo": "Commit", "valor": provenance.get("git_commit")},
-            {"campo": "Gerado em UTC", "valor": provenance.get("generated_at_utc")},
+            {"campo": "Gerado em Brasília", "valor": _format_brasilia_timestamp(provenance.get("generated_at_brasilia") or provenance.get("generated_at_utc"))},
             {"campo": "SHA-256 dos dados", "valor": provenance.get("data_sha256")},
             {"campo": "SHA-256 da configuração", "valor": provenance.get("config_sha256")},
         ]

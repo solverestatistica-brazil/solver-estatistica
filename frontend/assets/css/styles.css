@@ -502,6 +502,8 @@ select{
 .provenance-grid strong{display:block;color:var(--text-d1);font:600 12px var(--font-mono);overflow-wrap:anywhere}
 .export-card:disabled{opacity:.42;cursor:not-allowed;filter:saturate(.45)}
 .export-card:disabled:hover{border-color:var(--border);transform:none}
+.results-actions{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:2px 0 18px;padding:16px 18px;border:1px solid var(--border-brand);border-radius:var(--radius-md);background:var(--brand-dim)}
+.results-actions p{margin:0;color:var(--text-d2);font-size:13px}
 /* ANOVA tem 9 colunas — força layout mais compacto pra caber */
 #anovaTable{font-size:12px}
 #anovaTable th,#anovaTable td{padding:8px 8px}
@@ -563,6 +565,8 @@ body.is-processing{overflow:hidden}
 @keyframes solver-pulse{50%{transform:scale(.72);opacity:.6}}
 
 @media (max-width:560px){
+  .results-actions{align-items:stretch;flex-direction:column}
+  .results-actions .btn{width:100%}
   .processing-dialog{padding:24px 20px}
   .processing-steps{grid-template-columns:1fr 1fr}
   .processing-footer{align-items:stretch;flex-direction:column}
@@ -584,6 +588,12 @@ body.is-processing{overflow:hidden}
 .export-card:hover{border-color:var(--brand);transform:translateY(-2px);background:var(--brand-dim)}
 .export-card b{display:block;font-family:var(--font-heading);font-size:15px;margin-bottom:8px;font-weight:600}
 .export-card span{color:var(--text-d2);font-size:13px;line-height:1.5}
+.export-card[aria-busy="true"]{position:relative;cursor:wait;opacity:.74}
+.export-card[aria-busy="true"]::after{content:"";position:absolute;right:16px;top:16px;width:14px;height:14px;border:2px solid var(--border-brand);border-top-color:var(--brand);border-radius:50%;animation:solver-spin .8s linear infinite}
+.export-status{min-height:20px;margin:14px 0 0;color:var(--text-d2);font-size:13px}
+.export-status[data-state="loading"]{color:var(--brand);font-weight:600}
+.export-status[data-state="success"]{color:var(--success)}
+.export-status[data-state="error"]{color:var(--danger-foreground)}
 
 .format-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
 .format-grid article{
