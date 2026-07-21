@@ -1,24 +1,24 @@
-# Política de segurança
+# Politica de seguranca
 
-## Relato responsável
+## Contato privado
 
-Não publique planilhas, dados pessoais, credenciais ou detalhes que facilitem exploração em uma issue pública. Abra inicialmente uma issue sem dados sensíveis solicitando um canal privado ao mantenedor.
+Relate vulnerabilidades, incidentes de seguranca ou solicitacoes de privacidade para [solver.estatistica@gmail.com](mailto:solver.estatistica@gmail.com). Nao envie planilhas, dados pessoais, credenciais ou detalhes exploraveis em issues publicas.
 
-Inclua, quando possível:
+Inclua, quando possivel:
 
-- componente e versão afetados;
+- componente e versao afetados;
 - impacto observado;
-- passos mínimos para reprodução sem dados reais;
-- sugestão de mitigação.
+- passos minimos para reproduzir sem dados reais;
+- sugestao de mitigacao.
 
-## Versões suportadas
+## Versoes suportadas
 
-Enquanto não houver uma versão `1.x`, somente o commit mais recente de `main` recebe correções. Após a primeira release estável, esta seção deve indicar explicitamente as versões suportadas.
+Enquanto nao houver uma versao `1.x`, somente o commit mais recente de `main` recebe correcoes. Apos a primeira release estavel, esta secao deve indicar explicitamente as versoes suportadas.
 
-## Princípios operacionais
+## Principios operacionais
 
-- payloads e conteúdo de planilhas não devem ser gravados em logs;
-- mensagens 500 expostas ao usuário não devem conter exceções internas;
-- dependências devem ser verificadas e atualizadas por PR;
-- mudanças no motor estatístico exigem testes de regressão e validação numérica;
-- segredos nunca devem ser armazenados no repositório.
+- payloads e conteudo de planilhas nao devem ser gravados em logs;
+- mensagens 500 expostas ao usuario nao devem conter excecoes internas;
+- dependencias devem ser verificadas e atualizadas por PR;
+- mudancas no motor estatistico exigem testes de regressao e validacao numerica;
+- segredos nunca devem ser armazenados no repositorio.
