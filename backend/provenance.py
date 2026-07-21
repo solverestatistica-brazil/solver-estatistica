@@ -10,9 +10,11 @@ from datetime import datetime, timezone
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Dict
+from zoneinfo import ZoneInfo
 
 
 ENGINE_VERSION = "0.2.0"
+BRASILIA_TZ = ZoneInfo("America/Sao_Paulo")
 
 
 @lru_cache(maxsize=1)
@@ -45,10 +47,13 @@ def _canonical_json(value: Any) -> str:
 def build_provenance(payload: Dict[str, Any]) -> Dict[str, Any]:
     data = payload.get("data") or []
     config = {key: value for key, value in payload.items() if key != "data"}
+    generated_at = datetime.now(timezone.utc)
     return {
         "engine_version": ENGINE_VERSION,
         "git_commit": _git_commit(),
-        "generated_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        # UTC remains available for cross-system traceability; user-facing views use Brasilia time.
+        "generated_at_utc": generated_at.isoformat(timespec="seconds"),
+        "generated_at_brasilia": generated_at.astimezone(BRASILIA_TZ).isoformat(timespec="seconds"),
         "data_sha256": hashlib.sha256(_canonical_json(data).encode("utf-8")).hexdigest(),
         "config_sha256": hashlib.sha256(_canonical_json(config).encode("utf-8")).hexdigest(),
         "config": config,

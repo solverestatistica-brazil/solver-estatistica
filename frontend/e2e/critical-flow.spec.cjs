@@ -38,7 +38,7 @@ const analysisResult = {
   },
   recommendations: ['Interpretar o resultado considerando o delineamento.'],
   pressupostos: { veredito: 'ok', resumo: 'Pressupostos atendidos.', testes: {} },
-  provenance: { engine_version: 'test', git_commit: 'abcdef1234567890', generated_at_utc: '2026-07-20T00:00:00Z', data_sha256: 'a'.repeat(64), config: { alpha_mode: 'auto', alpha: 0.05, sum_squares_type: 2 } },
+  provenance: { engine_version: 'test', git_commit: 'abcdef1234567890', generated_at_utc: '2026-07-20T00:00:00Z', generated_at_brasilia: '2026-07-19T21:00:00-03:00', data_sha256: 'a'.repeat(64), config: { alpha_mode: 'auto', alpha: 0.05, sum_squares_type: 2 } },
   meta: { n_rows: 16, alpha_mode: 'auto', alpha: 0.05, sum_squares_type: 2 },
 };
 
@@ -76,10 +76,12 @@ test('upload CSV detecta colunas e oferece mapeamento sem bloquear o usuario', a
 test('fluxo DIC valida dados, analisa e libera exportacoes', async ({ page }) => {
   await preparePage(page);
   await page.route(`${apiBase}/api/analyze`, (route) => route.fulfill({ json: analysisResult }));
-  await page.route(`${apiBase}/api/export/pdf`, (route) => route.fulfill({
-    contentType: 'application/pdf',
-    body: '%PDF-1.4 test document',
-  }));
+  let releaseExport;
+  const exportGate = new Promise((resolve) => { releaseExport = resolve; });
+  await page.route(`${apiBase}/api/export/pdf`, async (route) => {
+    await exportGate;
+    await route.fulfill({ contentType: 'application/pdf', body: '%PDF-1.4 test document' });
+  });
   await page.goto('/resultados.html');
 
   await page.locator('#goToData').click();
@@ -98,12 +100,19 @@ test('fluxo DIC valida dados, analisa e libera exportacoes', async ({ page }) =>
   await expect(page.locator('#anovaTable')).toContainText('< 0,0001');
   await expect(page.locator('#downloadPdf')).toBeEnabled();
   await expect(page.locator('#downloadExcel')).toBeEnabled();
-  await page.locator('#tab-exports-btn').click();
+  await expect(page.locator('#goToExports')).toBeVisible();
+  await page.locator('#goToExports').click();
+  await expect(page.locator('#tab-exports')).toHaveClass(/active/);
   await expect(page.locator('#downloadPdf')).toBeVisible();
 
   const exportRequest = page.waitForRequest((request) => request.url() === `${apiBase}/api/export/pdf` && request.method() === 'POST');
   await page.locator('#downloadPdf').click();
+  await expect(page.locator('#downloadPdf')).toHaveAttribute('aria-busy', 'true');
+  await expect(page.locator('#exportStatus')).toContainText('Gerando PDF técnico');
+  releaseExport();
   await exportRequest;
+  await expect(page.locator('#exportStatus')).toContainText('O download foi iniciado.');
+  await expect(page.locator('#downloadPdf')).toBeEnabled();
 });
 
 test('falha da API e comunicada de forma acessivel', async ({ page }) => {

@@ -104,15 +104,19 @@
     $('runAnalysis').addEventListener('click', runAnalysis);
     $('cancelAnalysis')?.addEventListener('click', () => currentAnalysisController?.abort());
     $('fileInput').addEventListener('change', handleFileUpload);
-    $('downloadPdf').addEventListener('click', () => downloadExport('/api/export/pdf', 'solver-relatorio.pdf'));
-    $('downloadExcel').addEventListener('click', () => downloadExport('/api/export/excel', 'solver-resultados.xlsx'));
-    $('downloadPng').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png'));
-    $('downloadPlotPdf').addEventListener('click', () => downloadExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf'));
+    $('downloadPdf').addEventListener('click', (event) => downloadExport('/api/export/pdf', 'solver-relatorio.pdf', 'PDF técnico', event.currentTarget));
+    $('downloadExcel').addEventListener('click', (event) => downloadExport('/api/export/excel', 'solver-resultados.xlsx', 'planilha Excel', event.currentTarget));
+    $('downloadPng').addEventListener('click', (event) => downloadExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png', 'PNG da regressão', event.currentTarget));
+    $('downloadPlotPdf').addEventListener('click', (event) => downloadExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf', 'PDF vetorial da regressão', event.currentTarget));
     $('design')?.addEventListener('change', handleConfigurationChange);
     $('analysisType')?.addEventListener('change', handleConfigurationChange);
     $('manualMode')?.addEventListener('click', () => setDataMode('manual'));
     $('uploadMode')?.addEventListener('click', () => setDataMode('upload'));
     $('goToData')?.addEventListener('click', goToDataEntry);
+    $('goToExports')?.addEventListener('click', () => {
+      if (!currentResult) return notify('Execute uma análise antes de acessar as exportações.', 'info');
+      activateTab('exports');
+    });
     $('dismissValidation')?.addEventListener('click', hideValidationErrors);
     $('restoreDraft')?.addEventListener('click', restoreDraft);
     $('discardDraft')?.addEventListener('click', discardDraft);
@@ -856,6 +860,15 @@
     });
   }
 
+  function formatBrasiliaTimestamp(value) {
+    if (!value) return '—';
+    const instant = new Date(value);
+    if (Number.isNaN(instant.getTime())) return String(value);
+    return `${new Intl.DateTimeFormat('pt-BR', {
+      dateStyle: 'short', timeStyle: 'medium', timeZone: 'America/Sao_Paulo'
+    }).format(instant)} BRT`;
+  }
+
   function renderProvenance(provenance, meta) {
     const box = $('provenanceSummary');
     if (!box) return;
@@ -864,7 +877,7 @@
     const items = [
       ['Motor', provenance?.engine_version || '—'],
       ['Commit', String(provenance?.git_commit || '—').slice(0, 12)],
-      ['Gerado em UTC', provenance?.generated_at_utc || '—'],
+      ['Gerado em Brasília', formatBrasiliaTimestamp(provenance?.generated_at_brasilia || provenance?.generated_at_utc)],
       ['Dados SHA-256', dataHash === '—' ? dataHash : `${dataHash.slice(0, 16)}…`],
       ['Alfa', `${meta?.alpha_mode || config.alpha_mode || 'auto'} · ${format(meta?.alpha ?? config.alpha)}`],
       ['Soma de quadrados', `Tipo ${meta?.sum_squares_type || config.sum_squares_type || 2}`],
@@ -880,7 +893,6 @@
       box.appendChild(item);
     });
   }
-
   function updateExportAvailability(hasResult, hasRegression) {
     ['downloadPdf', 'downloadExcel'].forEach((id) => { if ($(id)) $(id).disabled = !hasResult; });
     ['downloadPng', 'downloadPlotPdf'].forEach((id) => { if ($(id)) $(id).disabled = !hasRegression; });
@@ -893,10 +905,23 @@
         : 'PDF e Excel disponíveis. Gráficos exigem uma análise de regressão.';
   }
 
-  async function downloadExport(endpoint, filename) {
+  function setExportStatus(message, state) {
+    const status = $('exportStatus');
+    if (status) {
+      status.textContent = message;
+      if (state) status.dataset.state = state;
+      else delete status.dataset.state;
+    }
+    announce(message);
+  }
+
+  async function downloadExport(endpoint, filename, label, button) {
     const base = cleanApiBase(apiInput.value);
     if (!base) return notify('O serviço estatístico não está configurado.', 'error');
     const payload = payloadFromUi();
+    button.disabled = true;
+    button.setAttribute('aria-busy', 'true');
+    setExportStatus(`Gerando ${label}. O download começará automaticamente.`, 'loading');
     try {
       const res = await fetchWithTimeout(`${base}${endpoint}`, {
         method: 'POST',
@@ -916,11 +941,15 @@
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
+      setExportStatus(`${label} pronto. O download foi iniciado.`, 'success');
     } catch (err) {
+      setExportStatus(`Não foi possível gerar ${label}. Tente novamente.`, 'error');
       notify(err.message || 'Erro ao exportar.', 'error');
+    } finally {
+      button.removeAttribute('aria-busy');
+      updateExportAvailability(Boolean(currentResult), Boolean(currentResult?.regression));
     }
   }
-
   async function handleFileUpload(event) {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -1061,12 +1090,12 @@
 
   function updateStepAvailability() {
     const hasResult = Boolean(currentResult);
+    if ($('goToExports')) $('goToExports').disabled = !hasResult;
     ['resultados', 'exports'].forEach((tabName) => {
       const btn = document.querySelector(`.side-item[data-tab="${tabName}"]`);
       if (btn) btn.setAttribute('aria-disabled', String(!hasResult));
     });
   }
-
   // ---- Prevencao de perda de dados ----
   function isTableDirty() {
     if (analysisRan || currentResult) return false;

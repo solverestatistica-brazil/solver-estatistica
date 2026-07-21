@@ -105,6 +105,7 @@ def test_api_adota_alfa_automatico_como_convencao_pedagogica():
     assert res.status_code == 200
     assert res.json()["meta"]["alpha_mode"] == "auto"
     assert res.json()["meta"]["alpha"] == 0.05
+    assert res.json()["provenance"]["generated_at_brasilia"].endswith("-03:00")
 
 
 def test_api_rejeita_alfa_fora_do_intervalo_aberto_unitario():
