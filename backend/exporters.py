@@ -9,6 +9,7 @@ from __future__ import annotations
 import io
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 from zoneinfo import ZoneInfo
 from xml.sax.saxutils import escape
@@ -25,6 +26,8 @@ from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
     BaseDocTemplate, Frame, KeepTogether, NextPageTemplate, PageBreak, PageTemplate,
     Paragraph, Spacer, Table, TableStyle,
@@ -32,6 +35,29 @@ from reportlab.platypus import (
 
 from statistics_engine import analyze
 from provenance import build_provenance
+
+FONT_DIR = Path(__file__).resolve().parent / "fonts"
+FONT_REGULAR = "Lato"
+FONT_SEMIBOLD = "Lato-Semibold"
+FONT_BOLD = "Lato-Bold"
+FONT_BLACK = "Lato-Black"
+
+for font_name, file_name in (
+    (FONT_REGULAR, "Lato-Regular.ttf"),
+    (FONT_SEMIBOLD, "Lato-Semibold.ttf"),
+    (FONT_BOLD, "Lato-Bold.ttf"),
+    (FONT_BLACK, "Lato-Black.ttf"),
+):
+    if font_name not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(TTFont(font_name, str(FONT_DIR / file_name)))
+
+pdfmetrics.registerFontFamily(
+    FONT_REGULAR,
+    normal=FONT_REGULAR,
+    bold=FONT_BOLD,
+    italic=FONT_REGULAR,
+    boldItalic=FONT_BOLD,
+)
 
 # ============================================================================
 # Paleta v3 — documento claro e adequado para leitura/impressão
@@ -155,24 +181,34 @@ def _draw_logo(canvas_obj, logo_x: float, logo_y: float, logo_size: float) -> No
 
 
 def _draw_cover_page(canvas_obj, doc) -> None:
-    """Capa limpa; a capa é contada, mas não recebe número visível."""
+    """Capa editorial, com elementos gráficos discretos e alto contraste."""
     canvas_obj.saveState()
     width, height = A4
     canvas_obj.setFillColor(CANVAS)
     canvas_obj.rect(0, 0, width, height, fill=1, stroke=0)
     canvas_obj.setFillColor(BRAND_DEEP)
-    canvas_obj.rect(0, 0, 1.15 * cm, height, fill=1, stroke=0)
+    canvas_obj.rect(0, 0, 1.35 * cm, height, fill=1, stroke=0)
     canvas_obj.setFillColor(BRAND_DIM)
-    canvas_obj.rect(1.15 * cm, height - 0.35 * cm, width - 1.15 * cm, 0.35 * cm, fill=1, stroke=0)
+    canvas_obj.rect(1.35 * cm, height - 0.42 * cm, width - 1.35 * cm, 0.42 * cm, fill=1, stroke=0)
+
+    # A assinatura gráfica ocupa o rodapé visual sem disputar atenção com o título.
+    canvas_obj.setFillColor(colors.HexColor("#F1F8F3"))
+    canvas_obj.circle(width - 3.0 * cm, 4.1 * cm, 4.25 * cm, fill=1, stroke=0)
+    canvas_obj.setStrokeColor(BORDER_BRAND)
+    canvas_obj.setLineWidth(0.55)
+    canvas_obj.circle(width - 3.0 * cm, 4.1 * cm, 3.45 * cm, fill=0, stroke=1)
+    canvas_obj.setFillColor(BRAND_HI)
+    for dot_x, dot_y, dot_size in ((width - 5.8 * cm, 7.0 * cm, 0.12), (width - 2.0 * cm, 5.35 * cm, 0.08), (width - 4.15 * cm, 2.25 * cm, 0.1)):
+        canvas_obj.circle(dot_x, dot_y, dot_size * cm, fill=1, stroke=0)
+
     _draw_logo(canvas_obj, 3.0 * cm, height - 4.15 * cm, 1.45 * cm)
-    canvas_obj.setFont("Helvetica-Bold", 16)
+    canvas_obj.setFont(FONT_BLACK, 16)
     canvas_obj.setFillColor(TEXT_D1)
     canvas_obj.drawString(4.85 * cm, height - 3.35 * cm, "SOLVER")
-    canvas_obj.setFont("Helvetica", 7.5)
+    canvas_obj.setFont(FONT_REGULAR, 7.5)
     canvas_obj.setFillColor(TEXT_D3)
     canvas_obj.drawString(4.85 * cm, height - 3.72 * cm, "INTELLIGENCE FOR FIELD TRIALS")
     canvas_obj.restoreState()
-
 
 def _draw_content_header_footer(canvas_obj, doc) -> None:
     """Cabeçalho e rodapé das páginas textuais em A4 retrato."""
@@ -183,12 +219,12 @@ def _draw_content_header_footer(canvas_obj, doc) -> None:
 
     _draw_logo(canvas_obj, 3.0 * cm, height - 1.75 * cm, 0.75 * cm)
     canvas_obj.setFillColor(TEXT_D1)
-    canvas_obj.setFont("Helvetica-Bold", 9.5)
+    canvas_obj.setFont(FONT_BOLD, 9.5)
     canvas_obj.drawString(3.95 * cm, height - 1.28 * cm, "SOLVER ESTATÍSTICA")
-    canvas_obj.setFont("Helvetica", 7.2)
+    canvas_obj.setFont(FONT_REGULAR, 7.2)
     canvas_obj.setFillColor(TEXT_D3)
     canvas_obj.drawString(3.95 * cm, height - 1.58 * cm, "Relatório estatístico experimental")
-    canvas_obj.setFont("Helvetica", 7.2)
+    canvas_obj.setFont(FONT_REGULAR, 7.2)
     canvas_obj.setFillColor(BRAND)
     canvas_obj.drawRightString(
         width - 2.0 * cm,
@@ -199,7 +235,7 @@ def _draw_content_header_footer(canvas_obj, doc) -> None:
     canvas_obj.setLineWidth(0.6)
     canvas_obj.line(3.0 * cm, height - 2.05 * cm, width - 2.0 * cm, height - 2.05 * cm)
     canvas_obj.line(3.0 * cm, 1.45 * cm, width - 2.0 * cm, 1.45 * cm)
-    canvas_obj.setFont("Helvetica", 7.2)
+    canvas_obj.setFont(FONT_REGULAR, 7.2)
     canvas_obj.setFillColor(TEXT_D3)
     canvas_obj.drawString(
         3.0 * cm,
@@ -213,15 +249,15 @@ def _draw_content_header_footer(canvas_obj, doc) -> None:
 def _kpi_card(label: str, value: str, sub: str) -> Table:
     """Card claro e compacto para a largura útil do A4 retrato."""
     label_style = ParagraphStyle(
-        "KpiLabel", fontName="Helvetica-Bold", fontSize=6.8,
+        "KpiLabel", fontName=FONT_BOLD, fontSize=6.8,
         textColor=TEXT_D3, leading=9,
     )
     value_style = ParagraphStyle(
-        "KpiValue", fontName="Helvetica-Bold", fontSize=15,
+        "KpiValue", fontName=FONT_BOLD, fontSize=15,
         textColor=TEXT_D1, leading=17, spaceBefore=4,
     )
     sub_style = ParagraphStyle(
-        "KpiSub", fontName="Helvetica-Bold", fontSize=7,
+        "KpiSub", fontName=FONT_BOLD, fontSize=7,
         textColor=BRAND, spaceBefore=3,
     )
     card = Table(
@@ -290,7 +326,7 @@ def _styled_table(
         # header
         ("BACKGROUND", (0, 0), (-1, 0), CANVAS_ELEVATED_2),
         ("TEXTCOLOR", (0, 0), (-1, 0), BRAND_DEEP),
-        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 0), (-1, 0), FONT_BOLD),
         ("FONTSIZE", (0, 0), (-1, -1), 7.2),
         # corpo
         ("TEXTCOLOR", (0, 1), (-1, -1), TEXT_D1),
@@ -307,7 +343,7 @@ def _styled_table(
         ("BOTTOMPADDING", (0, 0), (-1, -1), min(row_padding, 5.5)),
         ("LEFTPADDING", (0, 0), (-1, -1), 5),
         ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-        ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (0, -1), FONT_BOLD),
     ]
     if right_align_from is not None:
         style.append(("ALIGN", (right_align_from, 1), (-1, -1), "RIGHT"))
@@ -318,7 +354,7 @@ def _styled_table(
                 continue
             style.append(("BACKGROUND", (sig_col, row_idx), (sig_col, row_idx), bg))
             style.append(("TEXTCOLOR", (sig_col, row_idx), (sig_col, row_idx), fg))
-            style.append(("FONTNAME", (sig_col, row_idx), (sig_col, row_idx), "Helvetica-Bold"))
+            style.append(("FONTNAME", (sig_col, row_idx), (sig_col, row_idx), FONT_BOLD))
             style.append(("ALIGN", (sig_col, row_idx), (sig_col, row_idx), "CENTER"))
     table.setStyle(TableStyle(style))
     return table
@@ -418,16 +454,16 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     styles = getSampleStyleSheet()
     meta_style = ParagraphStyle(
         "SolverMeta", parent=styles["BodyText"],
-        fontName="Helvetica", fontSize=9, leading=13.5, textColor=TEXT_D2, spaceAfter=4,
+        fontName=FONT_REGULAR, fontSize=9, leading=13.5, textColor=TEXT_D2, spaceAfter=4,
     )
     h2 = ParagraphStyle(
         "SolverH2", parent=styles["Heading2"],
-        fontName="Helvetica-Bold", fontSize=12, leading=15, textColor=BRAND_DEEP,
+        fontName=FONT_BOLD, fontSize=12, leading=15, textColor=BRAND_DEEP,
         spaceBefore=10, spaceAfter=8, keepWithNext=1,
     )
     body = ParagraphStyle(
         "SolverBody", parent=styles["BodyText"],
-        fontName="Helvetica", fontSize=11, leading=16.5, textColor=TEXT_D1,
+        fontName=FONT_REGULAR, fontSize=11, leading=16.5, textColor=TEXT_D1,
         alignment=TA_JUSTIFY, firstLineIndent=1.25 * cm,
     )
     body_dim = ParagraphStyle(
@@ -441,28 +477,40 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         fontSize=8.2, leading=11.5, spaceBefore=7,
     )
     tag = ParagraphStyle(
-        "SolverTag", parent=body, fontName="Helvetica-Bold",
+        "SolverTag", parent=body, fontName=FONT_BOLD,
         fontSize=8.5, textColor=BRAND, leading=11, firstLineIndent=0, spaceBefore=0, spaceAfter=6,
     )
     cover_author = ParagraphStyle(
-        "CoverAuthor", parent=body, fontName="Helvetica", fontSize=12, leading=18,
+        "CoverAuthor", parent=body, fontName=FONT_REGULAR, fontSize=12, leading=18,
         alignment=TA_CENTER, firstLineIndent=0, textColor=TEXT_D1,
     )
     cover_title = ParagraphStyle(
-        "CoverTitle", parent=styles["Title"], fontName="Helvetica-Bold", fontSize=18,
-        leading=23, alignment=TA_CENTER, textColor=BRAND_DEEP, spaceAfter=12,
+        "CoverTitle", parent=styles["Title"], fontName=FONT_BLACK, fontSize=27,
+        leading=29, alignment=TA_CENTER, textColor=BRAND_DEEP, spaceAfter=12,
     )
     cover_subtitle = ParagraphStyle(
         "CoverSubtitle", parent=cover_author, fontSize=11, textColor=TEXT_D2,
     )
     cover_badge = ParagraphStyle(
-        "CoverBadge", parent=cover_author, fontName="Helvetica-Bold", fontSize=8.5,
+        "CoverBadge", parent=cover_author, fontName=FONT_BOLD, fontSize=8.5,
         leading=11, textColor=BRAND_DEEP,
+    )
+    cover_kicker = ParagraphStyle(
+        "CoverKicker", parent=cover_author, fontName=FONT_BOLD, fontSize=8,
+        leading=10, textColor=BRAND, spaceAfter=0,
+    )
+    cover_author_label = ParagraphStyle(
+        "CoverAuthorLabel", parent=cover_author, fontName=FONT_BOLD, fontSize=7,
+        leading=9, textColor=TEXT_D3,
     )
 
     meta = result.get("meta", {})
     design_label = DESIGN_LABELS.get(meta.get("design"), meta.get("design") or "—")
     type_label = TYPE_LABELS.get(meta.get("analysis_type"), meta.get("analysis_type") or "—")
+    alpha_mode_label = {"auto": "Automático", "fixed": "Fixo"}.get(
+        str(meta.get("alpha_mode", "auto")).lower(),
+        str(meta.get("alpha_mode", "auto")).title(),
+    )
     section_counter = [0]
 
     def section_heading(title: str) -> Paragraph:
@@ -470,17 +518,17 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         return Paragraph(f"{section_counter[0]} {escape(title.upper())}", h2)
 
     story: List[Any] = [
-        Spacer(1, 4.5 * cm),
-        Paragraph(escape(_author_display), cover_author),
-        Spacer(1, 4.0 * cm),
-        Paragraph("RELATÓRIO ESTATÍSTICO", cover_title),
+        Spacer(1, 4.25 * cm),
+        Paragraph("ANÁLISE ESTATÍSTICA EXPERIMENTAL", cover_kicker),
+        Spacer(1, 0.32 * cm),
+        Paragraph("RELATÓRIO<br/>ESTATÍSTICO", cover_title),
         Paragraph(
-            f"{escape(str(design_label))}<br/>{escape(str(type_label).title())}",
+            f"Delineamento {escape(str(design_label))}<br/>Análise de {escape(str(type_label))}",
             cover_subtitle,
         ),
         Spacer(1, 0.55 * cm),
         Table([[
-            Paragraph("LAUDO TÉCNICO · RASTREÁVEL · HORÁRIO DE BRASÍLIA", cover_badge)
+            Paragraph("LAUDO TÉCNICO - RASTREÁVEL - HORÁRIO DE BRASÍLIA", cover_badge)
         ]], colWidths=[doc.width], style=TableStyle([
             ("BACKGROUND", (0, 0), (-1, -1), BRAND_DIM),
             ("BOX", (0, 0), (-1, -1), 0.8, BORDER_BRAND),
@@ -490,21 +538,37 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
             ("LEFTPADDING", (0, 0), (-1, -1), 12),
             ("RIGHTPADDING", (0, 0), (-1, -1), 12),
         ])),
-        Spacer(1, 5.0 * cm),
+        Spacer(1, 1.35 * cm),
+        Table([
+            [Paragraph("PREPARADO PARA", cover_author_label)],
+            [Paragraph(escape(_author_display), cover_author)],
+        ], colWidths=[doc.width], style=TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.white),
+            ("BOX", (0, 0), (-1, -1), 0.7, BORDER),
+            ("ROUNDEDCORNERS", [10, 10, 10, 10]),
+            ("TOPPADDING", (0, 0), (-1, 0), 10),
+            ("BOTTOMPADDING", (0, 0), (-1, 0), 3),
+            ("TOPPADDING", (0, 1), (-1, 1), 2),
+            ("BOTTOMPADDING", (0, 1), (-1, 1), 11),
+            ("LEFTPADDING", (0, 0), (-1, -1), 14),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 14),
+        ])),
+        Spacer(1, 4.35 * cm),
         Paragraph(f"Brasil<br/>{_brasilia_now().year}", cover_author),
         NextPageTemplate("content"),
         PageBreak(),
         Paragraph(
-            f"DELINEAMENTO {meta.get('design')} · TIPO {meta.get('analysis_type')} · "
-            f"{meta.get('n_rows')} LINHAS",
+            f"DELINEAMENTO {escape(str(design_label)).upper()} - "
+            f"ANÁLISE DE {escape(str(type_label)).upper()} - "
+            f"{meta.get('n_rows')} OBSERVAÇÕES",
             tag,
         ),
         section_heading("Apresentação"),
         Paragraph(_intro_text(result), body),
         Paragraph(
-            f"Alfa: <b>{_fmt(meta.get('alpha'))}</b> ({escape(str(meta.get('alpha_mode', 'auto')))}) · "
-            f"Soma de quadrados: <b>tipo {_fmt(meta.get('sum_squares_type'))}</b> · "
-            f"Motor: <b>{escape(str(provenance.get('engine_version', '—')))}</b> · "
+            f"Alfa adotado: <b>{_fmt(meta.get('alpha'))}</b> ({escape(alpha_mode_label)}) - "
+            f"Soma de quadrados: <b>tipo {_fmt(meta.get('sum_squares_type'))}</b> - "
+            f"Motor: <b>{escape(str(provenance.get('engine_version', '—')))}</b> - "
             f"Commit: <b>{escape(str(provenance.get('git_commit', '—'))[:12])}</b>",
             meta_style,
         ),
