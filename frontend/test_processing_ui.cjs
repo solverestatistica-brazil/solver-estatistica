@@ -9,10 +9,11 @@ const css = fs.readFileSync(path.join(root, 'assets/css/styles.css'), 'utf8');
 
 for (const id of [
   'processingOverlay', 'processingTitle', 'processingMessage', 'processingProgress',
-  'processingProgressBar', 'processingSteps', 'processingElapsed', 'cancelAnalysis'
+  'processingContext', 'processingElapsed', 'cancelAnalysis'
 ]) {
   assert(html.includes(`id="${id}"`), `elemento interativo ausente: ${id}`);
 }
+assert(html.includes('data-processing-step="0"') && html.includes('pseg-fill'), 'as etapas precisam existir como segmentos de progresso');
 
 assert(html.includes('role="progressbar"'), 'o progresso precisa ser acessível');
 assert(html.includes('aria-modal="true"'), 'o processamento precisa bloquear a interação de fundo');
@@ -20,7 +21,7 @@ assert(js.includes('currentAnalysisController = new AbortController()'), 'a aná
 assert(js.includes('signal: currentAnalysisController.signal'), 'o cancelamento precisa chegar ao fetch');
 assert(js.includes("setAttribute('aria-busy', 'true')"), 'o estado ocupado precisa ser anunciado');
 assert(js.includes('completeProcessing()'), 'o progresso precisa indicar conclusão');
-assert(css.includes('@keyframes solver-spin'), 'a interface precisa ter feedback visual contínuo');
+assert(css.includes('.pseg-fill{'), 'o preenchimento das etapas precisa dar feedback visual contínuo');
 assert(css.includes('@media (prefers-reduced-motion:reduce)'), 'a animação precisa respeitar acessibilidade');
 
 console.log('Processamento: progresso, etapas, acessibilidade e cancelamento aprovados');
