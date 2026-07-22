@@ -53,6 +53,10 @@ test('tema claro preserva identidade e layout mobile nao transborda', async ({ p
 
   const widths = await page.evaluate(() => ({ viewport: window.innerWidth, document: document.documentElement.scrollWidth }));
   expect(widths.document).toBeLessThanOrEqual(widths.viewport);
+
+  // o gráfico demo (SVG) não pode esticar sem limite no mobile
+  const vizHeight = await page.locator('.viz-svg').first().evaluate((el) => el.getBoundingClientRect().height);
+  expect(vizHeight).toBeLessThan(300);
 });
 
 test('upload CSV detecta colunas e oferece mapeamento sem bloquear o usuario', async ({ page }) => {
