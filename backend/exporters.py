@@ -22,7 +22,7 @@ import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_CENTER, TA_JUSTIFY
+from reportlab.lib.enums import TA_JUSTIFY
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
@@ -206,34 +206,161 @@ def _draw_logo(canvas_obj, logo_x: float, logo_y: float, logo_size: float) -> No
     canvas_obj.drawPath(arrow, stroke=1, fill=0)
 
 
+COVER_BG = colors.HexColor("#FAFBF9")
+COVER_SIDEBAR = colors.HexColor("#0F4A2E")
+COVER_ACCENT = colors.HexColor("#55B06B")
+COVER_TITLE_DARK = colors.HexColor("#111111")
+COVER_TITLE_GREEN = colors.HexColor("#2EA052")
+COVER_SUB1 = colors.HexColor("#3A4A3D")
+COVER_SUB2 = colors.HexColor("#5A6B5D")
+COVER_BADGE_BG = colors.HexColor("#E6F2EA")
+COVER_BADGE_TEXT = colors.HexColor("#2C3D30")
+
+
+def _cover_icon_bars(c, cx: float, cy: float) -> None:
+    c.setStrokeColor(BRAND_DEEP)
+    c.setLineWidth(1.5)
+    c.setLineCap(1)
+    c.line(cx - 0.20 * cm, cy - 0.18 * cm, cx - 0.20 * cm, cy + 0.05 * cm)
+    c.line(cx,             cy - 0.18 * cm, cx,             cy + 0.18 * cm)
+    c.line(cx + 0.20 * cm, cy - 0.18 * cm, cx + 0.20 * cm, cy + 0.28 * cm)
+
+
+def _cover_icon_target(c, cx: float, cy: float) -> None:
+    c.setStrokeColor(BRAND_DEEP)
+    c.setLineWidth(1.1)
+    c.circle(cx, cy, 0.28 * cm, stroke=1, fill=0)
+    c.circle(cx, cy, 0.10 * cm, stroke=1, fill=0)
+    for dx, dy in ((0, 0.35), (0, -0.35), (0.35, 0), (-0.35, 0)):
+        c.line(cx + dx * cm * 0.65, cy + dy * cm * 0.65,
+               cx + dx * cm,        cy + dy * cm)
+
+
+def _cover_icon_leaf(c, cx: float, cy: float) -> None:
+    c.setStrokeColor(BRAND_DEEP)
+    c.setLineWidth(1.2)
+    p = c.beginPath()
+    p.moveTo(cx, cy + 0.28 * cm)
+    p.curveTo(cx + 0.30 * cm, cy + 0.10 * cm,
+              cx + 0.30 * cm, cy - 0.28 * cm,
+              cx,             cy - 0.28 * cm)
+    p.curveTo(cx - 0.30 * cm, cy - 0.28 * cm,
+              cx - 0.30 * cm, cy + 0.10 * cm,
+              cx,             cy + 0.28 * cm)
+    c.drawPath(p, stroke=1, fill=0)
+    c.line(cx - 0.16 * cm, cy + 0.05 * cm, cx + 0.16 * cm, cy - 0.16 * cm)
+
+
 def _draw_cover_page(canvas_obj, doc) -> None:
-    """Capa editorial, com elementos gráficos discretos e alto contraste."""
+    """Capa institucional: título grande à esquerda, sidebar com ano, selos no rodapé."""
     canvas_obj.saveState()
     width, height = A4
-    canvas_obj.setFillColor(CANVAS)
+
+    # Fundo geral
+    canvas_obj.setFillColor(COVER_BG)
     canvas_obj.rect(0, 0, width, height, fill=1, stroke=0)
-    canvas_obj.setFillColor(BRAND_DEEP)
-    canvas_obj.rect(0, 0, 1.35 * cm, height, fill=1, stroke=0)
-    canvas_obj.setFillColor(BRAND_DIM)
-    canvas_obj.rect(1.35 * cm, height - 0.42 * cm, width - 1.35 * cm, 0.42 * cm, fill=1, stroke=0)
 
-    # A assinatura gráfica ocupa o rodapé visual sem disputar atenção com o título.
-    canvas_obj.setFillColor(colors.HexColor("#F1F8F3"))
-    canvas_obj.circle(width - 3.0 * cm, 4.1 * cm, 4.25 * cm, fill=1, stroke=0)
-    canvas_obj.setStrokeColor(BORDER_BRAND)
+    # Faixa lateral verde escura
+    sidebar_w = 2.2 * cm
+    canvas_obj.setFillColor(COVER_SIDEBAR)
+    canvas_obj.rect(0, 0, sidebar_w, height, fill=1, stroke=0)
+
+    # Barra clara acima do ano
+    canvas_obj.setFillColor(COVER_ACCENT)
+    canvas_obj.rect(sidebar_w / 2 - 0.12 * cm, 5.5 * cm, 0.24 * cm, 2.2 * cm, fill=1, stroke=0)
+
+    # Ano (dinâmico) — 20 sobre 24
+    canvas_obj.setFillColor(colors.white)
+    canvas_obj.setFont(FONT_TEXT, 14)
+    year_now = str(getattr(doc, "cover_year", _brasilia_now().year))
+    canvas_obj.drawCentredString(sidebar_w / 2, 4.7 * cm, year_now[:2])
+    canvas_obj.drawCentredString(sidebar_w / 2, 4.0 * cm, year_now[2:])
+
+    # Pontos decorativos no canto superior direito
+    canvas_obj.setFillColor(COVER_ACCENT)
+    for i in range(10):
+        for j in range(4):
+            canvas_obj.circle(
+                width - 2.5 * cm - i * 0.26 * cm,
+                height - 2.5 * cm - j * 0.26 * cm,
+                0.7, fill=1, stroke=0,
+            )
+
+    # Círculos concêntricos decorativos à direita
+    cx, cy = width - 5.5 * cm, height / 2 + 0.5 * cm
+    canvas_obj.setStrokeColor(BRAND)
     canvas_obj.setLineWidth(0.55)
-    canvas_obj.circle(width - 3.0 * cm, 4.1 * cm, 3.45 * cm, fill=0, stroke=1)
-    canvas_obj.setFillColor(BRAND_HI)
-    for dot_x, dot_y, dot_size in ((width - 5.8 * cm, 7.0 * cm, 0.12), (width - 2.0 * cm, 5.35 * cm, 0.08), (width - 4.15 * cm, 2.25 * cm, 0.1)):
-        canvas_obj.circle(dot_x, dot_y, dot_size * cm, fill=1, stroke=0)
+    for r in (5.5 * cm, 4.2 * cm, 3.0 * cm):
+        canvas_obj.circle(cx, cy, r, stroke=1, fill=0)
+    canvas_obj.setFillColor(BRAND_DEEP)
+    canvas_obj.circle(cx, cy, 1.8, fill=1, stroke=0)
 
-    _draw_logo(canvas_obj, 3.0 * cm, height - 4.15 * cm, 1.45 * cm)
-    canvas_obj.setFont(FONT_HEADING_BLACK, 16)
-    canvas_obj.setFillColor(TEXT_D1)
-    canvas_obj.drawString(4.85 * cm, height - 3.35 * cm, "SOLVER")
-    canvas_obj.setFont(FONT_TEXT, 7.5)
+    # Curva decorativa passando pelo centro dos círculos
+    p = canvas_obj.beginPath()
+    p.moveTo(sidebar_w + 1.5 * cm, 9.0 * cm)
+    p.curveTo(sidebar_w + 6.0 * cm, 16.0 * cm, cx - 4.0 * cm, cy - 2.0 * cm, cx, cy)
+    canvas_obj.setStrokeColor(BRAND)
+    canvas_obj.setLineWidth(0.8)
+    canvas_obj.drawPath(p, stroke=1, fill=0)
+
+    # ------------------------------------------------------------------ LOGO
+    logo_x, logo_y = sidebar_w + 1.8 * cm, height - 4.2 * cm
+    _draw_logo(canvas_obj, logo_x, logo_y, 1.1 * cm)
+    canvas_obj.setFillColor(BRAND_DEEP)
+    canvas_obj.setFont(FONT_HEADING_BOLD, 17)
+    canvas_obj.drawString(logo_x + 1.35 * cm, logo_y + 0.48 * cm, "SOLVER")
     canvas_obj.setFillColor(TEXT_D3)
-    canvas_obj.drawString(4.85 * cm, height - 3.72 * cm, "INTELLIGENCE FOR FIELD TRIALS")
+    canvas_obj.setFont(FONT_TEXT_SEMIBOLD, 6.4)
+    canvas_obj.drawString(logo_x + 1.35 * cm, logo_y + 0.15 * cm, "INTELLIGENCE FOR FIELD TRIALS")
+
+    # ------------------------------------------------------------- TÍTULO
+    title_x = sidebar_w + 1.8 * cm
+    canvas_obj.setFillColor(COVER_TITLE_DARK)
+    canvas_obj.setFont(FONT_HEADING_BLACK, 56)
+    canvas_obj.drawString(title_x, height - 10.8 * cm, "RELATÓRIO")
+    canvas_obj.setFillColor(COVER_TITLE_GREEN)
+    canvas_obj.drawString(title_x, height - 12.6 * cm, "ESTATÍSTICO")
+
+    # Divisor
+    canvas_obj.setFillColor(COVER_TITLE_GREEN)
+    canvas_obj.rect(title_x, height - 13.6 * cm, 5.5 * cm, 0.16 * cm, fill=1, stroke=0)
+
+    # Subtítulos dinâmicos
+    subtitle_main = getattr(doc, "cover_design_label", "") or "Análise estatística experimental"
+    subtitle_second = getattr(doc, "cover_type_label", "") or ""
+    canvas_obj.setFillColor(COVER_SUB1)
+    canvas_obj.setFont(FONT_TEXT, 13)
+    canvas_obj.drawString(title_x, height - 14.5 * cm, subtitle_main)
+    if subtitle_second:
+        canvas_obj.setFillColor(COVER_SUB2)
+        canvas_obj.drawString(title_x, height - 15.2 * cm, subtitle_second)
+
+    # ------------------------------------------------------- RODAPÉ / SELOS
+    footer_h = 2.4 * cm
+    canvas_obj.setFillColor(colors.white)
+    canvas_obj.rect(sidebar_w, 0, width - sidebar_w, footer_h, fill=1, stroke=0)
+    canvas_obj.setStrokeColor(BORDER)
+    canvas_obj.setLineWidth(0.6)
+    canvas_obj.line(sidebar_w, footer_h, width, footer_h)
+
+    badges = (
+        ("DADOS", "CONFIÁVEIS", _cover_icon_bars),
+        ("ANÁLISES", "PRECISAS", _cover_icon_target),
+        ("DECISÕES", "INTELIGENTES", _cover_icon_leaf),
+    )
+    zone_w = (width - sidebar_w) / len(badges)
+    for i, (t1, t2, icon_fn) in enumerate(badges):
+        zone_cx = sidebar_w + zone_w * (i + 0.5)
+        icon_cx = zone_cx - 1.4 * cm
+        icon_cy = footer_h / 2
+        canvas_obj.setFillColor(COVER_BADGE_BG)
+        canvas_obj.circle(icon_cx, icon_cy, 0.45 * cm, fill=1, stroke=0)
+        icon_fn(canvas_obj, icon_cx, icon_cy)
+        canvas_obj.setFillColor(COVER_BADGE_TEXT)
+        canvas_obj.setFont(FONT_TEXT_BOLD, 7.5)
+        canvas_obj.drawString(icon_cx + 0.65 * cm, icon_cy + 0.10 * cm, t1)
+        canvas_obj.drawString(icon_cx + 0.65 * cm, icon_cy - 0.35 * cm, t2)
+
     canvas_obj.restoreState()
 
 def _draw_content_header_footer(canvas_obj, doc) -> None:
@@ -471,6 +598,16 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     doc.generated_at_brasilia_display = _format_brasilia_timestamp(
         provenance.get("generated_at_brasilia") or provenance.get("generated_at_utc")
     )
+    _meta_early = result.get("meta") or {}
+    _design_early = DESIGN_LABELS.get(
+        _meta_early.get("design"), _meta_early.get("design") or "—"
+    )
+    doc.cover_design_label = f"Delineamento {_design_early}"
+    _type_early = TYPE_LABELS.get(
+        _meta_early.get("analysis_type"), _meta_early.get("analysis_type") or ""
+    )
+    doc.cover_type_label = f"Análise de {_type_early}" if _type_early else ""
+    doc.cover_year = _brasilia_now().year
     cover_frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="cover-frame", showBoundary=0)
     content_frame = Frame(doc.leftMargin, doc.bottomMargin, doc.width, doc.height, id="content-frame", showBoundary=0)
     doc.addPageTemplates([
@@ -507,14 +644,7 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         "SolverTag", parent=body, fontName=FONT_HEADING_BOLD,
         fontSize=8.5, textColor=BRAND, leading=11, firstLineIndent=0, spaceBefore=0, spaceAfter=6,
     )
-    cover_title = ParagraphStyle(
-        "CoverTitle", parent=styles["Title"], fontName=FONT_HEADING_BLACK, fontSize=27,
-        leading=29, alignment=TA_CENTER, textColor=BRAND_DEEP, spaceAfter=0,
-    )
-    cover_subtitle = ParagraphStyle(
-        "CoverSubtitle", parent=body, fontName=FONT_TEXT, fontSize=10.5, leading=15,
-        alignment=TA_CENTER, firstLineIndent=0, textColor=TEXT_D2,
-    )
+    # (título e subtítulo da capa são desenhados via canvas em _draw_cover_page)
     meta = result.get("meta", {})
     design_label = DESIGN_LABELS.get(meta.get("design"), meta.get("design") or "—")
     type_label = TYPE_LABELS.get(meta.get("analysis_type"), meta.get("analysis_type") or "—")
@@ -529,14 +659,9 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         return Paragraph(f"{section_counter[0]} {escape(title.upper())}", h2)
 
     story: List[Any] = [
-        Spacer(1, 5.45 * cm),
-        Paragraph("RELATÓRIO<br/>ESTATÍSTICO", cover_title),
-        Spacer(1, 0.18 * cm),
-        Paragraph(
-            f"Delineamento {escape(str(design_label))}<br/>Análise de {escape(str(type_label))}",
-            cover_subtitle,
-        ),
-        Spacer(1, 6.6 * cm),
+        # Página 1 (capa) — desenhada 100% em canvas via _draw_cover_page.
+        # A story só precisa "empurrar" um flowable para o frame existir.
+        Spacer(1, 1),
         NextPageTemplate("content"),
         PageBreak(),
         Paragraph(
