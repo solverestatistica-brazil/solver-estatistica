@@ -18,7 +18,9 @@
       button.setAttribute('aria-pressed', String(isLight));
       button.setAttribute('aria-label', isLight ? 'Ativar tema escuro' : 'Ativar tema claro');
       if (label) label.textContent = isLight ? 'Escuro' : 'Claro';
-      if (icon) icon.textContent = isLight ? '☾' : '☀';
+      if (icon) icon.innerHTML = isLight
+        ? '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.2 6.2 0 0 0 10.5 10.5z"/></svg>'
+        : '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.1M12 19.3v2.1M4.7 4.7l1.5 1.5M17.8 17.8l1.5 1.5M2.6 12h2.1M19.3 12h2.1M4.7 19.3l1.5-1.5M17.8 6.2l1.5-1.5"/></svg>';
     });
   }
 

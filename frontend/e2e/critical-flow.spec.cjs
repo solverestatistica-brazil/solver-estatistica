@@ -57,6 +57,14 @@ test('tema claro preserva identidade e layout mobile nao transborda', async ({ p
   // o gráfico demo (SVG) não pode esticar sem limite no mobile
   const vizHeight = await page.locator('.viz-svg').first().evaluate((el) => el.getBoundingClientRect().height);
   expect(vizHeight).toBeLessThan(300);
+
+  // no mobile, cada tile do hero ocupa a largura total (bento empilha, não fica espremido)
+  const tileRatios = await page.evaluate(() => {
+    const hero = document.querySelector('.hero');
+    const heroW = hero.getBoundingClientRect().width || 1;
+    return Array.from(hero.children).map((c) => c.getBoundingClientRect().width / heroW);
+  });
+  for (const ratio of tileRatios) expect(ratio).toBeGreaterThan(0.9);
 });
 
 test('upload CSV detecta colunas e oferece mapeamento sem bloquear o usuario', async ({ page }) => {

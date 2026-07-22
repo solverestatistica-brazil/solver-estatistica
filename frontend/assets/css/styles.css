@@ -665,10 +665,10 @@ body.is-processing{overflow:hidden}
 }
 @media (max-width:640px){
   .page-shell{padding:16px 14px 40px}
-  .hero{grid-template-columns:1fr}
-  .hero-copy,.tile-viz,.tile-designs,.tile-tests,.tile-export{grid-column:span 1}
+  .hero{display:flex;flex-direction:column}
+  .hero>*{width:100%;min-width:0}
   .result-cards,.format-grid,.export-grid,.form-grid,.manual-builder,.tests-grid,.provenance-grid{grid-template-columns:1fr}
-  .tests-grid{grid-template-columns:repeat(6,1fr)}
+  .tests-grid{grid-template-columns:repeat(3,1fr)}
   .sidebar{grid-template-columns:1fr 1fr}
   .workarea,.panel{padding:18px}
   .btn:not(.nav-actions .btn){width:100%}
