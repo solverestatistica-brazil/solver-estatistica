@@ -615,8 +615,8 @@ body.is-processing{overflow:hidden}
 }
 .format-grid b{font-family:var(--font-heading);display:block;margin-bottom:8px;color:var(--text-d1);font-weight:600}
 .format-grid code{
-  display:inline-block;background:var(--canvas);border-radius:6px;padding:6px 10px;
-  color:var(--brand);font-size:12px;font-family:var(--font-mono);border:1px solid var(--border);
+  display:inline-block;color:var(--brand);font-size:12.5px;font-family:var(--font-mono);
+  letter-spacing:.02em;margin:2px 0 0;
 }
 .format-grid p{color:var(--text-d2);font-size:13px;line-height:1.6;margin:10px 0 0}
 
