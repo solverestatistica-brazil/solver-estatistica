@@ -425,31 +425,45 @@
     setTimeout(() => div.remove(), 4200);
   }
 
-  function setProcessingStep(stepIndex, progress, message) {
+  function processingContext(payload) {
+    const typeMap = { single: 'fator único', factorial: 'fatorial', split_plot: 'parcelas subdivididas', regression: 'regressão' };
+    const n = (payload?.data || []).length;
+    return [payload?.design, typeMap[payload?.analysis_type] || payload?.analysis_type, `${n} observações`]
+      .filter(Boolean).join(' · ');
+  }
+
+  function setProcessingStep(stepIndex, frac, message) {
+    frac = Math.max(0, Math.min(1, frac));
+    const overall = Math.min(100, Math.round(((stepIndex + frac) / PROCESSING_STEPS.length) * 100));
     const progressNode = $('processingProgress');
-    const progressBar = $('processingProgressBar');
-    if (progressNode) progressNode.setAttribute('aria-valuenow', String(Math.round(progress)));
-    if (progressBar) progressBar.style.width = `${progress}%`;
+    if (progressNode) progressNode.setAttribute('aria-valuenow', String(overall));
     if ($('processingMessage')) $('processingMessage').textContent = message;
     document.querySelectorAll('[data-processing-step]').forEach((node, index) => {
       node.classList.toggle('active', index === stepIndex);
       node.classList.toggle('completed', index < stepIndex);
+      const fill = node.querySelector('.pseg-fill');
+      if (fill) {
+        const pct = index < stepIndex ? 100 : index === stepIndex ? Math.max(6, frac * 100) : 0;
+        fill.style.width = `${pct}%`;
+      }
     });
   }
 
-  function startProcessing() {
+  function startProcessing(context) {
     processingStartedAt = performance.now();
+    if ($('processingContext')) $('processingContext').textContent = context || '';
     $('processingOverlay')?.classList.remove('hidden');
     document.body.classList.add('is-processing');
     document.querySelector('main')?.setAttribute('aria-busy', 'true');
     if ($('cancelAnalysis')) $('cancelAnalysis').disabled = false;
-    setProcessingStep(0, 8, PROCESSING_STEPS[0]);
+    setProcessingStep(0, 0.08, PROCESSING_STEPS[0]);
     processingTimer = window.setInterval(() => {
       const elapsed = performance.now() - processingStartedAt;
-      const stepIndex = Math.min(PROCESSING_STEPS.length - 1, Math.floor(elapsed / 1200));
-      const bases = [14, 38, 64, 84];
-      const withinStep = Math.min(10, ((elapsed % 1200) / 1200) * 10);
-      setProcessingStep(stepIndex, Math.min(94, bases[stepIndex] + withinStep), PROCESSING_STEPS[stepIndex]);
+      const last = PROCESSING_STEPS.length - 1;
+      const stepIndex = Math.min(last, Math.floor(elapsed / 1200));
+      let frac = (elapsed % 1200) / 1200;
+      if (stepIndex === last) frac = Math.min(0.9, frac);
+      setProcessingStep(stepIndex, frac, PROCESSING_STEPS[stepIndex]);
       if ($('processingElapsed')) {
         $('processingElapsed').textContent = `${(elapsed / 1000).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} s decorridos`;
       }
@@ -459,10 +473,12 @@
   function completeProcessing() {
     if (processingTimer) window.clearInterval(processingTimer);
     processingTimer = null;
-    setProcessingStep(PROCESSING_STEPS.length - 1, 100, 'Resultados prontos. Abrindo o painel…');
+    setProcessingStep(PROCESSING_STEPS.length - 1, 1, 'Resultados prontos. Abrindo o painel…');
     document.querySelectorAll('[data-processing-step]').forEach((node) => {
       node.classList.remove('active');
       node.classList.add('completed');
+      const fill = node.querySelector('.pseg-fill');
+      if (fill) fill.style.width = '100%';
     });
     if ($('cancelAnalysis')) $('cancelAnalysis').disabled = true;
     return new Promise((resolve) => window.setTimeout(resolve, 320));
@@ -634,7 +650,7 @@
     try {
       runButton.disabled = true;
       currentAnalysisController = new AbortController();
-      startProcessing();
+      startProcessing(processingContext(payload));
       setApiStatus('Processando...', '');
       const res = await fetchWithTimeout(`${base}/api/analyze`, {
         method: 'POST',

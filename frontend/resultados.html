@@ -369,19 +369,18 @@
 
 <div id="processingOverlay" class="processing-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="processingTitle" aria-describedby="processingMessage">
   <section class="processing-dialog">
-    <div class="processing-orbit" aria-hidden="true"><span></span><i></i></div>
-    <span class="processing-kicker">Solver Engine</span>
-    <h2 id="processingTitle">Processando sua análise</h2>
-    <p id="processingMessage">Validando os dados experimentais…</p>
-    <div id="processingProgress" class="processing-progress" role="progressbar" aria-label="Progresso da análise" aria-valuemin="0" aria-valuemax="100" aria-valuenow="8">
-      <span id="processingProgressBar"></span>
+    <h2 id="processingTitle">Processando o ensaio</h2>
+    <p id="processingContext" class="processing-context"></p>
+    <div id="processingProgress" class="processing-segments" role="progressbar" aria-label="Progresso da análise" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div class="pseg" data-processing-step="0"><span class="pseg-bar"><i class="pseg-fill"></i></span><span class="pseg-label">Dados</span></div>
+      <div class="pseg" data-processing-step="1"><span class="pseg-bar"><i class="pseg-fill"></i></span><span class="pseg-label">Modelo</span></div>
+      <div class="pseg" data-processing-step="2"><span class="pseg-bar"><i class="pseg-fill"></i></span><span class="pseg-label">Testes</span></div>
+      <div class="pseg" data-processing-step="3"><span class="pseg-bar"><i class="pseg-fill"></i></span><span class="pseg-label">Resultados</span></div>
     </div>
-    <ol id="processingSteps" class="processing-steps">
-      <li data-processing-step="0"><i></i><span>Validar dados</span></li>
-      <li data-processing-step="1"><i></i><span>Montar modelo</span></li>
-      <li data-processing-step="2"><i></i><span>Calcular testes</span></li>
-      <li data-processing-step="3"><i></i><span>Preparar resultados</span></li>
-    </ol>
+    <div class="processing-detail">
+      <div class="processing-plots" aria-hidden="true"><span></span><span></span><span class="on"></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+      <p id="processingMessage" class="processing-msg">Validando os dados experimentais…</p>
+    </div>
     <footer class="processing-footer">
       <span id="processingElapsed">0,0 s decorridos</span>
       <button class="btn ghost danger" id="cancelAnalysis" type="button">Cancelar análise</button>
