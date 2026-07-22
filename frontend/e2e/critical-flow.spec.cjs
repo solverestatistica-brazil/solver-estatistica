@@ -12,7 +12,7 @@ async function preparePage(page) {
 
 async function openFilledDic(page) {
   await page.goto('/resultados.html');
-  await expect(page.locator('#apiStatus')).toHaveText('API online');
+  await expect(page.locator('#apiStatus')).toHaveText('Serviço online');
   await page.locator('#goToData').click();
   await page.locator('#generateTable').click();
   await expect(page.locator('#dataTable tbody tr')).toHaveCount(16);
