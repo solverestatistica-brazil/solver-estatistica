@@ -774,8 +774,8 @@ def _means(ctx: AnalysisContext, anova: Dict[str, Any]) -> Dict[str, Any]:
 
     _resp = str(ctx.response)
     plot_png = _means_plot_base64(table, _resp, "print")
-    plot_png_screen_light = _means_plot_base64(table, _resp, "screen_light")
-    plot_png_screen_dark = _means_plot_base64(table, _resp, "screen_dark")
+    plot_png_screen_light = _means_forest_base64(table, _resp, "screen_light")
+    plot_png_screen_dark = _means_forest_base64(table, _resp, "screen_dark")
 
     return {
         "treatment_means": table.to_dict(orient="records"),
@@ -1379,6 +1379,69 @@ _MEANS_CHART_THEME = {
                      "grid": "#8FC37822", "spine": "#8FC37833", "edge": "none", "elw": 0.0,
                      "err": "#9FB0A4", "letter": "#F6F9F6", "width": 0.52},
 }
+
+
+def _means_forest_base64(table: pd.DataFrame, y_label: str = "Média", variant: str = "screen_dark") -> Optional[str]:
+    """Apresentação alternativa das médias para o dashboard (Modelo C aprovado): dot/forest plot
+    — ponto na média + linha do intervalo (desvio-padrão), tratamentos ordenados (melhor no topo),
+    letra do teste à direita e eixo com zoom nas diferenças. Fundo transparente por tema."""
+    if table is None or len(table) == 0:
+        return None
+    from matplotlib.colors import LinearSegmentedColormap
+    _register_chart_fonts()
+    th = _MEANS_CHART_THEME.get(variant, _MEANS_CHART_THEME["screen_dark"])
+    dot_edge = "#0D1E15" if variant == "screen_dark" else "#FFFFFF"
+
+    labels = [str(t) for t in table["treatment"].tolist()]
+    means = table["mean"].to_numpy(dtype=float)
+    sds = (
+        table["sd"].fillna(0).to_numpy(dtype=float)
+        if "sd" in table.columns else np.zeros(len(means))
+    )
+    groups = table["group"].tolist() if "group" in table.columns else [""] * len(means)
+
+    cmap = LinearSegmentedColormap.from_list("solver_means", ["#E07B39", "#E3B23C", "#7FBF5A", "#2E8B4E"])
+    lo, hi = float(np.min(means)), float(np.max(means))
+    span = (hi - lo) or 1.0
+    colors = [cmap((m - lo) / span) for m in means]
+
+    n = len(labels)
+    y = np.arange(n)[::-1]  # tabela vem ordenada (melhor primeiro) -> melhor no topo
+    fig, ax = plt.subplots(figsize=(9, max(3.0, 0.62 * n + 1.5)), dpi=170)
+    fig.patch.set_alpha(0)
+    ax.set_facecolor("none")
+    ax.set_axisbelow(True)
+
+    data_lo = float(np.min(means - sds))
+    data_hi = float(np.max(means + sds))
+    rng = (data_hi - data_lo) or 1.0
+    xlo, xhi = data_lo - rng * 0.14, data_hi + rng * 0.24
+    letter_x = data_hi + rng * 0.15
+
+    ax.hlines(y, means - sds, means + sds, color=th["err"], linewidth=2.0, zorder=2)
+    ax.scatter(means, y, s=180, color=colors, edgecolor=dot_edge, linewidth=1.2, zorder=3)
+    for yi, m, g in zip(y, means, groups):
+        if g:
+            ax.text(letter_x, yi, str(g), ha="center", va="center",
+                    color=th["letter"], fontsize=11, fontweight="bold")
+
+    ax.set_yticks(y)
+    ax.set_yticklabels(labels, color=th["text"], fontsize=11)
+    ax.set_xlabel(f"{y_label}  ·  ponto = média, linha = desvio-padrão", color=th["text"], fontsize=10)
+    ax.set_xlim(xlo, xhi)
+    ax.set_ylim(-0.6, n - 0.4)
+    ax.set_title("Médias por tratamento", color=th["title"], fontsize=13, fontweight="bold", fontname=CHART_TITLE_FONT)
+    ax.tick_params(colors=th["tick"], left=False)
+    ax.grid(True, axis="x", color=th["grid"])
+    for name in ("top", "right", "left"):
+        ax.spines[name].set_visible(False)
+    ax.spines["bottom"].set_color(th["spine"])
+
+    buffer = io.BytesIO()
+    fig.tight_layout()
+    fig.savefig(buffer, format="png", transparent=True)
+    plt.close(fig)
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
 def _means_plot_base64(table: pd.DataFrame, y_label: str = "Média", variant: str = "print") -> Optional[str]:
