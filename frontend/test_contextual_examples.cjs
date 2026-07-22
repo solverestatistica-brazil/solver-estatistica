@@ -7,12 +7,12 @@ const js = fs.readFileSync(path.join(root, 'assets/js/app.js'), 'utf8');
 
 assert.match(js, /const EXAMPLE_DATASETS = \{/, 'catálogo de exemplos ausente');
 assert.match(js, /function pickExampleKey\(\)/, 'pickExampleKey ausente');
-for (const key of ['dic_single', 'dbc_single', 'regression', 'factorial']) {
+for (const key of ['dic_single', 'dbc_single', 'regression', 'factorial', 'split_plot']) {
   assert.ok(js.includes(key), `exemplo contextual ausente: ${key}`);
 }
 // Cada exemplo referencia um arquivo de dados existente.
 const dataDir = path.join(root, 'assets/data');
-for (const f of ['dic_exemplo.json', 'dbc_exemplo.json', 'regressao_exemplo.json', 'fatorial_exemplo.json']) {
+for (const f of ['dic_exemplo.json', 'dbc_exemplo.json', 'regressao_exemplo.json', 'fatorial_exemplo.json', 'split_plot_exemplo.json']) {
   assert.ok(fs.existsSync(path.join(dataDir, f)), `dataset de exemplo ausente: ${f}`);
   const rows = JSON.parse(fs.readFileSync(path.join(dataDir, f), 'utf8'));
   assert.ok(Array.isArray(rows) && rows.length >= 3, `dataset ${f} deve ter linhas suficientes`);

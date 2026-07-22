@@ -19,4 +19,8 @@ assert.match(css, /min-height:44px/, 'controles móveis precisam ter alvo de toq
 assert.match(css, /max-height:calc\(100dvh - 24px\)/, 'o modal precisa caber em telas baixas');
 assert.match(css, /\.processing-dialog\{width:100%;max-width:100%;min-width:0/, 'o modal não pode ultrapassar a largura mobile');
 
+// Figuras dos gráficos (médias, interação, regressão) não podem estourar a largura no celular.
+assert.match(css, /\.chart-figure img\{[^}]*width:100%/, 'a imagem do gráfico precisa escalar à largura do container');
+assert.match(css, /\.chart-figure img\{[^}]*height:auto/, 'a imagem do gráfico precisa manter proporção');
+
 console.log('Mobile: tabelas, semântica, toque e modal aprovados');

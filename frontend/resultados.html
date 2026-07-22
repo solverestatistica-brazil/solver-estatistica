@@ -282,6 +282,10 @@
                   <h3>Médias e grupos</h3>
                   <p class="small-note tip-note">Tratamentos que compartilham a mesma letra não diferem estatisticamente pelo teste de médias escolhido.</p>
                   <div class="table-wrap compact"><table id="meansTable" class="result-table"></table></div>
+                  <figure id="meansChartWrap" class="chart-figure hidden">
+                    <img id="meansChart" alt="Gráfico de barras das médias por tratamento, com barras de erro e letras de agrupamento do teste de médias." />
+                    <figcaption class="caption">Médias por tratamento · barras de erro = desvio-padrão · letras iguais não diferem pelo teste escolhido.</figcaption>
+                  </figure>
                   <p class="small-note" id="comparisonNote"></p>
                 </section>
               </div>
@@ -294,6 +298,13 @@
               <section class="result-box hidden" id="factorComparisonsBox">
                 <h3>Comparações por fator</h3>
                 <div id="factorComparisonsList"></div>
+              </section>
+              <section class="result-box hidden" id="interactionChartBox">
+                <h3>Gráfico de interação</h3>
+                <figure class="chart-figure">
+                  <img id="interactionChart" alt="Gráfico de interação entre os dois fatores: uma linha por nível do fator A ao longo dos níveis do fator B." />
+                  <figcaption class="caption">Linhas paralelas sugerem ausência de interação; linhas que divergem ou se cruzam indicam interação entre os fatores.</figcaption>
+                </figure>
               </section>
               <section class="result-box hidden" id="interactionBox">
                 <h3>Desdobramento da interação</h3>
@@ -332,8 +343,8 @@
             <div class="export-grid">
               <button class="export-card" id="downloadPdf" disabled><b>PDF técnico · A4</b><span>Relatório claro, em retrato, com capa e formatação acadêmica baseada na ABNT.</span></button>
               <button class="export-card" id="downloadExcel" disabled><b>Excel</b><span>ANOVA, médias, pressupostos e rastreabilidade.</span></button>
-              <button class="export-card" id="downloadPng" disabled><b>PNG regressão</b><span>Disponível quando a análise contém regressão.</span></button>
-              <button class="export-card" id="downloadPlotPdf" disabled><b>PDF vetorial</b><span>Disponível quando a análise contém regressão.</span></button>
+              <button class="export-card" id="downloadPng" disabled><b>Gráfico PNG</b><span>Gráfico de médias (ANOVA) ou da curva de regressão, conforme a análise.</span></button>
+              <button class="export-card" id="downloadPlotPdf" disabled><b>Gráfico PDF vetorial</b><span>Mesma figura em vetor, para inserir no laudo ou na tese sem perda de qualidade.</span></button>
             </div>
             <p class="small-note" id="exportsNote">Execute uma análise para liberar as exportações correspondentes.</p>
             <p class="export-status" id="exportStatus" role="status" aria-live="polite"></p>

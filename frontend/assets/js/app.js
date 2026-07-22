@@ -33,6 +33,8 @@
   const MAX_DATA_ROWS = 10000;
   const API_TIMEOUT_MS = 60000;
   const API_HEALTH_TIMEOUT_MS = 45000;
+  const WARMUP_MAX_MS = 120000;      // até ~2 min tentando aquecer o serviço (cold start do Render)
+  const WARMUP_INTERVAL_MS = 5000;   // intervalo entre pings de aquecimento
 
   function cssColor(name, fallback) {
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -74,7 +76,7 @@
     lastAnalysis = $('analysisType')?.value;
     maybeOfferDraftRestore();
     updateStepAvailability();
-    testApi(false);
+    warmUpService();
   }
 
   function bindTabs() {
@@ -106,8 +108,8 @@
     $('fileInput').addEventListener('change', handleFileUpload);
     $('downloadPdf').addEventListener('click', (event) => downloadExport('/api/export/pdf', 'solver-relatorio.pdf', 'PDF técnico', event.currentTarget));
     $('downloadExcel').addEventListener('click', (event) => downloadExport('/api/export/excel', 'solver-resultados.xlsx', 'planilha Excel', event.currentTarget));
-    $('downloadPng').addEventListener('click', (event) => downloadExport('/api/export/regression-plot?fmt=png', 'solver-regressao.png', 'PNG da regressão', event.currentTarget));
-    $('downloadPlotPdf').addEventListener('click', (event) => downloadExport('/api/export/regression-plot?fmt=pdf', 'solver-regressao.pdf', 'PDF vetorial da regressão', event.currentTarget));
+    $('downloadPng').addEventListener('click', (event) => downloadExport(chartExportEndpoint('png'), chartExportFilename('png'), chartExportLabel('PNG'), event.currentTarget));
+    $('downloadPlotPdf').addEventListener('click', (event) => downloadExport(chartExportEndpoint('pdf'), chartExportFilename('pdf'), chartExportLabel('PDF vetorial'), event.currentTarget));
     $('design')?.addEventListener('change', handleConfigurationChange);
     $('analysisType')?.addEventListener('change', handleConfigurationChange);
     $('manualMode')?.addEventListener('click', () => setDataMode('manual'));
@@ -324,6 +326,48 @@
       clearTimeout(timer);
       externalSignal?.removeEventListener('abort', relayAbort);
     }
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function pingHealth(timeoutMs) {
+    const base = cleanApiBase(apiInput.value);
+    if (!base) return { ok: false, reason: 'noapi' };
+    try {
+      const res = await fetchWithTimeout(`${base}/health`, {}, timeoutMs);
+      return { ok: res.ok, reason: res.ok ? 'ok' : 'status' };
+    } catch (err) {
+      return { ok: false, reason: err?.code === 'timeout' ? 'timeout' : 'error' };
+    }
+  }
+
+  // Aquecimento gracioso: o backend hospedado pode estar "dormindo" (cold start) e levar
+  // até ~1 min para responder na primeira chamada. Em vez de exibir um erro assustador,
+  // fazemos ping em /health e vamos repetindo até o serviço acordar, com feedback claro.
+  async function warmUpService() {
+    const base = cleanApiBase(apiInput.value);
+    if (!base) { setApiStatus('Serviço não configurado', 'err'); return; }
+
+    setApiStatus('Verificando disponibilidade', '');
+    const first = await pingHealth(API_HEALTH_TIMEOUT_MS);
+    if (first.ok) { setApiStatus('Serviço online', 'ok'); return; }
+
+    setApiStatus('Aquecendo o serviço…', '');
+    announce('O serviço estatístico está iniciando. A primeira análise pode levar até um minuto.');
+    const deadline = Date.now() + WARMUP_MAX_MS;
+    while (Date.now() < deadline) {
+      await sleep(WARMUP_INTERVAL_MS);
+      const r = await pingHealth(API_HEALTH_TIMEOUT_MS);
+      if (r.ok) {
+        setApiStatus('Serviço online', 'ok');
+        announce('O serviço estatístico está pronto.');
+        return;
+      }
+    }
+    setApiStatus('Serviço demorando a responder', 'err');
+    announce('O serviço estatístico está demorando a responder. Você ainda pode tentar rodar a análise.');
   }
 
   async function testApi(showSuccess) {
@@ -630,10 +674,12 @@
 
     renderSimpleTable('anovaTable', ['source', 'df', 'sum_sq', 'mean_sq', 'f_calc', 'f_5', 'f_1', 'p_value', 'significance'], result?.anova?.table || [], 'significance');
     renderSimpleTable('meansTable', ['treatment', 'mean', 'n', 'sd', 'group'], result?.means?.treatment_means || []);
+    renderMeansChart(result?.means?.plot_png_base64);
     renderComparisonNote(result?.means?.comparison);
     renderRecommendations(result?.recommendations || []);
     renderRegression(result?.regression);
     renderFactorComparisons(result?.factor_comparisons);
+    renderInteractionChart(result?.means?.interaction_plot_base64);
     renderInteractionBreakdown(result?.interaction_breakdown);
     renderAssumptions(result?.pressupostos, result?.transformacao_sugerida);
     updateInterpretationCaveat(result?.pressupostos);
@@ -893,16 +939,57 @@
       box.appendChild(item);
     });
   }
+  function renderInteractionChart(base64) {
+    const box = $('interactionChartBox');
+    const img = $('interactionChart');
+    if (!box || !img) return;
+    if (base64) {
+      img.src = `data:image/png;base64,${base64}`;
+      box.classList.remove('hidden');
+    } else {
+      img.removeAttribute('src');
+      box.classList.add('hidden');
+    }
+  }
+
+  function renderMeansChart(base64) {
+    const wrap = $('meansChartWrap');
+    const img = $('meansChart');
+    if (!wrap || !img) return;
+    if (base64) {
+      img.src = `data:image/png;base64,${base64}`;
+      wrap.classList.remove('hidden');
+    } else {
+      img.removeAttribute('src');
+      wrap.classList.add('hidden');
+    }
+  }
+
+  function chartExportEndpoint(fmt) {
+    return currentResult?.regression
+      ? `/api/export/regression-plot?fmt=${fmt}`
+      : `/api/export/means-plot?fmt=${fmt}`;
+  }
+
+  function chartExportFilename(fmt) {
+    return currentResult?.regression ? `solver-regressao.${fmt}` : `solver-medias.${fmt}`;
+  }
+
+  function chartExportLabel(kind) {
+    const what = currentResult?.regression ? 'da regressão' : 'das médias';
+    return `${kind} ${what}`;
+  }
+
   function updateExportAvailability(hasResult, hasRegression) {
     ['downloadPdf', 'downloadExcel'].forEach((id) => { if ($(id)) $(id).disabled = !hasResult; });
-    ['downloadPng', 'downloadPlotPdf'].forEach((id) => { if ($(id)) $(id).disabled = !hasRegression; });
+    ['downloadPng', 'downloadPlotPdf'].forEach((id) => { if ($(id)) $(id).disabled = !hasResult; });
     const note = $('exportsNote');
     if (!note) return;
     note.textContent = !hasResult
       ? 'Execute uma análise para liberar as exportações correspondentes.'
       : hasRegression
-        ? 'Todas as exportações estão disponíveis para a análise atual.'
-        : 'PDF e Excel disponíveis. Gráficos exigem uma análise de regressão.';
+        ? 'Todas as exportações estão disponíveis: PDF, Excel e o gráfico da regressão (PNG e vetorial).'
+        : 'Todas as exportações estão disponíveis: PDF, Excel e o gráfico de médias (PNG e vetorial).';
   }
 
   function setExportStatus(message, state) {
@@ -1321,13 +1408,15 @@
     dic_single: { file: 'assets/data/dic_exemplo.json', headers: ['tratamento', 'valor'], config: { design: 'DIC', analysisType: 'single', response: 'valor', treatment: 'tratamento' }, label: 'Exemplo DIC (fator único)' },
     dbc_single: { file: 'assets/data/dbc_exemplo.json', headers: ['bloco', 'tratamento', 'valor'], config: { design: 'DBC', analysisType: 'single', response: 'valor', treatment: 'tratamento', block: 'bloco' }, label: 'Exemplo DBC (fator único)' },
     regression: { file: 'assets/data/regressao_exemplo.json', headers: ['dose', 'valor'], config: { design: 'DIC', analysisType: 'regression', response: 'valor', numeric: 'dose' }, label: 'Exemplo de regressão (doses)' },
-    factorial: { file: 'assets/data/fatorial_exemplo.json', headers: ['bloco', 'hibrido', 'dose', 'valor'], config: { design: 'DBC', analysisType: 'factorial', response: 'valor', block: 'bloco', factors: 'hibrido, dose' }, label: 'Exemplo fatorial ilustrativo (DBC)' }
+    factorial: { file: 'assets/data/fatorial_exemplo.json', headers: ['bloco', 'hibrido', 'dose', 'valor'], config: { design: 'DBC', analysisType: 'factorial', response: 'valor', block: 'bloco', factors: 'hibrido, dose' }, label: 'Exemplo fatorial ilustrativo (DBC)' },
+    split_plot: { file: 'assets/data/split_plot_exemplo.json', headers: ['bloco', 'irrigacao', 'cultivar', 'valor'], config: { design: 'DBC', analysisType: 'split_plot', response: 'valor', block: 'bloco', factors: 'irrigacao, cultivar' }, label: 'Exemplo parcelas subdivididas (irrigação × cultivar)' }
   };
   function pickExampleKey() {
     const type = $('analysisType')?.value;
     const design = $('design')?.value;
     if (type === 'regression') return 'regression';
-    if (type === 'factorial' || type === 'split_plot') return 'factorial';
+    if (type === 'split_plot') return 'split_plot';
+    if (type === 'factorial') return 'factorial';
     return design === 'DIC' ? 'dic_single' : 'dbc_single';
   }
   function applyExampleConfig(cfg) {

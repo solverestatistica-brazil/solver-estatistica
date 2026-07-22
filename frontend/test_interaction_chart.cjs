@@ -1,0 +1,10 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const js = fs.readFileSync(path.join(__dirname, 'assets/js/app.js'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, 'resultados.html'), 'utf8');
+assert.ok(js.includes('function renderInteractionChart('), 'renderInteractionChart ausente');
+assert.ok(js.includes('result?.means?.interaction_plot_base64'), 'app deve ler o gráfico de interação do resultado');
+assert.ok(html.includes('id="interactionChart"'), 'resultados.html deve ter o alvo do gráfico de interação');
+assert.ok(html.includes('id="interactionChartBox"'), 'seção do gráfico de interação ausente');
+console.log('Gráfico de interação: render e marcação presentes');
