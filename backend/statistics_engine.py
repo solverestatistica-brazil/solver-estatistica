@@ -772,13 +772,18 @@ def _means(ctx: AnalysisContext, anova: Dict[str, Any]) -> Dict[str, Any]:
     else:
         table["group"] = ""
 
-    plot_png = _means_plot_base64(table, str(ctx.response))
+    _resp = str(ctx.response)
+    plot_png = _means_plot_base64(table, _resp, "print")
+    plot_png_screen_light = _means_plot_base64(table, _resp, "screen_light")
+    plot_png_screen_dark = _means_plot_base64(table, _resp, "screen_dark")
 
     return {
         "treatment_means": table.to_dict(orient="records"),
         "best": best_row,
         "comparison": comparison,
         "plot_png_base64": plot_png,
+        "plot_png_screen_light": plot_png_screen_light,
+        "plot_png_screen_dark": plot_png_screen_dark,
     }
 
 def _alpha_for_row(payload: Dict[str, Any], row: Optional[Dict[str, Any]]) -> float:
@@ -1363,15 +1368,32 @@ def _poly_optimum(coeffs: List[float], x_min: float, x_max: float, goal: str) ->
     chosen = max(values, key=lambda t: t[1]) if goal == "max" else min(values, key=lambda t: t[1])
     return {"x": chosen[0], "y": chosen[1], "goal": goal}
 
-def _means_plot_base64(table: pd.DataFrame, y_label: str = "Média") -> Optional[str]:
-    """Gráfico de barras das médias por tratamento em fundo claro (harmonizado com o laudo).
-    A cor de cada barra segue um gradiente por valor: verde nas maiores médias, passando por
-    amarelo e chegando ao laranja nas menores. Barras de erro = desvio-padrão; a letra do teste
-    de médias aparece acima de cada barra."""
+_MEANS_CHART_THEME = {
+    "print":        {"transparent": False, "text": "#333333", "tick": "#555555", "title": "#0F5132",
+                     "grid": "#E8EBE9", "spine": "#D6DAD7", "edge": "#2F2F2F", "elw": 0.5,
+                     "err": "#5A5A5A", "letter": "#222222", "width": 0.66},
+    "screen_light": {"transparent": True,  "text": "#3A4A3D", "tick": "#5A6B5D", "title": "#1D7A46",
+                     "grid": "#DCE6DD", "spine": "#C8D1BF", "edge": "none", "elw": 0.0,
+                     "err": "#5A6B5D", "letter": "#163528", "width": 0.52},
+    "screen_dark":  {"transparent": True,  "text": "#A8B8AC", "tick": "#9AA79E", "title": "#8FC378",
+                     "grid": "#8FC37822", "spine": "#8FC37833", "edge": "none", "elw": 0.0,
+                     "err": "#9FB0A4", "letter": "#F6F9F6", "width": 0.52},
+}
+
+
+def _means_plot_base64(table: pd.DataFrame, y_label: str = "Média", variant: str = "print") -> Optional[str]:
+    """Gráfico de barras das médias por tratamento, com gradiente de cor por valor (verde nas
+    maiores, laranja nas menores), barras de erro (desvio-padrão) e letras do teste de médias.
+
+    Três variantes de tema:
+      - "print": fundo branco, para o laudo PDF/Excel (documento claro);
+      - "screen_light"/"screen_dark": fundo transparente e barras mais finas, para o dashboard
+        do site combinar com cada tema (claro/escuro) em vez de destoar."""
     if table is None or len(table) == 0:
         return None
     from matplotlib.colors import LinearSegmentedColormap
     _register_chart_fonts()
+    th = _MEANS_CHART_THEME.get(variant, _MEANS_CHART_THEME["print"])
 
     labels = [str(t) for t in table["treatment"].tolist()]
     means = table["mean"].to_numpy(dtype=float)
@@ -1382,7 +1404,6 @@ def _means_plot_base64(table: pd.DataFrame, y_label: str = "Média") -> Optional
     )
     groups = table["group"].tolist() if "group" in table.columns else [""] * len(means)
 
-    # Gradiente laranja (menor) -> amarelo -> verde (maior), aplicado pelo valor da média.
     cmap = LinearSegmentedColormap.from_list(
         "solver_means", ["#E07B39", "#E3B23C", "#7FBF5A", "#2E8B4E"]
     )
@@ -1391,47 +1412,57 @@ def _means_plot_base64(table: pd.DataFrame, y_label: str = "Média") -> Optional
     bar_colors = [cmap((m - lo) / span) for m in means]
 
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
-    fig.patch.set_facecolor("#FFFFFF")
-    ax.set_facecolor("#FFFFFF")
+    if th["transparent"]:
+        fig.patch.set_alpha(0)
+        ax.set_facecolor("none")
+    else:
+        fig.patch.set_facecolor("#FFFFFF")
+        ax.set_facecolor("#FFFFFF")
     ax.set_axisbelow(True)
 
     x = np.arange(len(labels))
-    ax.bar(x, means, color=bar_colors, edgecolor="#2F2F2F", linewidth=0.5, width=0.66, zorder=2)
-    ax.errorbar(
-        x, means, yerr=sds, fmt="none", ecolor="#5A5A5A", elinewidth=1.3, capsize=4, zorder=3,
-    )
+    ax.bar(x, means, color=bar_colors, edgecolor=th["edge"], linewidth=th["elw"], width=th["width"], zorder=2)
+    ax.errorbar(x, means, yerr=sds, fmt="none", ecolor=th["err"], elinewidth=1.3, capsize=4, zorder=3)
 
     top = float(np.max(means + sds)) if len(means) else 1.0
     offset = (abs(top) or 1.0) * 0.03
     for xi, m, sd, g in zip(x, means, sds, groups):
         if g:
-            ax.text(
-                xi, m + sd + offset, str(g), ha="center", va="bottom",
-                color="#222222", fontsize=11, fontweight="bold",
-            )
+            ax.text(xi, m + sd + offset, str(g), ha="center", va="bottom",
+                    color=th["letter"], fontsize=11, fontweight="bold")
 
     ax.set_xticks(x)
-    ax.set_xticklabels(labels, color="#333333", fontsize=10)
-    ax.set_ylabel(y_label, color="#333333", fontsize=10)
-    ax.set_title("Médias por tratamento", color="#0F5132", fontsize=13, fontweight="bold", fontname=CHART_TITLE_FONT)
-    ax.tick_params(colors="#555555")
+    ax.set_xticklabels(labels, color=th["text"], fontsize=10)
+    ax.set_ylabel(y_label, color=th["text"], fontsize=10)
+    ax.set_title("Médias por tratamento", color=th["title"], fontsize=13, fontweight="bold", fontname=CHART_TITLE_FONT)
+    ax.tick_params(colors=th["tick"])
     for spine in ax.spines.values():
-        spine.set_color("#D6DAD7")
-    ax.grid(True, axis="y", color="#E8EBE9", alpha=1.0)
+        spine.set_color(th["spine"])
+    ax.grid(True, axis="y", color=th["grid"], alpha=1.0)
     ax.margins(y=0.16)
 
     buffer = io.BytesIO()
     fig.tight_layout()
-    fig.savefig(buffer, format="png", facecolor=fig.get_facecolor())
+    fig.savefig(buffer, format="png", transparent=th["transparent"],
+                facecolor=(None if th["transparent"] else fig.get_facecolor()))
     plt.close(fig)
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
-def _interaction_plot_base64(ctx: AnalysisContext) -> Optional[str]:
-    """Gráfico de interação A × B para fatorial/split-plot, em fundo claro (harmonizado com o
-    laudo): uma linha por nível do fator A, com o eixo X percorrendo os níveis do fator B e cada
-    ponto na média da célula (A, B). Calculado direto dos dados, então existe mesmo sem interação
-    significativa (útil para mostrar o paralelismo)."""
+_INTERACTION_CHART_THEME = {
+    "print":        {"transparent": False, "text": "#333333", "title": "#0F5132", "grid": "#E8EBE9",
+                     "spine": "#D6DAD7", "legface": "#FFFFFF", "legedge": "#D6DAD7", "marker_edge": "#FFFFFF"},
+    "screen_light": {"transparent": True,  "text": "#3A4A3D", "title": "#1D7A46", "grid": "#DCE6DD",
+                     "spine": "#C8D1BF", "legface": "#FFFFFF", "legedge": "#C8D1BF", "marker_edge": "#FFFFFF"},
+    "screen_dark":  {"transparent": True,  "text": "#A8B8AC", "title": "#8FC378", "grid": "#8FC37822",
+                     "spine": "#8FC37833", "legface": "#122820", "legedge": "#8FC37855", "marker_edge": "#0D1E15"},
+}
+
+
+def _interaction_plot_base64(ctx: AnalysisContext, variant: str = "print") -> Optional[str]:
+    """Gráfico de interação A × B para fatorial/split-plot: uma linha por nível do fator A, com
+    o eixo X percorrendo os níveis do fator B. Três variantes de tema ("print" para o laudo;
+    "screen_light"/"screen_dark" transparentes para o dashboard do site)."""
     factors = [c for c in (ctx.payload.get("factor_columns") or []) if str(c).strip()]
     if ctx.analysis_type not in ("factorial", "split_plot") or len(factors) != 2:
         return None
@@ -1452,11 +1483,16 @@ def _interaction_plot_base64(ctx: AnalysisContext) -> Optional[str]:
         return None
 
     _register_chart_fonts()
+    th = _INTERACTION_CHART_THEME.get(variant, _INTERACTION_CHART_THEME["print"])
     cell = ctx.df.groupby([fa, fb])[ctx.response].mean()
 
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
-    fig.patch.set_facecolor("#FFFFFF")
-    ax.set_facecolor("#FFFFFF")
+    if th["transparent"]:
+        fig.patch.set_alpha(0)
+        ax.set_facecolor("none")
+    else:
+        fig.patch.set_facecolor("#FFFFFF")
+        ax.set_facecolor("#FFFFFF")
     ax.set_axisbelow(True)
 
     palette = ["#2E8B4E", "#E07B39", "#3B7EA1", "#B0518F", "#C9A227", "#6A8D3A", "#8A5AA8"]
@@ -1471,24 +1507,25 @@ def _interaction_plot_base64(ctx: AnalysisContext) -> Optional[str]:
         color = palette[idx % len(palette)]
         ax.plot(
             x, ys, marker="o", markersize=7, linewidth=2.2, color=color,
-            markeredgecolor="#FFFFFF", markeredgewidth=0.8, label=f"{fa} = {a}",
+            markeredgecolor=th["marker_edge"], markeredgewidth=0.8, label=f"{fa} = {a}",
         )
 
     ax.set_xticks(x)
-    ax.set_xticklabels([str(b) for b in b_levels], color="#333333", fontsize=10)
-    ax.set_xlabel(str(fb), color="#333333", fontsize=10)
-    ax.set_ylabel(str(ctx.response), color="#333333", fontsize=10)
-    ax.set_title(f"Interação {fa} × {fb}", color="#0F5132", fontsize=13, fontweight="bold", fontname=CHART_TITLE_FONT)
-    ax.tick_params(colors="#555555")
+    ax.set_xticklabels([str(b) for b in b_levels], color=th["text"], fontsize=10)
+    ax.set_xlabel(str(fb), color=th["text"], fontsize=10)
+    ax.set_ylabel(str(ctx.response), color=th["text"], fontsize=10)
+    ax.set_title(f"Interação {fa} × {fb}", color=th["title"], fontsize=13, fontweight="bold", fontname=CHART_TITLE_FONT)
+    ax.tick_params(colors=th["text"])
     for spine in ax.spines.values():
-        spine.set_color("#D6DAD7")
-    ax.grid(True, color="#E8EBE9", alpha=1.0)
+        spine.set_color(th["spine"])
+    ax.grid(True, color=th["grid"], alpha=1.0)
     ax.margins(y=0.16)
-    ax.legend(facecolor="#FFFFFF", edgecolor="#D6DAD7", labelcolor="#333333", fontsize=9)
+    ax.legend(facecolor=th["legface"], edgecolor=th["legedge"], labelcolor=th["text"], fontsize=9)
 
     buffer = io.BytesIO()
     fig.tight_layout()
-    fig.savefig(buffer, format="png", facecolor=fig.get_facecolor())
+    fig.savefig(buffer, format="png", transparent=th["transparent"],
+                facecolor=(None if th["transparent"] else fig.get_facecolor()))
     plt.close(fig)
     return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
@@ -1760,7 +1797,9 @@ def analyze(payload: Dict[str, Any]) -> Dict[str, Any]:
     anova = _anova(ctx)
     means = _means(ctx, anova)
     if ctx.analysis_type in ("factorial", "split_plot"):
-        means["interaction_plot_base64"] = _interaction_plot_base64(ctx)
+        means["interaction_plot_base64"] = _interaction_plot_base64(ctx, "print")
+        means["interaction_plot_screen_light"] = _interaction_plot_base64(ctx, "screen_light")
+        means["interaction_plot_screen_dark"] = _interaction_plot_base64(ctx, "screen_dark")
     # Direct regression is an explicit flow. Reducing DBC/factorial data to y ~ dose
     # would ignore blocks and other factors, potentially biasing the optimum.
     # Covariate-adjusted regression must be implemented as explicit ANCOVA.

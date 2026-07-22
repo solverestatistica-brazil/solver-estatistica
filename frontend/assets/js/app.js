@@ -60,6 +60,11 @@
       });
       regressionChart.update('none');
     }
+
+    if (currentResult) {
+      renderMeansChart();
+      renderInteractionChart();
+    }
   }
 
   function init() {
@@ -674,12 +679,12 @@
 
     renderSimpleTable('anovaTable', ['source', 'df', 'sum_sq', 'mean_sq', 'f_calc', 'f_5', 'f_1', 'p_value', 'significance'], result?.anova?.table || [], 'significance');
     renderSimpleTable('meansTable', ['treatment', 'mean', 'n', 'sd', 'group'], result?.means?.treatment_means || []);
-    renderMeansChart(result?.means?.plot_png_base64);
+    renderMeansChart();
     renderComparisonNote(result?.means?.comparison);
     renderRecommendations(result?.recommendations || []);
     renderRegression(result?.regression);
     renderFactorComparisons(result?.factor_comparisons);
-    renderInteractionChart(result?.means?.interaction_plot_base64);
+    renderInteractionChart();
     renderInteractionBreakdown(result?.interaction_breakdown);
     renderAssumptions(result?.pressupostos, result?.transformacao_sugerida);
     updateInterpretationCaveat(result?.pressupostos);
@@ -939,12 +944,20 @@
       box.appendChild(item);
     });
   }
-  function renderInteractionChart(base64) {
+  function isDarkTheme() {
+    return (document.documentElement.dataset.theme || 'dark') !== 'light';
+  }
+
+  function renderInteractionChart() {
     const box = $('interactionChartBox');
     const img = $('interactionChart');
     if (!box || !img) return;
-    if (base64) {
-      img.src = `data:image/png;base64,${base64}`;
+    const means = currentResult?.means || {};
+    const b64 = isDarkTheme()
+      ? (means.interaction_plot_screen_dark || means.interaction_plot_base64)
+      : (means.interaction_plot_screen_light || means.interaction_plot_base64);
+    if (b64) {
+      img.src = `data:image/png;base64,${b64}`;
       box.classList.remove('hidden');
     } else {
       img.removeAttribute('src');
@@ -952,12 +965,16 @@
     }
   }
 
-  function renderMeansChart(base64) {
+  function renderMeansChart() {
     const wrap = $('meansChartWrap');
     const img = $('meansChart');
     if (!wrap || !img) return;
-    if (base64) {
-      img.src = `data:image/png;base64,${base64}`;
+    const means = currentResult?.means || {};
+    const b64 = isDarkTheme()
+      ? (means.plot_png_screen_dark || means.plot_png_base64)
+      : (means.plot_png_screen_light || means.plot_png_base64);
+    if (b64) {
+      img.src = `data:image/png;base64,${b64}`;
       wrap.classList.remove('hidden');
     } else {
       img.removeAttribute('src');
