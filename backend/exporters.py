@@ -316,10 +316,10 @@ def _draw_cover_page(canvas_obj, doc) -> None:
     # ------------------------------------------------------------- TÍTULO
     title_x = sidebar_w + 1.8 * cm
     canvas_obj.setFillColor(COVER_TITLE_DARK)
-    canvas_obj.setFont(FONT_HEADING_BLACK, 56)
+    canvas_obj.setFont(FONT_HEADING_BLACK, 46)
     canvas_obj.drawString(title_x, height - 10.8 * cm, "RELATÓRIO")
     canvas_obj.setFillColor(COVER_TITLE_GREEN)
-    canvas_obj.drawString(title_x, height - 12.6 * cm, "ESTATÍSTICO")
+    canvas_obj.drawString(title_x, height - 12.3 * cm, "ESTATÍSTICO")
 
     # Divisor
     canvas_obj.setFillColor(COVER_TITLE_GREEN)
