@@ -20,7 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from exporters import build_excel, build_pdf, build_regression_plot
+from exporters import build_excel, build_means_plot, build_pdf, build_regression_plot
 from provenance import ENGINE_VERSION
 from statistics_engine import analyze
 
@@ -187,7 +187,10 @@ def analyze_endpoint(payload: AnalyzePayload) -> Dict[str, Any]:
 async def analyze_upload(config: str = Form(...), file: UploadFile = File(...)) -> Dict[str, Any]:
     """Recebe CSV (separado por ;) e um JSON de configuração para análise."""
     try:
-        payload = json.loads(config)
+        try:
+            payload = json.loads(config)
+        except json.JSONDecodeError as exc:
+            raise ValueError("Configuração inválida: não foi possível ler os parâmetros da análise.") from exc
         df = await _read_uploaded_table(file)
         payload["data"] = df.to_dict(orient="records")
         # analyze() e' CPU-bound (pandas/statsmodels/scipy) e sincrono; chama-lo direto
@@ -260,6 +263,25 @@ def export_regression_plot(payload: AnalyzePayload, fmt: str = "png") -> Respons
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception as exc:
         raise _internal_error("export-regression-plot") from exc
+    finally:
+        _analysis_semaphore.release()
+
+
+@app.post("/api/export/means-plot")
+def export_means_plot(payload: AnalyzePayload, fmt: str = "png") -> Response:
+    _acquire_analysis_slot()
+    try:
+        fmt = fmt.lower()
+        if fmt not in {"png", "pdf"}:
+            raise ValueError("Formato inválido. Use png ou pdf.")
+        content = build_means_plot(payload.model_dump(), fmt=fmt)
+        media = "image/png" if fmt == "png" else "application/pdf"
+        filename = f"solver-medias.{fmt}"
+        return Response(content, media_type=media, headers={"Content-Disposition": f"attachment; filename={filename}"})
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except Exception as exc:
+        raise _internal_error("export-means-plot") from exc
     finally:
         _analysis_semaphore.release()
 
