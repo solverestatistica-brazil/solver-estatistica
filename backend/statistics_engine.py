@@ -27,6 +27,34 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import matplotlib.font_manager as _fm
+from pathlib import Path as _Path
+
+# --- Fontes dos gráficos idênticas às do laudo: Open Sans (corpo) e Exo 2 (títulos) ---
+_CHART_FONT_DIR = _Path(__file__).resolve().parent / "fonts"
+_CHART_FONTS_READY = False
+CHART_BODY_FONT = "Open Sans"
+CHART_TITLE_FONT = "Exo 2"
+
+
+def _register_chart_fonts() -> None:
+    """Registra as fontes empacotadas no matplotlib e define Open Sans como família padrão,
+    para que os gráficos usem a mesma tipografia do documento (em vez do DejaVu do matplotlib)."""
+    global _CHART_FONTS_READY
+    if _CHART_FONTS_READY:
+        return
+    try:
+        for fname in (
+            "OpenSans-Regular.ttf", "OpenSans-Semibold.ttf", "OpenSans-Bold.ttf",
+            "Exo2-Regular.ttf", "Exo2-Bold.ttf", "Exo2-ExtraBold.ttf",
+        ):
+            fpath = _CHART_FONT_DIR / fname
+            if fpath.exists():
+                _fm.fontManager.addfont(str(fpath))
+        plt.rcParams["font.family"] = CHART_BODY_FONT
+    except Exception:
+        pass
+    _CHART_FONTS_READY = True
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
@@ -744,10 +772,13 @@ def _means(ctx: AnalysisContext, anova: Dict[str, Any]) -> Dict[str, Any]:
     else:
         table["group"] = ""
 
+    plot_png = _means_plot_base64(table, str(ctx.response))
+
     return {
         "treatment_means": table.to_dict(orient="records"),
         "best": best_row,
         "comparison": comparison,
+        "plot_png_base64": plot_png,
     }
 
 def _alpha_for_row(payload: Dict[str, Any], row: Optional[Dict[str, Any]]) -> float:
@@ -1332,31 +1363,167 @@ def _poly_optimum(coeffs: List[float], x_min: float, x_max: float, goal: str) ->
     chosen = max(values, key=lambda t: t[1]) if goal == "max" else min(values, key=lambda t: t[1])
     return {"x": chosen[0], "y": chosen[1], "goal": goal}
 
-def _regression_plot_base64(means_df: pd.DataFrame, x_grid: np.ndarray, y_grid: np.ndarray, model: Dict[str, Any]) -> str:
-    # [FIX P0-9] Grafico embutido no PDF no tema escuro do site (fundo #0d1e15,
-    # texto claro, verde vivo) em vez do fundo branco original.
+def _means_plot_base64(table: pd.DataFrame, y_label: str = "Média") -> Optional[str]:
+    """Gráfico de barras das médias por tratamento em fundo claro (harmonizado com o laudo).
+    A cor de cada barra segue um gradiente por valor: verde nas maiores médias, passando por
+    amarelo e chegando ao laranja nas menores. Barras de erro = desvio-padrão; a letra do teste
+    de médias aparece acima de cada barra."""
+    if table is None or len(table) == 0:
+        return None
+    from matplotlib.colors import LinearSegmentedColormap
+    _register_chart_fonts()
+
+    labels = [str(t) for t in table["treatment"].tolist()]
+    means = table["mean"].to_numpy(dtype=float)
+    sds = (
+        table["sd"].fillna(0).to_numpy(dtype=float)
+        if "sd" in table.columns
+        else np.zeros(len(means))
+    )
+    groups = table["group"].tolist() if "group" in table.columns else [""] * len(means)
+
+    # Gradiente laranja (menor) -> amarelo -> verde (maior), aplicado pelo valor da média.
+    cmap = LinearSegmentedColormap.from_list(
+        "solver_means", ["#E07B39", "#E3B23C", "#7FBF5A", "#2E8B4E"]
+    )
+    lo, hi = float(np.min(means)), float(np.max(means))
+    span = (hi - lo) or 1.0
+    bar_colors = [cmap((m - lo) / span) for m in means]
+
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
-    fig.patch.set_facecolor("#0d1e15")
-    ax.set_facecolor("#0d1e15")
+    fig.patch.set_facecolor("#FFFFFF")
+    ax.set_facecolor("#FFFFFF")
+    ax.set_axisbelow(True)
+
+    x = np.arange(len(labels))
+    ax.bar(x, means, color=bar_colors, edgecolor="#2F2F2F", linewidth=0.5, width=0.66, zorder=2)
+    ax.errorbar(
+        x, means, yerr=sds, fmt="none", ecolor="#5A5A5A", elinewidth=1.3, capsize=4, zorder=3,
+    )
+
+    top = float(np.max(means + sds)) if len(means) else 1.0
+    offset = (abs(top) or 1.0) * 0.03
+    for xi, m, sd, g in zip(x, means, sds, groups):
+        if g:
+            ax.text(
+                xi, m + sd + offset, str(g), ha="center", va="bottom",
+                color="#222222", fontsize=11, fontweight="bold",
+            )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, color="#333333", fontsize=10)
+    ax.set_ylabel(y_label, color="#333333", fontsize=10)
+    ax.set_title("Médias por tratamento", color="#0F5132", fontsize=13, fontweight="bold", fontname=CHART_TITLE_FONT)
+    ax.tick_params(colors="#555555")
+    for spine in ax.spines.values():
+        spine.set_color("#D6DAD7")
+    ax.grid(True, axis="y", color="#E8EBE9", alpha=1.0)
+    ax.margins(y=0.16)
+
+    buffer = io.BytesIO()
+    fig.tight_layout()
+    fig.savefig(buffer, format="png", facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+
+def _interaction_plot_base64(ctx: AnalysisContext) -> Optional[str]:
+    """Gráfico de interação A × B para fatorial/split-plot, em fundo claro (harmonizado com o
+    laudo): uma linha por nível do fator A, com o eixo X percorrendo os níveis do fator B e cada
+    ponto na média da célula (A, B). Calculado direto dos dados, então existe mesmo sem interação
+    significativa (útil para mostrar o paralelismo)."""
+    factors = [c for c in (ctx.payload.get("factor_columns") or []) if str(c).strip()]
+    if ctx.analysis_type not in ("factorial", "split_plot") or len(factors) != 2:
+        return None
+    fa, fb = factors[0], factors[1]
+    if fa not in ctx.df.columns or fb not in ctx.df.columns or ctx.response not in ctx.df.columns:
+        return None
+
+    def _ordered_levels(series: pd.Series) -> List[Any]:
+        seen = list(dict.fromkeys(series.tolist()))
+        try:
+            return sorted(seen, key=lambda v: float(v))
+        except (TypeError, ValueError):
+            return sorted(seen, key=lambda v: str(v))
+
+    a_levels = _ordered_levels(ctx.df[fa])
+    b_levels = _ordered_levels(ctx.df[fb])
+    if len(a_levels) < 1 or len(b_levels) < 2:
+        return None
+
+    _register_chart_fonts()
+    cell = ctx.df.groupby([fa, fb])[ctx.response].mean()
+
+    fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
+    fig.patch.set_facecolor("#FFFFFF")
+    ax.set_facecolor("#FFFFFF")
+    ax.set_axisbelow(True)
+
+    palette = ["#2E8B4E", "#E07B39", "#3B7EA1", "#B0518F", "#C9A227", "#6A8D3A", "#8A5AA8"]
+    x = list(range(len(b_levels)))
+    for idx, a in enumerate(a_levels):
+        ys = []
+        for b in b_levels:
+            try:
+                ys.append(float(cell.loc[(a, b)]))
+            except KeyError:
+                ys.append(float("nan"))
+        color = palette[idx % len(palette)]
+        ax.plot(
+            x, ys, marker="o", markersize=7, linewidth=2.2, color=color,
+            markeredgecolor="#FFFFFF", markeredgewidth=0.8, label=f"{fa} = {a}",
+        )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels([str(b) for b in b_levels], color="#333333", fontsize=10)
+    ax.set_xlabel(str(fb), color="#333333", fontsize=10)
+    ax.set_ylabel(str(ctx.response), color="#333333", fontsize=10)
+    ax.set_title(f"Interação {fa} × {fb}", color="#0F5132", fontsize=13, fontweight="bold", fontname=CHART_TITLE_FONT)
+    ax.tick_params(colors="#555555")
+    for spine in ax.spines.values():
+        spine.set_color("#D6DAD7")
+    ax.grid(True, color="#E8EBE9", alpha=1.0)
+    ax.margins(y=0.16)
+    ax.legend(facecolor="#FFFFFF", edgecolor="#D6DAD7", labelcolor="#333333", fontsize=9)
+
+    buffer = io.BytesIO()
+    fig.tight_layout()
+    fig.savefig(buffer, format="png", facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return base64.b64encode(buffer.getvalue()).decode("utf-8")
+
+
+def _regression_plot_base64(means_df: pd.DataFrame, x_grid: np.ndarray, y_grid: np.ndarray, model: Dict[str, Any]) -> str:
+    """Gráfico de regressão em fundo claro (harmonizado com o laudo): pontos observados,
+    curva ajustada em verde e o ponto ótimo destacado em laranja. Fontes do documento."""
+    _register_chart_fonts()
+    fig, ax = plt.subplots(figsize=(9, 5.2), dpi=160)
+    fig.patch.set_facecolor("#FFFFFF")
+    ax.set_facecolor("#FFFFFF")
+    ax.set_axisbelow(True)
     ax.errorbar(
         means_df["x"], means_df["y"], yerr=means_df["sd"],
-        fmt="o", color="#8FC378", ecolor="#3E7E54", elinewidth=1.4,
+        fmt="o", color="#3E9B52", ecolor="#5A5A5A", elinewidth=1.3,
         capsize=4, markersize=7, label="Observado (média por dose)",
-        markeredgecolor="#F6F9F6", markeredgewidth=0.6,
+        markeredgecolor="#FFFFFF", markeredgewidth=0.7, zorder=3,
     )
-    ax.plot(x_grid, y_grid, color="#8FC378", linewidth=2.2, label=f"Grau {model['degree']} · R²aj {model['adj_r2']:.3f}")
+    ax.plot(
+        x_grid, y_grid, color="#1F7A3D", linewidth=2.3, zorder=2,
+        label=f"Grau {model['degree']} · R²aj {model['adj_r2']:.3f}",
+    )
     optimum = model.get("optimum") or {}
     if optimum.get("x") is not None:
-        ax.axvline(optimum["x"], linestyle="--", linewidth=1, color="#D4B14A")
-        ax.scatter([optimum["x"]], [optimum["y"]], marker="D", s=60, color="#D4B14A", zorder=5, label="Dose ótima")
-    ax.set_xlabel("Dose / fator numérico", color="#a8b8ac", fontsize=10)
-    ax.set_ylabel("Resposta", color="#a8b8ac", fontsize=10)
-    ax.set_title("Regressão ajustada", color="#F6F9F6", fontsize=13, fontweight="bold")
-    ax.tick_params(colors="#a8b8ac")
+        ax.axvline(optimum["x"], linestyle="--", linewidth=1, color="#E07B39", alpha=0.8)
+        ax.scatter([optimum["x"]], [optimum["y"]], marker="D", s=60, color="#E07B39",
+                   edgecolor="#FFFFFF", linewidth=0.8, zorder=5, label="Dose ótima")
+    ax.set_xlabel("Dose / fator numérico", color="#333333", fontsize=10)
+    ax.set_ylabel("Resposta", color="#333333", fontsize=10)
+    ax.set_title("Regressão ajustada", color="#0F5132", fontsize=13, fontweight="bold", fontname=CHART_TITLE_FONT)
+    ax.tick_params(colors="#555555")
     for spine in ax.spines.values():
-        spine.set_color("#8FC37833")
-    ax.grid(True, color="#8FC378", alpha=0.15)
-    ax.legend(facecolor="#122820", edgecolor="#8FC37855", labelcolor="#F6F9F6")
+        spine.set_color("#D6DAD7")
+    ax.grid(True, color="#E8EBE9", alpha=1.0)
+    ax.legend(facecolor="#FFFFFF", edgecolor="#D6DAD7", labelcolor="#333333", fontsize=9)
     buffer = io.BytesIO()
     fig.tight_layout()
     fig.savefig(buffer, format="png", facecolor=fig.get_facecolor())
@@ -1592,6 +1759,8 @@ def analyze(payload: Dict[str, Any]) -> Dict[str, Any]:
     ctx = _prepare_context(payload)
     anova = _anova(ctx)
     means = _means(ctx, anova)
+    if ctx.analysis_type in ("factorial", "split_plot"):
+        means["interaction_plot_base64"] = _interaction_plot_base64(ctx)
     # Direct regression is an explicit flow. Reducing DBC/factorial data to y ~ dose
     # would ignore blocks and other factors, potentially biasing the optimum.
     # Covariate-adjusted regression must be implemented as explicit ANCOVA.

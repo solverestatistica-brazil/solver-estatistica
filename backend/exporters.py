@@ -6,6 +6,7 @@ NBR 14724. Excel mantém cabeçalho escuro + corpo claro para impressão.
 
 from __future__ import annotations
 
+import base64
 import io
 import json
 from datetime import datetime, timezone
@@ -19,21 +20,22 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
+from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_JUSTIFY
+from reportlab.lib.enums import TA_JUSTIFY, TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import cm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import (
-    BaseDocTemplate, Frame, KeepTogether, NextPageTemplate, PageBreak, PageTemplate,
+    BaseDocTemplate, Frame, Image, KeepTogether, NextPageTemplate, PageBreak, PageTemplate,
     Paragraph, Spacer, Table, TableStyle,
 )
 
-from statistics_engine import analyze
+from statistics_engine import analyze, _register_chart_fonts, CHART_TITLE_FONT
 from provenance import build_provenance
 
 FONT_DIR = Path(__file__).resolve().parent / "fonts"
@@ -209,6 +211,7 @@ def _draw_logo(canvas_obj, logo_x: float, logo_y: float, logo_size: float) -> No
 COVER_BG = colors.HexColor("#FAFBF9")
 COVER_SIDEBAR = colors.HexColor("#0F4A2E")
 COVER_ACCENT = colors.HexColor("#55B06B")
+COVER_WATERMARK = colors.HexColor("#A6C3B0")  # verde acinzentado suave p/ marca d'água
 COVER_TITLE_DARK = colors.HexColor("#111111")
 COVER_TITLE_GREEN = colors.HexColor("#2EA052")
 COVER_SUB1 = colors.HexColor("#3A4A3D")
@@ -218,37 +221,55 @@ COVER_BADGE_TEXT = colors.HexColor("#2C3D30")
 
 
 def _cover_icon_bars(c, cx: float, cy: float) -> None:
+    # Traço 1.3 e caixa óptica ~0.22 cm, padronizados com os demais selos.
     c.setStrokeColor(BRAND_DEEP)
-    c.setLineWidth(1.5)
+    c.setLineWidth(1.3)
     c.setLineCap(1)
-    c.line(cx - 0.20 * cm, cy - 0.18 * cm, cx - 0.20 * cm, cy + 0.05 * cm)
-    c.line(cx,             cy - 0.18 * cm, cx,             cy + 0.18 * cm)
-    c.line(cx + 0.20 * cm, cy - 0.18 * cm, cx + 0.20 * cm, cy + 0.28 * cm)
+    c.setLineJoin(1)
+    c.line(cx - 0.17 * cm, cy - 0.17 * cm, cx - 0.17 * cm, cy + 0.02 * cm)
+    c.line(cx,             cy - 0.17 * cm, cx,             cy + 0.11 * cm)
+    c.line(cx + 0.17 * cm, cy - 0.17 * cm, cx + 0.17 * cm, cy + 0.20 * cm)
 
 
 def _cover_icon_target(c, cx: float, cy: float) -> None:
+    # Traço 1.3 e caixa óptica ~0.22 cm, padronizados com os demais selos.
     c.setStrokeColor(BRAND_DEEP)
-    c.setLineWidth(1.1)
-    c.circle(cx, cy, 0.28 * cm, stroke=1, fill=0)
-    c.circle(cx, cy, 0.10 * cm, stroke=1, fill=0)
-    for dx, dy in ((0, 0.35), (0, -0.35), (0.35, 0), (-0.35, 0)):
-        c.line(cx + dx * cm * 0.65, cy + dy * cm * 0.65,
-               cx + dx * cm,        cy + dy * cm)
+    c.setLineWidth(1.3)
+    c.setLineCap(1)
+    c.circle(cx, cy, 0.185 * cm, stroke=1, fill=0)
+    c.circle(cx, cy, 0.065 * cm, stroke=1, fill=0)
+    for dx, dy in ((0, 1), (0, -1), (1, 0), (-1, 0)):
+        c.line(cx + dx * 0.185 * cm, cy + dy * 0.185 * cm,
+               cx + dx * 0.24 * cm,  cy + dy * 0.24 * cm)
 
 
-def _cover_icon_leaf(c, cx: float, cy: float) -> None:
+def _cover_icon_bulb(c, cx: float, cy: float) -> None:
+    """Lâmpada — símbolo de ideia/decisão inteligente (combina com "Decisões inteligentes")."""
+    # Traço 1.3 e caixa óptica ~0.22 cm, padronizados com os demais selos.
     c.setStrokeColor(BRAND_DEEP)
-    c.setLineWidth(1.2)
-    p = c.beginPath()
-    p.moveTo(cx, cy + 0.28 * cm)
-    p.curveTo(cx + 0.30 * cm, cy + 0.10 * cm,
-              cx + 0.30 * cm, cy - 0.28 * cm,
-              cx,             cy - 0.28 * cm)
-    p.curveTo(cx - 0.30 * cm, cy - 0.28 * cm,
-              cx - 0.30 * cm, cy + 0.10 * cm,
-              cx,             cy + 0.28 * cm)
-    c.drawPath(p, stroke=1, fill=0)
-    c.line(cx - 0.16 * cm, cy + 0.05 * cm, cx + 0.16 * cm, cy - 0.16 * cm)
+    c.setLineWidth(1.3)
+    c.setLineCap(1)
+    c.setLineJoin(1)
+    # Bulbo
+    bulb_cy = cy + 0.055 * cm
+    r = 0.155 * cm
+    c.circle(cx, bulb_cy, r, stroke=1, fill=0)
+    # Gargalo (ombros do bulbo até a base)
+    neck = 0.085 * cm
+    base_top = bulb_cy - r + 0.005 * cm
+    c.line(cx - neck, base_top, cx - neck, base_top - 0.045 * cm)
+    c.line(cx + neck, base_top, cx + neck, base_top - 0.045 * cm)
+    # Rosca da base (duas ranhuras)
+    by = base_top - 0.045 * cm
+    c.line(cx - neck, by, cx + neck, by)
+    c.line(cx - neck * 0.7, by - 0.06 * cm, cx + neck * 0.7, by - 0.06 * cm)
+    # Filamento (ziguezague) dentro do bulbo
+    fil = c.beginPath()
+    fil.moveTo(cx - 0.07 * cm, bulb_cy + 0.045 * cm)
+    fil.lineTo(cx - 0.025 * cm, bulb_cy - 0.028 * cm)
+    fil.lineTo(cx + 0.018 * cm, bulb_cy + 0.035 * cm)
+    fil.lineTo(cx + 0.063 * cm, bulb_cy - 0.028 * cm)
+    c.drawPath(fil, stroke=1, fill=0)
 
 
 def _draw_cover_page(canvas_obj, doc) -> None:
@@ -276,8 +297,13 @@ def _draw_cover_page(canvas_obj, doc) -> None:
     canvas_obj.drawCentredString(sidebar_w / 2, 4.7 * cm, year_now[:2])
     canvas_obj.drawCentredString(sidebar_w / 2, 4.0 * cm, year_now[2:])
 
-    # Pontos decorativos no canto superior direito
-    canvas_obj.setFillColor(COVER_ACCENT)
+    # Grafismo decorativo como marca d'água suave. Envolto em save/restore para que a
+    # transparência não afete o logo, o título e os selos desenhados depois.
+    canvas_obj.saveState()
+
+    # Pontos decorativos no canto superior direito (bem sutis)
+    canvas_obj.setFillAlpha(0.30)
+    canvas_obj.setFillColor(COVER_WATERMARK)
     for i in range(10):
         for j in range(4):
             canvas_obj.circle(
@@ -286,22 +312,27 @@ def _draw_cover_page(canvas_obj, doc) -> None:
                 0.7, fill=1, stroke=0,
             )
 
-    # Círculos concêntricos decorativos à direita
+    # Círculos concêntricos à direita (traço fino e translúcido)
     cx, cy = width - 5.5 * cm, height / 2 + 0.5 * cm
-    canvas_obj.setStrokeColor(BRAND)
-    canvas_obj.setLineWidth(0.55)
+    canvas_obj.setStrokeAlpha(0.45)
+    canvas_obj.setStrokeColor(COVER_WATERMARK)
+    canvas_obj.setLineWidth(0.5)
     for r in (5.5 * cm, 4.2 * cm, 3.0 * cm):
         canvas_obj.circle(cx, cy, r, stroke=1, fill=0)
-    canvas_obj.setFillColor(BRAND_DEEP)
-    canvas_obj.circle(cx, cy, 1.8, fill=1, stroke=0)
+    canvas_obj.setFillAlpha(0.5)
+    canvas_obj.setFillColor(COVER_WATERMARK)
+    canvas_obj.circle(cx, cy, 1.6, fill=1, stroke=0)
 
-    # Curva decorativa passando pelo centro dos círculos
+    # Curva decorativa passando pelo centro dos círculos (bem suave)
     p = canvas_obj.beginPath()
     p.moveTo(sidebar_w + 1.5 * cm, 9.0 * cm)
     p.curveTo(sidebar_w + 6.0 * cm, 16.0 * cm, cx - 4.0 * cm, cy - 2.0 * cm, cx, cy)
-    canvas_obj.setStrokeColor(BRAND)
-    canvas_obj.setLineWidth(0.8)
+    canvas_obj.setStrokeAlpha(0.4)
+    canvas_obj.setStrokeColor(COVER_WATERMARK)
+    canvas_obj.setLineWidth(0.7)
     canvas_obj.drawPath(p, stroke=1, fill=0)
+
+    canvas_obj.restoreState()
 
     # ------------------------------------------------------------------ LOGO
     logo_x, logo_y = sidebar_w + 1.8 * cm, height - 4.2 * cm
@@ -316,24 +347,24 @@ def _draw_cover_page(canvas_obj, doc) -> None:
     # ------------------------------------------------------------- TÍTULO
     title_x = sidebar_w + 1.8 * cm
     canvas_obj.setFillColor(COVER_TITLE_DARK)
-    canvas_obj.setFont(FONT_HEADING_BLACK, 56)
+    canvas_obj.setFont(FONT_HEADING_BLACK, 45)
     canvas_obj.drawString(title_x, height - 10.8 * cm, "RELATÓRIO")
     canvas_obj.setFillColor(COVER_TITLE_GREEN)
-    canvas_obj.drawString(title_x, height - 12.6 * cm, "ESTATÍSTICO")
+    canvas_obj.drawString(title_x, height - 12.3 * cm, "ESTATÍSTICO")
 
     # Divisor
     canvas_obj.setFillColor(COVER_TITLE_GREEN)
-    canvas_obj.rect(title_x, height - 13.6 * cm, 5.5 * cm, 0.16 * cm, fill=1, stroke=0)
+    canvas_obj.rect(title_x, height - 13.1 * cm, 4.6 * cm, 0.14 * cm, fill=1, stroke=0)
 
     # Subtítulos dinâmicos
     subtitle_main = getattr(doc, "cover_design_label", "") or "Análise estatística experimental"
     subtitle_second = getattr(doc, "cover_type_label", "") or ""
     canvas_obj.setFillColor(COVER_SUB1)
-    canvas_obj.setFont(FONT_TEXT, 13)
-    canvas_obj.drawString(title_x, height - 14.5 * cm, subtitle_main)
+    canvas_obj.setFont(FONT_TEXT, 12)
+    canvas_obj.drawString(title_x, height - 13.9 * cm, subtitle_main)
     if subtitle_second:
         canvas_obj.setFillColor(COVER_SUB2)
-        canvas_obj.drawString(title_x, height - 15.2 * cm, subtitle_second)
+        canvas_obj.drawString(title_x, height - 14.55 * cm, subtitle_second)
 
     # ------------------------------------------------------- RODAPÉ / SELOS
     footer_h = 2.4 * cm
@@ -346,7 +377,7 @@ def _draw_cover_page(canvas_obj, doc) -> None:
     badges = (
         ("DADOS", "CONFIÁVEIS", _cover_icon_bars),
         ("ANÁLISES", "PRECISAS", _cover_icon_target),
-        ("DECISÕES", "INTELIGENTES", _cover_icon_leaf),
+        ("DECISÕES", "INTELIGENTES", _cover_icon_bulb),
     )
     zone_w = (width - sidebar_w) / len(badges)
     for i, (t1, t2, icon_fn) in enumerate(badges):
@@ -638,8 +669,31 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
     )
     caption = ParagraphStyle(
         "SolverCaption", parent=body_dim,
-        fontSize=8.2, leading=11.5, spaceBefore=7,
+        fontSize=8.2, leading=11.5, spaceBefore=7, alignment=TA_LEFT,
     )
+    cell_small = ParagraphStyle(
+        "SolverCellSmall", parent=body_dim,
+        fontSize=7.4, leading=9.5, spaceBefore=0, spaceAfter=0, alignment=TA_LEFT,
+    )
+    cell_ok = ParagraphStyle(
+        "SolverCellOk", parent=cell_small, textColor=SUCCESS, fontName=FONT_HEADING_BOLD,
+    )
+    cell_warn = ParagraphStyle(
+        "SolverCellWarn", parent=cell_small, textColor=WARNING, fontName=FONT_HEADING_BOLD,
+    )
+    cell_neutral = ParagraphStyle(
+        "SolverCellNeutral", parent=cell_small, textColor=NEUTRAL, fontName=FONT_HEADING_BOLD,
+    )
+
+    def _status_cell(raw_status: Any) -> Paragraph:
+        key = str(raw_status or "").strip().lower()
+        if key in ("atencao", "atenção", "violado", "warning", "alerta"):
+            st = cell_warn
+        elif key == "ok":
+            st = cell_ok
+        else:
+            st = cell_neutral
+        return Paragraph(escape(_status_label(raw_status)), st)
     tag = ParagraphStyle(
         "SolverTag", parent=body, fontName=FONT_HEADING_BOLD,
         fontSize=8.5, textColor=BRAND, leading=11, firstLineIndent=0, spaceBefore=0, spaceAfter=6,
@@ -723,6 +777,45 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         story.append(KeepTogether(means_block))
         story.append(Spacer(1, 0.35 * cm))
 
+    means_png = (result.get("means") or {}).get("plot_png_base64")
+    if means_png:
+        try:
+            _img_w = 15.0 * cm
+            _img_h = _img_w * 5.2 / 9.0
+            _fig = Image(io.BytesIO(base64.b64decode(means_png)), width=_img_w, height=_img_h)
+            story.append(KeepTogether([
+                section_heading("Gráfico de médias"),
+                _fig,
+                Paragraph(
+                    "Barras de erro = desvio-padrão. Letras iguais indicam tratamentos que não "
+                    "diferem pelo teste de médias escolhido.",
+                    caption,
+                ),
+            ]))
+            story.append(Spacer(1, 0.35 * cm))
+        except Exception:
+            # A ausência do gráfico nunca deve invalidar o laudo textual.
+            pass
+
+    interaction_png = (result.get("means") or {}).get("interaction_plot_base64")
+    if interaction_png:
+        try:
+            _iw = 15.0 * cm
+            _ih = _iw * 5.2 / 9.0
+            _ifig = Image(io.BytesIO(base64.b64decode(interaction_png)), width=_iw, height=_ih)
+            story.append(KeepTogether([
+                section_heading("Gráfico de interação"),
+                _ifig,
+                Paragraph(
+                    "Linhas paralelas sugerem ausência de interação; linhas que divergem ou se "
+                    "cruzam indicam interação entre os fatores.",
+                    caption,
+                ),
+            ]))
+            story.append(Spacer(1, 0.35 * cm))
+        except Exception:
+            pass
+
     comparison = (result.get("means") or {}).get("comparison") or {}
     comparison_rows = comparison.get("comparisons") or []
     if comparison_rows:
@@ -784,15 +877,15 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
         assumption_rows: List[List[Any]] = [["Pressuposto", "Teste", "Status", "Estatística", "p", "Interpretação"]]
         for key, item in tests.items():
             assumption_rows.append([
-                Paragraph(escape(str(key)), caption),
-                Paragraph(escape(str(item.get("teste", ""))), caption),
-                Paragraph(escape(_status_label(item.get("status"))), caption),
+                Paragraph(escape(str(key)), cell_small),
+                Paragraph(escape(str(item.get("teste", ""))), cell_small),
+                _status_cell(item.get("status")),
                 _fmt(item.get("statistic")),
                 _fmt(item.get("p_value")), Paragraph(escape(str(item.get("mensagem", ""))), caption),
             ])
         story.append(_styled_table(
             assumption_rows,
-            col_widths=[2.4 * cm, 2.7 * cm, 1.5 * cm, 1.7 * cm, 1.2 * cm, 6.5 * cm],
+            col_widths=[2.8 * cm, 2.7 * cm, 2.6 * cm, 1.4 * cm, 1.1 * cm, 5.4 * cm],
         ))
         transform = result.get("transformacao_sugerida")
         if transform:
@@ -831,6 +924,23 @@ def build_pdf(payload: Dict[str, Any]) -> bytes:
             ),
             caption,
         ))
+        reg_png = reg.get("plot_png_base64")
+        if reg_png:
+            try:
+                _rw = 15.0 * cm
+                _rh = _rw * 5.2 / 9.0
+                _rfig = Image(io.BytesIO(base64.b64decode(reg_png)), width=_rw, height=_rh)
+                story.append(KeepTogether([
+                    _rfig,
+                    Paragraph(
+                        "Curva ajustada às médias observadas; linha tracejada indica o ponto "
+                        "ótimo estimado.",
+                        caption,
+                    ),
+                ]))
+                story.append(Spacer(1, 0.35 * cm))
+            except Exception:
+                pass
 
     config = provenance.get("config") or {}
     trace_rows: List[List[Any]] = [["Campo", "Valor"]]
@@ -950,7 +1060,16 @@ def build_excel(payload: Dict[str, Any]) -> bytes:
         write_df("Configuracao", pd.DataFrame(config_rows, columns=["campo", "valor"]))
         write_df("Dados_Entrada", pd.DataFrame(payload.get("data") or []))
         write_df("ANOVA", pd.DataFrame(result.get("anova", {}).get("table", [])))
-        write_df("Medias", pd.DataFrame(result.get("means", {}).get("treatment_means", [])))
+        means_data = result.get("means", {}).get("treatment_means", [])
+        write_df("Medias", pd.DataFrame(means_data))
+        means_png_b64 = (result.get("means") or {}).get("plot_png_base64")
+        if means_png_b64:
+            try:
+                _img = XLImage(io.BytesIO(base64.b64decode(means_png_b64)))
+                _img.width, _img.height = 640, int(640 * 5.2 / 9)
+                writer.sheets["Medias"].add_image(_img, f"A{len(means_data) + 3}")
+            except Exception:
+                pass
 
         comparison = (result.get("means") or {}).get("comparison") or {}
         comparison_rows = []
@@ -986,6 +1105,14 @@ def build_excel(payload: Dict[str, Any]) -> bytes:
         write_df("Interacao", pd.DataFrame(interaction_rows, columns=[
             "factor", "fixed_level", "sub_factor", "test", "alpha", "treatment", "mean", "n", "group",
         ]))
+        interaction_png_b64 = (result.get("means") or {}).get("interaction_plot_base64")
+        if interaction_png_b64:
+            try:
+                _iimg = XLImage(io.BytesIO(base64.b64decode(interaction_png_b64)))
+                _iimg.width, _iimg.height = 640, int(640 * 5.2 / 9)
+                writer.sheets["Interacao"].add_image(_iimg, f"A{len(interaction_rows) + 3}")
+            except Exception:
+                pass
 
         assumption_rows = []
         assumption_detail_rows = []
@@ -1054,39 +1181,104 @@ def _apply_dark_theme(ax) -> None:
     ax.grid(True, color="#1F1F1F", alpha=1.0, linewidth=0.6)
 
 
+def build_means_plot(payload: Dict[str, Any], fmt: str = "png") -> bytes:
+    """Exporta o gráfico de barras das médias por tratamento em PNG ou PDF vetorial, em fundo
+    claro (harmonizado com o laudo) e com gradiente de cor por valor: verde nas maiores médias,
+    amarelo no meio e laranja nas menores."""
+    result = analyze(payload)
+    means = result.get("means") or {}
+    rows = means.get("treatment_means") or []
+    if not rows:
+        raise ValueError("Não há médias por tratamento disponíveis para exportar.")
+
+    from matplotlib.colors import LinearSegmentedColormap
+    _register_chart_fonts()
+
+    labels = [str(r.get("treatment")) for r in rows]
+    vals = [float(r.get("mean") or 0.0) for r in rows]
+    sds = [float(r.get("sd") or 0.0) for r in rows]
+    groups = [str(r.get("group") or "") for r in rows]
+    y_label = str((result.get("meta") or {}).get("response_column") or "Média")
+
+    cmap = LinearSegmentedColormap.from_list(
+        "solver_means", ["#E07B39", "#E3B23C", "#7FBF5A", "#2E8B4E"]
+    )
+    lo, hi = min(vals), max(vals)
+    span = (hi - lo) or 1.0
+    bar_colors = [cmap((v - lo) / span) for v in vals]
+
+    fig, ax = plt.subplots(figsize=(9, 5.2), dpi=200)
+    fig.patch.set_facecolor("#FFFFFF")
+    ax.set_facecolor("#FFFFFF")
+    ax.set_axisbelow(True)
+
+    x = list(range(len(labels)))
+    ax.bar(x, vals, color=bar_colors, edgecolor="#2F2F2F", linewidth=0.6, width=0.66, zorder=2)
+    ax.errorbar(x, vals, yerr=sds, fmt="none", ecolor="#5A5A5A", elinewidth=1.3, capsize=4, zorder=3)
+
+    top = max((v + s for v, s in zip(vals, sds)), default=1.0) or 1.0
+    for xi, v, s, g in zip(x, vals, sds, groups):
+        if g:
+            ax.text(xi, v + s + abs(top) * 0.03, g, ha="center", va="bottom",
+                    color="#222222", fontsize=11, fontweight="bold")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, color="#333333")
+    ax.set_ylabel(y_label, color="#333333")
+    ax.set_title("Médias por tratamento", color="#0F5132", pad=14, fontweight="bold", fontname=CHART_TITLE_FONT)
+    ax.tick_params(colors="#555555")
+    for spine in ax.spines.values():
+        spine.set_color("#D6DAD7")
+    ax.grid(True, axis="y", color="#E8EBE9")
+    ax.margins(y=0.16)
+
+    output = io.BytesIO()
+    fig.tight_layout()
+    fig.savefig(output, format=fmt, facecolor=fig.get_facecolor(), edgecolor="none")
+    plt.close(fig)
+    return output.getvalue()
+
+
 def build_regression_plot(payload: Dict[str, Any], fmt: str = "png") -> bytes:
-    """Exporta gráfico de regressão em PNG ou PDF vetorial no tema escuro."""
+    """Exporta gráfico de regressão em PNG ou PDF vetorial, em fundo claro (harmonizado com o
+    laudo) e com as fontes do documento."""
     result = analyze(payload)
     reg = result.get("regression")
     if not reg:
         raise ValueError("Não há regressão disponível para exportar.")
+    _register_chart_fonts()
     points = pd.DataFrame(reg["points"])
     curve = pd.DataFrame(reg["fitted_curve"])
     selected = reg["selected_model"]
 
     fig, ax = plt.subplots(figsize=(9, 5.2), dpi=200)
-    _apply_dark_theme(ax)
+    fig.patch.set_facecolor("#FFFFFF")
+    ax.set_facecolor("#FFFFFF")
+    ax.set_axisbelow(True)
 
-    ax.scatter(points["x"], points["y"], label="Observado", color="#22C55E", edgecolor="#0A0A0A", s=55, zorder=3)
+    ax.scatter(points["x"], points["y"], label="Observado", color="#3E9B52",
+               edgecolor="#FFFFFF", linewidth=0.7, s=55, zorder=3)
     ax.plot(
         curve["x"], curve["y"],
         label=f"Grau {reg['selected_degree']} · R²aj {selected['adj_r2']:.3f}",
-        color="#4ADE80", linewidth=2.4, zorder=2,
+        color="#1F7A3D", linewidth=2.4, zorder=2,
     )
-    ax.fill_between(curve["x"], curve["y"], curve["y"].min(), color="#22C55E", alpha=0.08, zorder=1)
+    ax.fill_between(curve["x"], curve["y"], curve["y"].min(), color="#3E9B52", alpha=0.10, zorder=1)
 
     opt = selected.get("optimum") or {}
     if opt.get("x") is not None:
-        ax.axvline(opt["x"], linestyle="--", linewidth=1.1, color="#F5A85B", alpha=0.7)
+        ax.axvline(opt["x"], linestyle="--", linewidth=1.1, color="#E07B39", alpha=0.8)
         ax.scatter([opt["x"]], [opt["y"]], marker="o", s=90, label="Ótimo",
-                   color="#F5A85B", edgecolor="#0A0A0A", linewidth=2, zorder=4)
+                   color="#E07B39", edgecolor="#FFFFFF", linewidth=1.5, zorder=4)
 
-    ax.set_xlabel(reg.get("x_label", "x"))
-    ax.set_ylabel(reg.get("y_label", "Resposta"))
-    ax.set_title("Regressão Solver", pad=14, fontweight="bold")
-    leg = ax.legend(facecolor="#121212", edgecolor="#262626", labelcolor="#F5F5F5", framealpha=1.0)
-    for text in leg.get_texts():
-        text.set_color("#F5F5F5")
+    ax.set_xlabel(reg.get("x_label", "x"), color="#333333")
+    ax.set_ylabel(reg.get("y_label", "Resposta"), color="#333333")
+    ax.set_title("Regressão ajustada", color="#0F5132", pad=14, fontweight="bold", fontname=CHART_TITLE_FONT)
+    ax.tick_params(colors="#555555")
+    for spine in ax.spines.values():
+        spine.set_color("#D6DAD7")
+    ax.grid(True, color="#E8EBE9")
+    ax.legend(facecolor="#FFFFFF", edgecolor="#D6DAD7", labelcolor="#333333")
 
     output = io.BytesIO()
     fig.tight_layout()

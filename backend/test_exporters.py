@@ -6,7 +6,7 @@ import pytest
 from openpyxl import load_workbook
 from pypdf import PdfReader
 
-from exporters import build_excel, build_pdf
+from exporters import build_excel, build_means_plot, build_pdf
 from test_statistics_engine import DBC_EXEMPLO
 
 
@@ -106,3 +106,76 @@ def test_excel_contem_planilhas_tecnicas_e_dados_de_entrada():
     assert "Gerado em UTC" not in metadata
     assert workbook["ANOVA"].auto_filter.ref
     assert workbook["Resumo"].sheet_view.showGridLines is False
+
+
+# ---------------------------------------------------------------------------
+# Gráfico de médias (ANOVA) — figura de barras com desvio-padrão e letras
+# ---------------------------------------------------------------------------
+def test_means_plot_embutido_na_analise_e_no_laudo():
+    import base64 as _b64
+    from statistics_engine import analyze
+
+    result = analyze(PAYLOAD)
+    b64 = (result.get("means") or {}).get("plot_png_base64")
+    assert b64, "a análise ANOVA deve produzir o gráfico de médias em base64"
+    raw = _b64.b64decode(b64)
+    assert raw[:8] == b"\x89PNG\r\n\x1a\n", "o gráfico de médias deve ser um PNG válido"
+    pdf = build_pdf(PAYLOAD)
+    assert pdf.startswith(b"%PDF") and len(pdf) > 10_000
+
+
+def test_build_means_plot_png_e_pdf_vetorial():
+    png = build_means_plot(PAYLOAD, "png")
+    assert png[:4] == b"\x89PNG"
+    pdf_vec = build_means_plot(PAYLOAD, "pdf")
+    assert pdf_vec[:5] == b"%PDF-"
+
+
+def test_excel_embute_grafico_de_medias():
+    import io as _io
+    from openpyxl import load_workbook
+
+    xlsx = build_excel(PAYLOAD)
+    assert xlsx[:2] == b"PK"
+    wb = load_workbook(_io.BytesIO(xlsx))
+    assert "Medias" in wb.sheetnames
+    assert len(wb["Medias"]._images) == 1, "a aba Medias deve embutir o gráfico de médias"
+
+
+# ---------------------------------------------------------------------------
+# Gráfico de interação (fatorial / split-plot)
+# ---------------------------------------------------------------------------
+def _fatorial_payload():
+    import json as _json
+    from pathlib import Path
+    data = _json.loads(
+        (Path(__file__).resolve().parents[1] / "frontend/assets/data/fatorial_exemplo.json").read_text()
+    )
+    return {
+        "design": "DBC", "analysis_type": "factorial", "goal": "max",
+        "response_column": "valor", "block_column": "bloco",
+        "factor_columns": ["hibrido", "dose"], "alpha": 0.05, "alpha_mode": "fixed",
+        "comparison_test": "tukey", "data": data,
+    }
+
+
+def test_interaction_plot_gerado_e_embutido():
+    import base64 as _b64, io as _io
+    from openpyxl import load_workbook
+    from statistics_engine import analyze
+
+    pay = _fatorial_payload()
+    r = analyze(pay)
+    ip = (r.get("means") or {}).get("interaction_plot_base64")
+    assert ip, "análise fatorial deve gerar o gráfico de interação"
+    assert _b64.b64decode(ip)[:8] == b"\x89PNG\r\n\x1a\n"
+
+    wb = load_workbook(_io.BytesIO(build_excel(pay)))
+    assert len(wb["Interacao"]._images) == 1, "aba Interacao deve embutir o gráfico"
+    assert build_pdf(pay).startswith(b"%PDF")
+
+
+def test_interaction_plot_ausente_em_fator_unico():
+    from statistics_engine import analyze
+    r = analyze(PAYLOAD)  # DBC de fator único
+    assert "interaction_plot_base64" not in (r.get("means") or {})

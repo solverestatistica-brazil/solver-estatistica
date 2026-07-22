@@ -2,7 +2,9 @@ name: Production health monitor
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    # A cada 10 min: além de monitorar, mantém a instância do Render aquecida
+    # (o plano free hiberna após ~15 min de inatividade, causando cold start).
+    - cron: "*/10 * * * *"
   workflow_dispatch:
 
 permissions:
