@@ -653,6 +653,7 @@ body.is-processing{overflow:hidden}
 @media (max-width:980px){
   .hero{grid-template-columns:repeat(2,1fr)}
   .hero-copy{grid-column:span 2;grid-row:span 1;padding:26px}
+  .viz-svg{flex:none;height:auto;aspect-ratio:340 / 130;min-height:0}
   .tile-viz,.tile-designs,.tile-tests,.tile-export{grid-column:span 1}
   .workspace,.data-actions{grid-template-columns:1fr}
   .format-grid,.export-grid{grid-template-columns:repeat(2,1fr)}
