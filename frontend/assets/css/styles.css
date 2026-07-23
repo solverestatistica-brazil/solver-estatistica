@@ -1,5 +1,5 @@
 /* Solver Estatística Experimental — v2 (bento / dark / emerald) */
-
+:root:not([data-theme=light]) .hero .tile,:root:not([data-theme=light]) .panel{background:rgba(18,48,36,.5);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 :root{
   color-scheme:dark;
   --canvas:#0C1A11;
