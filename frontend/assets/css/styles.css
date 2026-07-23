@@ -2,9 +2,9 @@
 
 :root{
   color-scheme:dark;
-  --canvas:#111C15;
-  --canvas-elevated:#18271D;
-  --canvas-elevated-2:#213328;
+  --canvas:#0C1A11;
+  --canvas-elevated:#123024;
+  --canvas-elevated-2:#1B3E2A;
   --surface:#F5F7F5;
   --surface-subtle:#F1F4F1;
   --surface-line:#E5E9E5;
@@ -32,14 +32,14 @@
   --accent:#F5A85B;
   --page-glow-brand:rgba(34,197,94,.10);
   --page-glow-accent:rgba(245,168,91,.05);
-  --nav-bg:rgba(18,18,18,.6);
+  --nav-bg:rgba(14,32,22,.6);
   --solid-foreground:#02150A;
   --interactive-tint:rgba(255,255,255,.05);
   --danger-foreground:#FCA5A5;
   --danger-border:rgba(239,68,68,.35);
   --danger-tint:rgba(239,68,68,.12);
-  --hero-gradient-start:#0F0F0F;
-  --hero-gradient-end:#0A0A0A;
+  --hero-gradient-start:#15311F;
+  --hero-gradient-end:#0C1A11;
   --chart-grid:rgba(255,255,255,.05);
   --table-hover:rgba(255,255,255,.02);
   --toast-shadow:rgba(0,0,0,.5);
